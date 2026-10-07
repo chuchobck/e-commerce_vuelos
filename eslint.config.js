@@ -105,6 +105,12 @@ export default tseslint.config(
     },
   },
   {
+    // Integración contra la API real (npm run test:api): corre en Node.
+    files: ['tests/**/*.ts'],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: { globals: globals.node },
+  },
+  {
     files: ['*.config.{js,ts}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: { globals: globals.node },

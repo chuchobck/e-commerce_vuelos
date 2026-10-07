@@ -4,8 +4,10 @@
  * - JSON con `Accept: application/json` y tiempo máximo de 45 s (el arranque en frío de Render
  *   puede tardar cerca de un minuto en la primera petición).
  * - Errores ProblemDetails → ApiError; red caída → NETWORK; tiempo agotado → TIMEOUT.
- * - Reintento: solo lecturas (`retry: true`), una vez, ante error de red o 503, esperando lo que
- *   diga Retry-After con un tope de 10 s. Las escrituras nunca se reintentan solas.
+ * - Reintento: solo lecturas (`retry: true`), una vez, ante error de red, tiempo agotado o 503,
+ *   esperando lo que diga Retry-After con un tope de 10 s. Las escrituras nunca se reintentan solas.
+ *   El tiempo agotado cuenta porque el arranque en frío de Render (~52 s medidos) supera los 45 s:
+ *   al reintentar, el servidor ya despertó.
  * - Si una petición tarda más de 3 s se marca como "servidor despertando" (ver activity.ts).
  */
 import { ApiError } from '../errors';
@@ -120,7 +122,8 @@ export function createHttpClient({
       try {
         return await attempt<T>(method, path, options);
       } catch (error) {
-        const retryable = error instanceof ApiError && (error.code === 'NETWORK' || error.status === 503);
+        const retryable =
+          error instanceof ApiError && (error.code === 'NETWORK' || error.code === 'TIMEOUT' || error.status === 503);
         if (!options.retry || !retryable) throw error;
         const waitS = Math.min(error.retryAfter ?? DEFAULT_RETRY_WAIT_S, MAX_RETRY_WAIT_S);
         await sleep(waitS * 1000);
