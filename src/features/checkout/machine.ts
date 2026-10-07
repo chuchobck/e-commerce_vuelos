@@ -22,7 +22,17 @@ export type CheckoutState =
   /** Creando el hold o verificando el guardado. */
   | { step: 'holding' }
   /** Hold activo. `passengersReady`: los datos de pasajeros están completos. */
-  | { step: 'held'; hold: Hold; passengersReady: boolean; passengerErrors: FieldError[] }
+  | {
+      step: 'held';
+      hold: Hold;
+      passengersReady: boolean;
+      passengerErrors: FieldError[];
+      /**
+       * Asiento ocupado (409 SEAT_TAKEN) o de otra cabina (422 SEAT_CABIN_MISMATCH) al reservar. La API no
+       * dice qué asiento falló: el selector lo averigua con un mapa nuevo. Se limpia al volver a continuar.
+       */
+      bookingError?: ApiError;
+    }
   | { step: 'paying'; hold: Hold }
   | { step: 'confirmed'; booking: Booking }
   /** 202: el pago o la emisión siguen en curso. `gaveUp`: se dejó de consultar (ver polling.ts). */
@@ -96,8 +106,11 @@ export function classifyPaymentError(error: unknown, hold: Hold): CheckoutState 
     // Hold ya usado (otra pestaña o un intento anterior que sí llegó) o inexistente.
     if (error.status === 409 && error.code === 'OFFER_NO_LONGER_AVAILABLE') return { step: 'expired', reason: 'consumed' };
     if (error.status === 422 && error.fieldErrors.some((e) => e.field === 'holdId')) return { step: 'expired', reason: 'missing' };
-    // Datos de pasajeros o asiento: se vuelve a los datos con los campos marcados.
-    if (error.code === 'SEAT_TAKEN' || error.code === 'SEAT_CABIN_MISMATCH' || error.code === 'INFANT_SEAT_NOT_ALLOWED') {
+    // Asientos: se vuelve a los datos y el selector revisa lo elegido contra un mapa nuevo (el hold sigue vivo).
+    if (error.code === 'SEAT_TAKEN' || error.code === 'SEAT_CABIN_MISMATCH') {
+      return { step: 'held', hold, passengersReady: false, passengerErrors: [], bookingError: error };
+    }
+    if (error.code === 'INFANT_SEAT_NOT_ALLOWED') {
       return { step: 'held', hold, passengersReady: false, passengerErrors: error.fieldErrors };
     }
     if ((error.status === 400 || error.status === 422) && error.fieldErrors.some(isPassengerField)) {
@@ -142,7 +155,10 @@ export function reduce(state: CheckoutState, event: CheckoutEvent): CheckoutStat
         ? { step: 'expired', reason: 'expired' }
         : state;
     case 'PASSENGERS':
-      return state.step === 'held' ? { ...state, passengersReady: event.ready, passengerErrors: [] } : state;
+      // Al continuar con los datos ya revisados, el error de asientos queda atendido.
+      return state.step === 'held'
+        ? { ...state, passengersReady: event.ready, passengerErrors: [], bookingError: event.ready ? undefined : state.bookingError }
+        : state;
     case 'PAY_START': {
       const hold = holdOf(state);
       const canPay = (state.step === 'held' && state.passengersReady) || state.step === 'rejected' || (state.step === 'error' && state.during === 'payment');
