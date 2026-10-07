@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LogIn } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { authErrorMessage, authFieldErrors, type User } from '@/shared/api';
 import { es } from '@/shared/i18n';
@@ -39,12 +39,19 @@ export function LoginForm({ idPrefix = 'login', onSuccess }: LoginFormProps) {
     shouldFocusError: true,
   });
 
-  // Evita el doble envío también con Enter mientras la petición sigue en curso.
+  // Evita el doble envío (también con Enter): el candado se toma en el evento de envío, antes de
+  // la validación asíncrona, y se suelta cuando termina todo el envío.
   const sending = useRef(false);
-
-  const onValid = async (values: LoginInput) => {
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (sending.current) return;
     sending.current = true;
+    void handleSubmit(onValid)(event).finally(() => {
+      sending.current = false;
+    });
+  };
+
+  const onValid = async (values: LoginInput) => {
     setSubmitError(null);
     try {
       // La contraseña va tal cual la escribió (el backend la normaliza igual que el formulario).
@@ -55,13 +62,11 @@ export function LoginForm({ idPrefix = 'login', onSuccess }: LoginFormProps) {
       if (fields.email) setError('email', { message: fields.email }, { shouldFocus: true });
       if (fields.password) setError('password', { message: fields.password }, { shouldFocus: !fields.email });
       if (!fields.email && !fields.password) setSubmitError(authErrorMessage(error, 'login'));
-    } finally {
-      sending.current = false;
     }
   };
 
   return (
-    <form noValidate onSubmit={handleSubmit(onValid)} className="flex flex-col gap-6">
+    <form noValidate onSubmit={onSubmit} className="flex flex-col gap-6">
       {submitError ? (
         <Alert variant="error" live="assertive">
           <p>{submitError}</p>

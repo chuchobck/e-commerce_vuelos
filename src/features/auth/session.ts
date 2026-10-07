@@ -50,6 +50,7 @@ export interface SessionDeps {
 export const REFRESH_SKEW_MS = 60_000;
 const LOCK_NAME = 'quinde-auth-refresh';
 const WAIT_FOR_OTHER_TAB_MS = 1_500;
+const WAIT_STEP_MS = 100;
 
 /** El registro funcionó pero el ingreso automático no: la cuenta existe y hay que ingresar a mano. */
 export class AccountCreatedError extends Error {
@@ -257,9 +258,9 @@ export class SessionManager {
    * vieja haría que la API revoque toda la sesión.
    */
   private async waitForReplacement(stale: string): Promise<string | null> {
-    const until = this.now() + WAIT_FOR_OTHER_TAB_MS;
-    while (this.now() < until) {
-      await this.sleep(100);
+    // Intentos contados (no por reloj): termina aunque el reloj del sistema no avance.
+    for (let attempt = 0; attempt < WAIT_FOR_OTHER_TAB_MS / WAIT_STEP_MS; attempt++) {
+      await this.sleep(WAIT_STEP_MS);
       const current = this.deps.store.read();
       if (current && current !== stale) return current;
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { es, fmt } from '@/shared/i18n';
-import { ApiError, errorMessage, fieldErrorMessage, NotYetConnectedError } from './errors';
+import { ApiError, authErrorMessage, authFieldErrors, errorMessage, fieldErrorMessage, NotYetConnectedError } from './errors';
 
 const e = es.errors;
 const err = (status: number, extra: Partial<ConstructorParameters<typeof ApiError>[0]> = {}) => new ApiError({ status, ...extra });
@@ -52,5 +52,34 @@ describe('errores por campo de la búsqueda (400 con invalidParams)', () => {
     expect(fieldErrorMessage({ field: 'itineraries[0].origin', message: 'must match' })).toBe(e.fields.airport);
     expect(fieldErrorMessage({ field: 'passengers.adults', message: 'adults must not be greater than 9' })).toBe(es.validation.maxPassengers);
     expect(fieldErrorMessage({ field: 'X-Device-Fingerprint', message: 'is required' })).toBe(e.fields.other);
+  });
+});
+
+describe('errores de cuenta (/auth/*)', () => {
+  it('401 al ingresar es genérico: no revela si el correo existe', () => {
+    expect(authErrorMessage(err(401, { code: 'VALIDATION_FAILED' }), 'login')).toBe(es.auth.invalidCredentials);
+  });
+  it('409 al registrar = correo ya registrado', () => {
+    expect(authErrorMessage(err(409, { code: 'VALIDATION_FAILED' }), 'register')).toBe(es.auth.emailTaken);
+  });
+  it('429 con el tiempo de espera de Retry-After', () => {
+    expect(authErrorMessage(err(429, { retryAfter: 42 }), 'login')).toBe(fmt(es.auth.tooManyAttempts, { seconds: 42 }));
+    expect(authErrorMessage(err(429), 'register')).toBe(es.auth.tooManyAttemptsNoTime);
+  });
+  it('servidor caído y red, con los mensajes generales', () => {
+    expect(authErrorMessage(err(503), 'login')).toBe(e.unavailable503);
+    expect(authErrorMessage(err(0, { code: 'NETWORK' }), 'login')).toBe(e.network);
+  });
+  it('400 por campo, en español', () => {
+    const bad = err(400, {
+      fieldErrors: [
+        { field: 'email', message: 'email must be an email' },
+        { field: 'password', message: 'password must be longer than or equal to 12 characters' },
+      ],
+    });
+    expect(authFieldErrors(bad)).toEqual({ email: es.validation.emailInvalid, password: es.validation.passwordLength });
+    expect(authFieldErrors(err(400, { fieldErrors: [{ field: 'password', message: 'password must be shorter than or equal to 128 characters' }] }))).toEqual({
+      password: es.validation.passwordMax,
+    });
   });
 });
