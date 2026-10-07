@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { BookingStatusBadge } from '@/features/bookings';
+import { BookingStatusBadge } from '@/features/trips';
 import { TripSummary } from '@/features/results';
 import { errorMessage, flightsApi, isApiError, type Booking } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
