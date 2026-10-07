@@ -54,7 +54,7 @@ export function CheckoutConfirmationPage() {
     content = (
       <>
         <Alert variant="success" title={fmt(p.confirmationCode, { code: data.code })}>
-          <p>{fmt(p.confirmationText, { email: data.contact.email })}</p>
+          <p>{fmt(p.confirmationText, { email: data.passengers[0]?.email ?? '' })}</p>
         </Alert>
         <div className="flex flex-wrap gap-4">
           <Button asChild>

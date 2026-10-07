@@ -32,12 +32,12 @@ export function HoldStatus({ state, expired, onExpire, onExtend, extending, onRe
   }
   const hold = state.data;
   if (!hold) return null;
-  if (expired || hold.status !== 'ACTIVE') {
+  if (expired || hold.status !== 'HELD') {
     return (
       <Alert variant="error" live="assertive" title={p.holdExpiredTitle} action={searchAgain}>
         <p>{p.holdExpiredText}</p>
       </Alert>
     );
   }
-  return <Timer expiresAt={hold.expiresAt} onExpire={onExpire} onExtend={() => onExtend(hold)} extending={extending} />;
+  return <Timer expiresAt={new Date(hold.receivedAt + hold.remainingSeconds * 1000).toISOString()} onExpire={onExpire} onExtend={() => onExtend(hold)} extending={extending} />;
 }

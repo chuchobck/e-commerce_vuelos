@@ -33,7 +33,7 @@ function createHoldOnce(selection: CheckoutSelection): Promise<Hold> {
   const key = selectionKey(selection);
   if (creating?.key !== key) {
     const promise = flightsApi
-      .createHold(holdRequest(selection.offerId, selection.outbound, selection.inbound, selection.passengers))
+      .createHold(holdRequest(selection.offerId, selection.outbound, selection.inbound, selection.passengers), crypto.randomUUID())
       .then((hold) => {
         setSelectionHold(hold.id);
         return hold;
@@ -65,9 +65,10 @@ export function useCheckoutHold(selection: CheckoutSelection | null, { create }:
 
   /** "Necesito más tiempo" (WCAG 2.2.1): hold nuevo con la misma selección; el anterior se libera. */
   const extend = async (previous: Hold) => {
+    if (!selection) return;
     setExtending(true);
     try {
-      const next = await flightsApi.createHold(holdRequest(previous.offerId, previous.outbound, previous.inbound, previous.passengers));
+      const next = await flightsApi.createHold(holdRequest(selection.offerId, selection.outbound, selection.inbound, selection.passengers), crypto.randomUUID());
       await flightsApi.cancelHold(previous.id).catch(() => undefined);
       setSelectionHold(next.id);
       state.setState({ status: 'success', data: next, error: undefined });
@@ -85,7 +86,7 @@ export function useCheckoutHold(selection: CheckoutSelection | null, { create }:
     state,
     hold,
     /** Hay hold y sigue vigente. */
-    active: !!hold && hold.status === 'ACTIVE' && !expired,
+    active: !!hold && hold.status === 'HELD' && !expired,
     statusProps: {
       state,
       expired,

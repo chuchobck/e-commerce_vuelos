@@ -73,9 +73,9 @@ export function CheckoutPaymentPage() {
       )}
 
       <CheckoutSummary
-        outbound={hold?.outbound ?? selection.outbound}
-        inbound={hold?.inbound ?? selection.inbound}
-        total={hold?.totalPrice ?? selectionTotal(selection)}
+        outbound={selection.outbound}
+        inbound={selection.inbound}
+        total={hold?.lockedPrice ?? selectionTotal(selection)}
         held={active}
       />
 

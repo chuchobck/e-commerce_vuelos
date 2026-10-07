@@ -56,7 +56,7 @@ export function TripsPage() {
                   </h2>
                   <p className="text-muted">
                     {formatLongDate(first.departureTime)} · {formatTime(first.departureTime)} ·{' '}
-                    {fmt(t.passengersCount, { count: bk.passengers.length })} · {formatMoney(bk.totalPaid)}
+                    {fmt(t.passengersCount, { count: bk.passengers.length })} · {formatMoney(bk.total)}
                   </p>
                   <div>
                     <BookingStatusBadge status={bk.status} />

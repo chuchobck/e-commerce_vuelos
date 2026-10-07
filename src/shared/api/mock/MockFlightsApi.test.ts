@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiError } from '../errors';
 import type { MockFlightsApi } from './MockFlightsApi';
+import { demoBookingId } from './seed';
 
 /**
  * Mock sin errores aleatorios y con base de datos nueva en memoria. El token de acceso lo pone
@@ -27,7 +28,7 @@ async function failure(promise: Promise<unknown>) {
 const DEMO = { email: 'demo@quinde.ec', password: 'quinde-demo-2026' };
 const PASSWORD = 'una frase larga de prueba';
 // Reserva de demostración a 21 días: fuera de la ventana de check-in.
-const LATER_BOOKING = 'bkg_qg4p9x';
+const LATER_BOOKING = demoBookingId('QG4P9X');
 
 describe('cuenta del mock (mismas reglas y errores que /auth/* de la API)', () => {
   beforeEach(() => {

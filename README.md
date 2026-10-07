@@ -252,6 +252,35 @@ Verificado con curl y `npm run test:api` contra el **backend local** (en Render 
 - **Límites por IP:** ingreso 5 por minuto (los fallidos cuentan), registro 10 cada 10 minutos, renovación 30 por minuto. El 429 trae `Retry-After` (60 s medidos en el ingreso) y la pantalla dice cuánto esperar.
 - Las rutas públicas ignoran un `Authorization` inválido, pero el frontend igual **no envía el token** en ellas.
 
+### Lo que aprendimos de hold y reserva (F4a)
+
+Verificado contra el **backend local** el 2026-10-07 (en Render no se crean holds ni reservas):
+
+| Caso | Respuesta real |
+|---|---|
+| `POST /offers/hold` | 201 `HoldResponse` (`HELD`, `expiresAt`, `ttlMinutes: 15`, `lockedPrice` con `baseFare` y `taxes`) |
+| Misma `Idempotency-Key` y mismo cuerpo | 201 con **el mismo hold** y la cabecera `Idempotent-Replayed: true` (la respuesta original, aunque haya pasado tiempo) |
+| Misma clave, cuerpo distinto | 422 `VALIDATION_FAILED`, `invalidParams: Idempotency-Key` |
+| Sin `Idempotency-Key` (o no es UUID) | 400 `VALIDATION_FAILED` |
+| Oferta inexistente o vencida, tarifa sin cupo | 409 `OFFER_NO_LONGER_AVAILABLE` |
+| `GET /offers/hold/{id}` | 200 `HoldStatusResponse` con `remainingSeconds` (calculado por el servidor). No repite el `holdId`. Ajeno o inexistente: 404 |
+| `DELETE` de un hold vivo, vencido o ya liberado | 204 (liberar dos veces no es error) |
+| `DELETE` de un hold usado en una reserva | **409** (fuera del contrato) |
+| `POST /bookings` con `PAY-OK-…` | 201 `CONFIRMED` con un boleto `ISSUED` por pasajero y número de 13 dígitos |
+| Con `PAY-PEND-…` | 202 `PENDING_PAYMENT`, boletos `PENDING`; a los ~20 s `GET /bookings/{id}` ya da `CONFIRMED` (el proceso de emisión corre cada 30 s) |
+| Con `PAY-REJ-…` | 422 `PAYMENT_NOT_AUTHORIZED`; **el hold sigue `HELD`** con el mismo tiempo: se puede pagar otra vez |
+| Referencia que no es `PAY-(OK\|PEND\|REJ)-…` | 422 `PAYMENT_REFERENCE_INVALID` |
+| Referencia ya usada en otra reserva | 409 `PAYMENT_REFERENCE_INVALID` (cada intento de pago necesita una referencia nueva) |
+| Reserva repetida con la misma clave y cuerpo | 201 con **la misma reserva** e `Idempotent-Replayed: true` |
+| Hold ya usado, con otra clave | 409 `OFFER_NO_LONGER_AVAILABLE` |
+| Hold vencido o liberado | 410 `OFFER_NO_LONGER_AVAILABLE` |
+| Hold inexistente o ajeno | 422 `VALIDATION_FAILED` (`invalidParams: holdId`), no 404 |
+| Límites por IP | 30 holds y **10 reservas por minuto** (además del global de 100); el 429 trae `Retry-After` |
+
+- La reserva devuelve la familia vendida **sin precios por tipo** (`pricePerPassengerType: []`) y el `grandTotal` congelado del hold; los pasajeros vuelven con su documento y contacto.
+- Reglas del pasajero (las del DTO del backend): nombre con letras, espacios, `'`, `.` y `-` (hasta 60); documento de 5 a 20 letras o dígitos; cédula ecuatoriana con módulo 10; pasaporte con vencimiento obligatorio y posterior al último vuelo; nacionalidad ISO alfa-2; teléfono de 7 a 15 dígitos con `+` opcional; **edad el día del primer vuelo: infante < 2, niño 2–11, joven 12–17, adulto ≥ 18**; cada infante va con un adulto distinto (`associatedAdultId`).
+- **Reloj:** durante la prueba el reloj de este equipo iba ~5 minutos adelantado al del backend. Por eso el temporizador nunca compara `expiresAt` con la hora local: usa `remainingSeconds` (o `ttlMinutes` al crear) contado desde que llegó la respuesta, y se vuelve a sincronizar con `GET` del hold.
+
 ### Modelo de seguridad de la sesión
 
 | Qué | Dónde | Por qué |

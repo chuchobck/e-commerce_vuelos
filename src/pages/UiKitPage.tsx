@@ -160,7 +160,7 @@ export function UiKitPage() {
       <Block title={k.badges}>
         <div className="flex flex-wrap gap-4">
           <Badge tone="success">{es.trip.status.CONFIRMED}</Badge>
-          <Badge tone="info">{es.trip.status.CHECKED_IN}</Badge>
+          <Badge tone="info">{es.trip.status.PENDING_PAYMENT}</Badge>
           <Badge tone="warning">{es.status.states.DELAYED}</Badge>
           <Badge tone="error">{es.trip.status.CANCELLED}</Badge>
           <Badge tone="neutral">{es.status.states.SCHEDULED}</Badge>

@@ -1,4 +1,5 @@
-import type { Booking, Hold, User } from '../types';
+import type { BookingDetailDto, HoldRequestDto, MoneyDto } from '../contract';
+import type { HoldStatus, User } from '../types';
 
 /** Base de datos simulada persistida en localStorage (solo para el mock). */
 export interface StoredUser extends User {
@@ -17,18 +18,51 @@ export interface StoredRefreshToken {
   revoked: boolean;
 }
 
+/** Hold del mock: el pedido original (forma del contrato) y su estado. */
+export interface StoredHold {
+  id: string;
+  ownerId: string;
+  status: HoldStatus;
+  createdAt: string;
+  expiresAt: string;
+  request: HoldRequestDto;
+  lockedPrice: MoneyDto;
+}
+
+/** Reserva del mock: el BookingDetail del contrato más lo que la API guarda aparte. */
+export interface StoredBooking {
+  dto: BookingDetailDto;
+  ownerId: string;
+  /** Pago pendiente: cuándo lo confirma el "proceso de emisión". */
+  issueAfter?: string;
+  /** Check-in hecho (solo el mock: la API lo sabe por sus pases; se conecta en F6). */
+  checkedIn: boolean;
+}
+
+/** Idempotency-Key usada: por usuario y operación, con la huella del cuerpo. */
+export interface StoredIdempotencyKey {
+  scope: 'hold' | 'booking';
+  ownerId: string;
+  key: string;
+  bodyHash: string;
+  resultId: string;
+}
+
 export interface MockDb {
   version: number;
   /** Día (yyyy-MM-dd) en que se generaron las reservas de demostración. */
   seededOn: string;
   users: StoredUser[];
   refreshTokens: StoredRefreshToken[];
-  holds: Hold[];
-  bookings: Booking[];
+  holds: StoredHold[];
+  bookings: StoredBooking[];
+  idempotency: StoredIdempotencyKey[];
+  /** Referencias de pago ya usadas (la API rechaza reusarlas con 409). */
+  paymentReferences: string[];
 }
 
 const KEY = 'quinde.mock.db';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 let memory: MockDb | null = null;
 
