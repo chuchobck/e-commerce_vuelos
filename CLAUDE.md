@@ -51,6 +51,25 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - Un componente por archivo. Al quitar o reemplazar algo, borrar todo lo que quede sin uso
   (textos, exportaciones, componentes, assets).
 
+## Cuenta y sesión (desde F3)
+
+- `/auth/*` no está en `vuelos-openapi.yaml`: sus tipos salen de `contracts/backend-openapi.json`
+  (`/api/docs-json` del backend) → `generated/backend.ts`. Las reglas de correo y contraseña son las
+  de los DTO del backend (`shared/lib/credentials.ts`); no se inventan reglas propias.
+- Toda la sesión vive en `features/auth` (`SessionManager` + `AuthProvider`/`useAuth`). Las páginas
+  usan `useAuth()`; las llamadas con sesión van envueltas en `authorized(() => flightsApi.…())`.
+- Access token solo en memoria; refresh token en `sessionStorage` (o `localStorage` con "Mantener mi
+  sesión iniciada"). Nunca cookies propias, el token en la URL ni en logs. El cliente HTTP solo envía
+  Bearer en llamadas `auth: true`; las rutas públicas van sin token.
+- Una sola renovación a la vez (promesa compartida + Web Locks + BroadcastChannel). Nunca llamar a
+  `api.refresh` fuera de `SessionManager`: un refresh token rotado que se reusa revoca la sesión.
+- El vencimiento se calcula con `expires_in` (relativo), no con el `exp` del JWT: un reloj desfasado
+  no debe provocar renovaciones en bucle.
+- El frontend nunca envía un rol. La cuenta es solo correo y contraseña; Mi perfil es de solo lectura.
+- `npm run test:api` crea usuarios `@example.test` **solo contra el backend local**; nunca contra
+  Render ni con la cuenta de administrador sembrada. Esperar un minuto entre corridas (ingreso 5/min).
+- Modelo de seguridad y contrapartida XSS: sección 6 del README. F8 debe agregar una CSP estricta.
+
 ## Accesibilidad: WCAG 2.2 AA
 
 HTML semántico, un solo `h1` por página, "Saltar al contenido", foco siempre visible y nunca tapado,
@@ -68,7 +87,8 @@ Se valida al salir del campo y al enviar, sin borrar lo escrito. Si el contrato 
 ## Reglas de la API que no se negocian
 
 Check-in por `bookingId`, solo dueño con sesión, ventana de 48 h a 60 min antes de la salida
-(`shared/lib/checkin.ts`). Reserva ajena = 404. Hold de 15 minutos. Detalle en la sección 6 del README.
+(`shared/lib/checkin.ts`). Reserva ajena = 404. Hold de 15 minutos. Refresh token de un solo uso.
+Detalle en la sección 6 del README.
 
 ## Flujo Git
 

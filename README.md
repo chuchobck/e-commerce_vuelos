@@ -14,17 +14,18 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 
 ---
 
-## 1. Estado actual (2026-10-06, cierre de F2)
+## 1. Estado actual (2026-10-07, cierre de F3)
 
-- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 y 2. 155 archivos en `src`, unas 11.600 líneas de TypeScript (sin contar los tipos generados).
-- 196 pruebas en verde con `npm run test` y 9 de integración contra la API real con `npm run test:api` (local y Render); lint, typecheck y build sin errores.
-- **Dos modos sin mezclas** (sección 2): mock completo, o API real para lo público. Con la API real ya funcionan **búsqueda, resultados, "Escápate" y estado de vuelo**; el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
-- Las formas de datos salen del contrato (`contracts/vuelos-openapi.yaml` → tipos generados) y el mock produce exactamente esa forma: reproduce la red, horarios y precios de la API al centavo.
-- Cuenta, compra y postventa siguen en el mock; con la API real muestran "se conecta en una fase posterior" (F3, F4 y F6).
-- Navegación (sección 4): menú por momento del viajero, rutas centralizadas en `src/app/routes.ts`, rutas protegidas con `RequireAuth` y redirecciones desde las rutas viejas.
-- Compra: los 3 pasos tienen pantalla, indicador, resumen y temporizador; la selección del paso 1 sobrevive a ingresar y a refrescar. Faltan el formulario de pasajeros, el asiento y el pago (F4).
-- Mis viajes: lista, detalle con estado del vuelo, check-in por viaje (ventana 48 h / 60 min) y cancelación. Pases, equipaje y cambio de fecha son pantallas de espera (F6).
-- Ofertas y Mi perfil son pantallas iniciales (F7 y F3).
+- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 3. 171 archivos en `src`, unas 13.300 líneas de TypeScript (sin contar los tipos generados).
+- 260 pruebas en verde con `npm run test` y 17 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta, solo contra el backend local). Lint, typecheck y build sin errores.
+- **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, "Escápate", estado de vuelo y la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
+- Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para `/auth/*`, `contracts/backend-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
+- **Sesión** (sección 6, "Modelo de seguridad de la sesión"): access token solo en memoria, renovación única entre pestañas, cierre de sesión que se propaga a las demás pestañas, restauración al recargar sin parpadeo.
+- Compra y postventa siguen en el mock; con la API real muestran "se conecta en una fase posterior" (F4 y F6). El bloque de cuenta del paso 2 ya usa la sesión real.
+- Navegación (sección 4): menú por momento del viajero, rutas centralizadas en `src/app/routes.ts`, rutas protegidas con `RequireAuth` (espera a que la sesión se restaure y conserva `?volver=`).
+- Compra: los 3 pasos tienen pantalla, indicador, resumen y temporizador; la selección del paso 1 sobrevive a ingresar, a refrescar y a un cierre de sesión por seguridad. Faltan el formulario de pasajeros, el asiento y el pago (F4).
+- Mis viajes: lista, detalle con estado del vuelo, check-in por viaje (ventana 48 h / 60 min) y cancelación (mock). Pases, equipaje y cambio de fecha son pantallas de espera (F6).
+- Ofertas es una pantalla inicial (F7). Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
 
 > Regla de mantenimiento: al cerrar cada fase se actualiza esta sección y las columnas "Estado" de las tablas. Si este README y el código no coinciden, se corrige el README en el mismo commit.
 
@@ -48,12 +49,12 @@ npm run dev               # http://localhost:5173
 | `npm run typecheck` | Revisión de tipos |
 | `npm run lint` | ESLint: accesibilidad (jsx-a11y) y reglas de arquitectura de la sección 3 |
 | `npm run api:types` | Regenera los tipos del contrato en `src/shared/api/generated/` |
-| `npm run test:api` | Integración contra la API real (búsqueda, asientos, estado y errores validados contra el contrato con Ajv). No es parte de `npm run test` |
+| `npm run test:api` | Integración contra la API real: búsqueda, asientos, estado y errores validados contra el contrato con Ajv y, **solo con un backend local**, la cuenta (crea un usuario `@example.test`). No es parte de `npm run test` |
 
 ### Contrato y tipos generados
 
-- `contracts/vuelos-openapi.yaml` es una copia del contrato del backend; su origen y fecha están en `contracts/PROCEDENCIA.md`.
-- `npm run api:types` genera `src/shared/api/generated/vuelos.ts` con `openapi-typescript`. Ese archivo **se versiona** y no se edita a mano: es el único lugar que define las formas del contrato.
+- `contracts/vuelos-openapi.yaml` es una copia del contrato del backend; su origen y fecha están en `contracts/PROCEDENCIA.md`. Ese contrato no describe `/auth/*`: para la cuenta se usa `contracts/backend-openapi.json`, el documento que el backend publica en `/api/docs-json` (mismo `PROCEDENCIA.md`).
+- `npm run api:types` genera `src/shared/api/generated/vuelos.ts` y `generated/backend.ts` con `openapi-typescript`. Ese archivo **se versiona** y no se edita a mano: es el único lugar que define las formas del contrato.
 - Si el contrato cambia: descargar el YAML nuevo, actualizar `PROCEDENCIA.md`, correr `npm run api:types` y después `npm run typecheck`. El mock está tipado contra esos tipos, así que cualquier diferencia hace fallar la compilación hasta que se corrija.
 
 ### Variables de entorno
@@ -62,7 +63,7 @@ Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
 
 - **`VITE_API_URL`** elige el modo, sin mezclas:
   - **Vacía → mock completo.** Todo funciona sin backend y se ven las pistas "Para probar".
-  - **Con valor → API real.** Búsqueda, mapa de asientos y estado de vuelo van a la API; cuenta, compra y postventa muestran "se conecta en una fase posterior" hasta F3, F4 y F6. Las pistas "Para probar" no se ven.
+  - **Con valor → API real.** Búsqueda, mapa de asientos, estado de vuelo y cuenta van a la API; compra y postventa muestran "se conecta en una fase posterior" hasta F4 y F6. Las pistas "Para probar" (incluida la cuenta demo del mock) no se ven.
 - **`VITE_LAST_FLIGHT_DATE`**: último día con salidas de la semilla del backend (la semilla genera 90 días desde su carga y esa ventana es fija). El buscador no deja elegir fechas posteriores; vacía = hoy + 89 días.
 - **`VITE_MOCK_ERROR_RATE`**: frecuencia de errores simulados. Solo afecta al mock; sirve para diseñar los estados de error.
 
@@ -70,8 +71,8 @@ Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
 
 | Backend | URL | Para qué |
 |---|---|---|
-| Local (recomendado en desarrollo) | `http://localhost:3010/flights/v1` | Navegador y `npm run test:api`. El backend debe tener `CORS_ORIGINS=http://localhost:5173`. Con el backend en WSL, desde Windows funciona `localhost` (no `127.0.0.1`). |
-| Render | `https://quinde-vuelos-api.onrender.com/flights/v1` | Solo verificación de lectura con `npm run test:api` (corre en Node, no necesita CORS). Su CORS no incluye `localhost`. Duerme tras 15 min: la primera petición tarda cerca de un minuto. |
+| Local (recomendado en desarrollo) | `http://localhost:3010/flights/v1` | Navegador y `npm run test:api` (incluida la cuenta). El backend debe tener `CORS_ORIGINS=http://localhost:5173`. Con el backend en WSL, desde Windows funciona `localhost` (no `127.0.0.1`). |
+| Render | `https://quinde-vuelos-api.onrender.com/flights/v1` | Solo verificación de lectura con `npm run test:api` (corre en Node, no necesita CORS); la suite de cuenta se omite sola porque escribe. **No se crean usuarios en Render.** Su CORS no incluye `localhost`. Duerme tras 15 min: la primera petición tarda cerca de un minuto. |
 
 `npm run test:api` toma la URL de `API_TEST_URL` o, si no está, de `VITE_API_URL` del `.env`. Ejemplo contra Render: `API_TEST_URL=https://quinde-vuelos-api.onrender.com/flights/v1 npm run test:api`.
 
@@ -87,9 +88,9 @@ src/
 ├─ app/
 │  ├─ routes.ts               tabla única de rutas (paths, routes.trip(id), returnTo, redirecciones)
 │  ├─ routeTable.tsx          qué página atiende cada ruta; router.tsx la monta
-│  ├─ RequireAuth.tsx         rutas con sesión (manda a /ingresar?volver=…)
-│  ├─ providers/              tema y sesión del usuario
-│  └─ layout/                 header, menú móvil, footer, plantilla de página, página de error
+│  ├─ RequireAuth.tsx         rutas con sesión (espera la restauración; manda a /ingresar?volver=…)
+│  ├─ providers/              tema
+│  └─ layout/                 header, menú móvil, footer, avisos de sesión, plantilla de página, página de error
 ├─ pages/                     una página por ruta; solo arma piezas, sin lógica de negocio
 ├─ features/                  una carpeta por módulo; cada uno expone solo lo de su index.ts
 │  ├─ home/  search/  results/
@@ -122,7 +123,7 @@ Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `np
 | `home` | Inicio y "Escápate" (precios reales con caché de 10 min) | Hecho (mock y API real) |
 | `search` | Buscador (solo pares con vuelos y fechas dentro de la ventana) | Hecho (mock y API real) |
 | `results` | Resultados y familias tarifarias reales | Hecho (mock y API real) |
-| `auth` | Validaciones de ingreso y registro (la sesión y `RequireAuth` viven en `app/`) | Parcial (mock) |
+| `auth` | Sesión (`SessionManager`: tokens, renovación, pestañas), `AuthProvider`/`useAuth`, formularios de ingreso y registro (`RequireAuth` vive en `app/`) | Hecho (mock y API real) |
 | `checkout` | Compra en 3 pasos: selección, hold, cuenta, resumen | Parcial (faltan pasajeros y pago) |
 | `seats` | Mapa de asientos (avión) | Planificado (carpeta creada) |
 | `trips` | Mis viajes y detalle del viaje | Parcial (mock) |
@@ -148,7 +149,7 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo**. A la de
 | `/` | Inicio con buscador | Público | `POST /search` | Hecho (mock y API real) |
 | `/resultados` | Vuelos y tarifas (paso 1) | Público | `POST /search` | Hecho (mock y API real) |
 | `/ofertas` | Precios más bajos por destino | Público | `POST /search` | Pantalla de espera (F7) |
-| `/compra/datos` | Cuenta y pasajeros (paso 2) | Sesión dentro del paso | hold, `/auth/*`, mapa de asientos | Parcial: cuenta, hold, temporizador y resumen; pasajeros en F4 |
+| `/compra/datos` | Cuenta y pasajeros (paso 2) | Sesión dentro del paso | hold, `/auth/*`, mapa de asientos | Parcial: cuenta con la sesión real; hold, temporizador y resumen en el mock; pasajeros en F4 |
 | `/compra/pago` | Pago (paso 3) | Sesión dentro del paso | `POST /bookings` | Parcial: resumen y temporizador; pago en F4 |
 | `/compra/confirmacion/:id` | Compra lista | Sesión | `GET /bookings/{id}` | Hecho (mock); se llega a ella en F4 |
 | `/mis-viajes` | Lista de viajes | Sesión | `GET /bookings` | Hecho (mock) |
@@ -159,8 +160,8 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo**. A la de
 | `/mis-viajes/:id/cambiar-fecha` | Cambio de fecha | Sesión | `date-change` | Pantalla de espera (F6) |
 | `/mis-viajes/:id/cancelar` | Cancelación | Sesión | `cancellation-quote`, `cancel` | Parcial (sin cotización) |
 | `/estado-vuelo` | Estado de un vuelo | Público | `GET /flights/{n}/status` | Hecho (mock y API real) |
-| `/ingresar`, `/registrarse` | Cuenta (vuelven a `?volver=`) | Público | `/auth/*` | Hecho (mock) |
-| `/perfil` | Mis datos | Sesión | `GET /auth/me` | Parcial: muestra la sesión actual |
+| `/ingresar`, `/registrarse` | Cuenta (vuelven a `?volver=`) | Público | `POST /auth/login`, `POST /auth/register` | Hecho (mock y API real) |
+| `/perfil` | Mis datos (solo lectura) y cerrar sesión | Sesión | `GET /auth/me`, `POST /auth/logout` | Hecho (mock y API real) |
 | `/ayuda` | Ayuda y textos legales | Público | Ninguna | Hecho |
 | `/componentes` | Catálogo interno | Solo desarrollo (404 en producción) | Ninguna | Hecho |
 
@@ -184,7 +185,7 @@ Reglas del flujo:
 
 - **El ingreso ocurre dentro del paso 2**, no antes. Buscar y comparar es público; la cuenta se pide recién cuando hay algo que apartar.
 - Ingresar o registrarse **nunca pierde la selección** del paso 1: al terminar, el usuario sigue en el mismo vuelo y tarifa.
-- Con sesión iniciada, el bloque de cuenta se reduce a "Compras como María" y el paso 2 empieza en pasajeros. El indicador siempre muestra 3 pasos.
+- Con sesión iniciada, el bloque de cuenta se reduce a "Compras como ana@correo.ec" (la cuenta solo tiene correo) y el paso 2 empieza en pasajeros. El indicador siempre muestra 3 pasos.
 - Los datos de la cuenta se precargan en el primer pasajero. No se pide dos veces el mismo dato.
 - El registro dentro de la compra pide lo mínimo.
 - El asiento es opcional. Si no se elige, se asigna solo.
@@ -200,7 +201,7 @@ Pago simulado: la pantalla lo dice de forma visible. Los datos de tarjeta no sal
 ## 6. Reglas de la API que el frontend respeta
 
 - **Rutas públicas:** búsqueda, mapa de asientos y estado de vuelo. Todo lo demás exige sesión.
-- **Sesión:** token de acceso de 15 minutos y token de renovación de 7 días que rota en cada uso. Reutilizar un token de renovación viejo cierra todas las sesiones, así que la renovación se hace una sola vez a la vez, nunca en paralelo.
+- **Sesión:** token de acceso de 15 minutos y token de renovación de 7 días que rota en cada uso. Reutilizar un token de renovación viejo cierra la sesión (toda su familia de tokens), así que la renovación se hace una sola vez a la vez, nunca en paralelo, ni siquiera entre pestañas.
 - **Hold:** dura 15 minutos y aparta cupo real. Si el usuario abandona la compra, se libera.
 - **Reservas:** solo las ve su dueño. Una reserva ajena responde 404.
 - **Pago simulado por prefijo de la referencia:** `PAY-OK-` aprobado (201), `PAY-PEND-` pendiente (202), `PAY-REJ-` rechazado (422).
@@ -235,6 +236,36 @@ Diferencias con el contrato encontradas en esta fase (además de las de `docs/DI
 | Horas `date-time` sin zona definida | Siempre UTC (4.10 del backend) |
 
 Las respuestas de búsqueda, mapa de asientos, estado de vuelo y los ProblemDetails de 400 y 404 **cumplen los esquemas del contrato** (Ajv, local y Render).
+
+### Lo que aprendimos de `/auth/*` (F3)
+
+Verificado con curl y `npm run test:api` contra el **backend local** (en Render no se crean usuarios):
+
+- **El registro no inicia sesión.** `POST /auth/register` responde 201 con el usuario y **sin tokens**; el frontend ingresa justo después con `POST /auth/login`. Si ese ingreso falla (por ejemplo, un 429), la cuenta ya existe y la pantalla lo dice así, sin anunciar que el registro falló.
+- **La cuenta es solo correo y contraseña.** No hay nombre, teléfono ni documento, y no hay endpoint para editar: Mi perfil es de solo lectura (`GET /auth/me`: correo, fecha de alta, roles y permisos).
+- **El rol lo decide el backend:** todo registro queda como `cliente`. El frontend nunca envía un rol.
+- **Reglas de los datos** (las mismas que los DTO del backend, en `shared/lib/credentials.ts`): el correo se recorta, se normaliza (NFC) y va en minúsculas, máximo 254 caracteres, con dominio y TLD, sin IP, sin nombre visible, sin caracteres de control, invisibles ni etiquetas HTML. La contraseña tiene de 12 a 128 caracteres medidos tras NFKC, **sin recortar** y sin reglas de composición (una frase sirve).
+- **Tokens:** el access token es un JWT (`expires_in` 900); el refresh token es opaco (43 caracteres base64url). Los campos van en snake_case (`access_token`, `refresh_token`, `expires_in`).
+- **Rotación:** cada `POST /auth/refresh` devuelve un refresh token nuevo y el anterior deja de servir. Reusar el anterior responde **401** (`code: VALIDATION_FAILED`, "The refresh token is invalid or expired") **y revoca toda la familia**: el token vigente también deja de servir.
+- **`POST /auth/logout` exige Bearer** además del `refresh_token` en el cuerpo; responde 204 y revoca ese refresh token.
+- **Errores:** credenciales incorrectas = 401 genérico (no dice si el correo existe); correo ya registrado = **409 con `code: VALIDATION_FAILED`** (no hay un código propio); datos inválidos = 400.
+- **Límites por IP:** ingreso 5 por minuto (los fallidos cuentan), registro 10 cada 10 minutos, renovación 30 por minuto. El 429 trae `Retry-After` (60 s medidos en el ingreso) y la pantalla dice cuánto esperar.
+- Las rutas públicas ignoran un `Authorization` inválido, pero el frontend igual **no envía el token** en ellas.
+
+### Modelo de seguridad de la sesión
+
+| Qué | Dónde | Por qué |
+|---|---|---|
+| Access token | **Solo en memoria** (`SessionManager`) | No queda en ningún almacén que un script pueda leer más tarde. Nunca en cookies propias, en la URL ni en logs. |
+| Refresh token | `sessionStorage` por defecto; `localStorage` solo con "Mantener mi sesión iniciada" | Recargar la página no cierra la sesión. Sin la casilla, cerrar la pestaña la termina. |
+| Huellas de tokens ya rotados | `localStorage` (`quinde.auth.rotated`, hash FNV-1a, nunca el token) | Una pestaña duplicada con una copia vieja en su `sessionStorage` no la envía (evita que la API lo tome por un robo). |
+| Tokens nuevos tras renovar | `BroadcastChannel` entre pestañas del mismo origen | Las demás pestañas adoptan el token rotado en vez de renovar otra vez. |
+
+- **Una sola renovación a la vez:** una promesa compartida dentro de la pestaña y Web Locks (`quinde-auth-refresh`) entre pestañas; con el candado tomado se vuelve a leer el almacén por si otra pestaña ya renovó. Sin Web Locks se usa un candado local.
+- **Proactiva y reactiva:** se renueva poco antes de vencer (con el `expires_in` relativo, para que un reloj desfasado no provoque renovaciones en bucle) y, ante un 401, se renueva una vez y se reintenta la petición una vez; un segundo 401 cierra la sesión.
+- **Si la renovación es rechazada** (401/403): se borra todo, se avisa "Tu sesión se cerró por seguridad. Ingresa de nuevo." y se va a `/ingresar?volver=…`. La selección de compra no se pierde.
+- **Cerrar sesión** llama a `POST /auth/logout`, borra los tokens y avisa a las demás pestañas; si la llamada falla, la sesión se cierra igual en el navegador.
+- **Contrapartida aceptada:** un script inyectado (XSS) podría leer el refresh token de `sessionStorage`/`localStorage` mientras la página está abierta. Lo mitigan React (no se inserta HTML sin escapar), la ausencia de `dangerouslySetInnerHTML` y que no se cargan scripts de terceros. **F8 debe agregar una Content-Security-Policy estricta** al publicar (`script-src 'self'`, `connect-src` limitado a la API, sin `unsafe-inline`). Una cookie `HttpOnly` sería mejor, pero la API no la ofrece.
 
 ### Aeropuertos y rutas (verificado contra la API el 2026-10-07)
 
@@ -288,7 +319,8 @@ Hay rutas de un solo sentido por los horarios de conexión (por ejemplo CUE→GP
 | Nombres y apellidos | Letras, tildes, espacios, apóstrofe y guion; 2 a 40 caracteres |
 | Cédula | 10 dígitos con verificación de módulo 10 |
 | Pasaporte | Alfanumérico, 6 a 12 caracteres |
-| Correo | Formato válido, máximo 100 caracteres |
+| Correo | Como el backend: se recorta, NFC y minúsculas; máximo 254 caracteres, con dominio y TLD, sin IP, nombre visible, caracteres de control, invisibles ni etiquetas HTML |
+| Contraseña | 12 a 128 caracteres medidos tras NFKC, sin recortar y sin reglas de composición; se puede pegar y mostrar |
 | Teléfono | +593 y 9 dígitos |
 | Fecha de nacimiento | Coherente con el tipo de pasajero (adulto, niño de 2 a 11, infante menor de 2) |
 | Tarjeta (simulada) | Luhn, vencimiento futuro, CVV de 3 o 4 dígitos |
@@ -301,8 +333,8 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 
 ## 8. Pruebas
 
-- **Hoy:** 196 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth`, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché y componentes de resultados y estado de vuelo.
-- **Integración:** `npm run test:api` contra la API real (local o Render), con las respuestas validadas contra el contrato.
+- **Hoy:** 260 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429).
+- **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 por minuto).
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
 - Al cerrar cada fase: lint, typecheck, build, pruebas, recorrido solo con teclado, 320 px, zoom al 200 % y modo oscuro.
 
@@ -315,8 +347,8 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 | F0 | Fundación: diseño, layout, rutas, mock, inicio | Hecha |
 | F1 | Orden: repositorio git, navegación y rutas nuevas, limpieza | Hecha (tag `fase-1`) |
 | F2 | Contrato: tipos generados desde el OpenAPI, `FlightsApi` alineada, API real en lo público (búsqueda, asientos, estado) | Hecha (tag `fase-2`) |
-| F3 | Cuenta: ingreso, registro, renovación de sesión y rutas protegidas contra la API real | Siguiente |
-| F4 | Compra en 3 pasos completa | Pendiente |
+| F3 | Cuenta: ingreso, registro, renovación de sesión y rutas protegidas contra la API real | Hecha (tag `fase-3`) |
+| F4 | Compra en 3 pasos completa | Siguiente |
 | F5 | Mapa de asientos en forma de avión | Pendiente |
 | F6 | Mis viajes: detalle, check-in, pases, equipaje, cambio de fecha, cancelación | Pendiente |
 | F7 | Ofertas y pulido del inicio | Pendiente |
