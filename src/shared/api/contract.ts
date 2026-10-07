@@ -2,6 +2,7 @@
  * Formas del contrato (generadas desde contracts/vuelos-openapi.yaml con `npm run api:types`).
  * Este archivo solo les pone nombre: nunca se redefinen a mano.
  */
+import type { components as backend } from './generated/backend';
 import type { components } from './generated/vuelos';
 
 type Schemas = components['schemas'];
@@ -25,6 +26,17 @@ export type CabinClass = CabinPricingDto['cabinClass'];
 export type FlightStatusCode = FlightStatusDto['status'];
 /** Códigos de error que puede traer un ProblemDetails. */
 export type ProblemCode = ProblemDetailsDto['code'];
+
+/**
+ * Cuenta (/auth/*). No está en el contrato del equipo: los tipos se generan del OpenAPI que publica
+ * el backend (`GET /api/docs-json` del backend local → contracts/backend-openapi.json → generated/backend.ts).
+ */
+type BackendSchemas = backend['schemas'];
+export type RegisterRequestDto = BackendSchemas['RegistroDto'];
+export type LoginRequestDto = BackendSchemas['LoginDto'];
+export type RefreshRequestDto = BackendSchemas['RefrescoDto'];
+export type TokenResponseDto = BackendSchemas['TokenRespuestaDto'];
+export type UserResponseDto = BackendSchemas['UsuarioRespuestaDto'];
 
 /**
  * Tipos de pasajero que devuelve la API en `pricePerPassengerType` (el contrato los deja como

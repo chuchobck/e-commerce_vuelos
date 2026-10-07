@@ -49,11 +49,53 @@ describe('cliente HTTP', () => {
     expect(init.headers).toMatchObject({ Accept: 'application/json', 'Content-Type': 'application/json' });
   });
 
-  it('inyecta el token de acceso cuando existe (punto preparado para F3)', async () => {
-    const { http, fetchImpl } = client([json(200, {})], { getAccessToken: () => 'tok123' });
-    await http.request('GET', '/bookings');
-    const init = (fetchImpl.mock.calls[0] as unknown as [URL, RequestInit])[1];
-    expect(init.headers).toMatchObject({ Authorization: 'Bearer tok123' });
+  it('envía el token de acceso SOLO en peticiones con sesión (auth: true)', async () => {
+    const { http, fetchImpl } = client([json(200, {}), json(200, {})], { getAccessToken: () => 'tok123' });
+    await http.request('GET', '/auth/me', { auth: true });
+    await http.request('POST', '/search', { body: {} });
+    const headersOf = (i: number) => (fetchImpl.mock.calls[i] as unknown as [URL, RequestInit])[1].headers as Record<string, string>;
+    expect(headersOf(0)).toMatchObject({ Authorization: 'Bearer tok123' });
+    // Las rutas públicas nunca llevan token.
+    expect(headersOf(1).Authorization).toBeUndefined();
+  });
+
+  describe('deduplicación de lecturas en vuelo', () => {
+    it('dos lecturas idénticas simultáneas = una sola petición y la misma respuesta', async () => {
+      const { http, fetchImpl } = client([json(200, { n: 1 })]);
+      const [a, b] = await Promise.all([
+        http.request('GET', '/x', { query: { q: '1' }, retry: true }),
+        http.request('GET', '/x', { query: { q: '1' }, retry: true }),
+      ]);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(a).toEqual({ n: 1 });
+      expect(b).toBe(a);
+    });
+
+    it('al terminar, la siguiente lectura vuelve a ir a la red', async () => {
+      const { http, fetchImpl } = client([json(200, {}), json(200, {})]);
+      await http.request('GET', '/x', { retry: true });
+      await http.request('GET', '/x', { retry: true });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    it('cuerpos distintos o escrituras no se deduplican', async () => {
+      const { http, fetchImpl } = client([json(200, {}), json(200, {}), json(200, {}), json(200, {})]);
+      await Promise.all([
+        http.request('POST', '/search', { body: { a: 1 }, retry: true }),
+        http.request('POST', '/search', { body: { a: 2 }, retry: true }),
+        http.request('POST', '/auth/login', { body: { a: 1 } }),
+        http.request('POST', '/auth/login', { body: { a: 1 } }),
+      ]);
+      expect(fetchImpl).toHaveBeenCalledTimes(4);
+    });
+
+    it('un error también se comparte y libera la clave', async () => {
+      const { http, fetchImpl } = client([json(404, { status: 404 }), json(200, { ok: 1 })]);
+      const results = await Promise.allSettled([http.request('GET', '/x', { retry: true }), http.request('GET', '/x', { retry: true })]);
+      expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected']);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      await expect(http.request('GET', '/x', { retry: true })).resolves.toEqual({ ok: 1 });
+    });
   });
 
   it('convierte un ProblemDetails en ApiError con código, detalle y errores de campo', async () => {

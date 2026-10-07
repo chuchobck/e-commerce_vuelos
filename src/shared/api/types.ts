@@ -226,34 +226,31 @@ export interface CheckInResult {
   boardingPasses: BoardingPass[];
 }
 
+/**
+ * Usuario de GET /auth/me. La API no guarda nombre, documento ni teléfono: la cuenta es solo
+ * correo y contraseña; los datos de quien viaja se piden por pasajero en la compra (F4).
+ */
 export interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  documentType: DocumentType;
-  documentNumber: string;
-  phone: string;
-  birthDate?: string;
+  /** Los decide el backend (p. ej. "cliente"); el frontend nunca envía un rol. */
+  roles: string[];
+  scopes: string[];
+  createdAt: string;
 }
 
-export interface AuthSession {
-  token: string;
-  user: User;
-  expiresAt: string;
-}
-
-export interface LoginRequest {
+export interface Credentials {
   email: string;
   password: string;
 }
 
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  documentType: DocumentType;
-  documentNumber: string;
-  phone: string;
+/** Respuesta de /auth/login y /auth/refresh. */
+export interface AuthTokens {
+  /** JWT de 15 minutos: solo en memoria. */
+  accessToken: string;
+  /** Token opaco de 7 días; se rota en cada uso. */
+  refreshToken: string;
+  /** Segundos de vida del token de acceso. */
+  expiresIn: number;
+  scope: string;
 }

@@ -1,18 +1,18 @@
 import type {
-  AuthSession,
+  AuthTokens,
   BoardingPass,
   Booking,
   CheckInRequest,
   CheckInResult,
   CreateBookingRequest,
   CreateHoldRequest,
+  Credentials,
   FlightStatus,
   Hold,
-  LoginRequest,
-  RegisterRequest,
   SearchParams,
   SearchResult,
   SeatMap,
+  User,
 } from './types';
 
 /**
@@ -22,6 +22,9 @@ import type {
  * Las operaciones públicas (search, getSeatMap, getFlightStatus) reciben y devuelven tipos que
  * derivan del contrato (./contract.ts → ./mapping.ts): las dos implementaciones producen la forma
  * del contrato y la mapean con las mismas funciones.
+ *
+ * Sesión: las operaciones con sesión NO reciben el token; cada implementación lo toma del proveedor
+ * de token de acceso (./authBridge.ts), que registra el módulo de sesión (features/auth).
  *
  * Errores: toda implementación lanza `ApiError` (./errors.ts).
  */
@@ -33,7 +36,20 @@ export interface FlightsApi {
   /** GET /flights/{flightNumber}/status?date=yyyy-MM-dd (fecha local de salida). */
   getFlightStatus(flightNumber: string, date: string): Promise<FlightStatus>;
 
-  /* Desde aquí: solo en el mock hasta F3 (sesión), F4 (hold y reserva) y F6 (postventa). */
+  /* Cuenta (F3). */
+
+  /** POST /auth/register. Devuelve el usuario, NO tokens: después hay que ingresar. 409 si el correo existe. */
+  register(credentials: Credentials): Promise<User>;
+  /** POST /auth/login. 401 genérico (correo o contraseña incorrectos). */
+  login(credentials: Credentials): Promise<AuthTokens>;
+  /** POST /auth/refresh. Rota el refresh token; reusar uno ya rotado revoca la sesión (401). */
+  refresh(refreshToken: string): Promise<AuthTokens>;
+  /** POST /auth/logout (con sesión). Revoca la familia del refresh token. */
+  logout(refreshToken: string): Promise<void>;
+  /** GET /auth/me (con sesión). */
+  me(): Promise<User>;
+
+  /* Desde aquí: solo en el mock hasta F4 (hold y reserva) y F6 (postventa). */
 
   /** Bloquea temporalmente precio y cupo. 409 si la tarifa ya no está disponible. */
   createHold(request: CreateHoldRequest): Promise<Hold>;
@@ -41,16 +57,14 @@ export interface FlightsApi {
   cancelHold(holdId: string): Promise<void>;
 
   /** Convierte un hold en reserva pagada. 422 si los datos no son válidos, 409 si el hold expiró. */
-  createBooking(request: CreateBookingRequest, token?: string): Promise<Booking>;
+  createBooking(request: CreateBookingRequest): Promise<Booking>;
   /** Reservas del usuario autenticado. 401 sin sesión. */
-  listBookings(token: string): Promise<Booking[]>;
+  listBookings(): Promise<Booking[]>;
   getBooking(bookingIdOrCode: string): Promise<Booking>;
-  cancelBooking(bookingId: string, token?: string): Promise<Booking>;
+  cancelBooking(bookingId: string): Promise<Booking>;
 
   /** Check-in de todos los pasajeros. 401 sin sesión, 404 si la reserva no es del usuario, 409 fuera de la ventana. */
-  checkIn(request: CheckInRequest, token?: string): Promise<CheckInResult>;
-  getBoardingPasses(bookingId: string, token?: string): Promise<BoardingPass[]>;
+  checkIn(request: CheckInRequest): Promise<CheckInResult>;
+  getBoardingPasses(bookingId: string): Promise<BoardingPass[]>;
 
-  login(request: LoginRequest): Promise<AuthSession>;
-  register(request: RegisterRequest): Promise<AuthSession>;
 }

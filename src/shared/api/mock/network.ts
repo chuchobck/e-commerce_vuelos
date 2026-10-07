@@ -74,6 +74,9 @@ export const MOCK_OPERATIONS = [
   'getFlightStatus',
   'login',
   'register',
+  'refresh',
+  'logout',
+  'me',
 ] as const;
 
 export const SIMULATED_STATUSES: SimulatedStatus[] = [409, 422, 429, 503];

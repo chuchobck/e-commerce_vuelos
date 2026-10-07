@@ -1,11 +1,10 @@
 import { ChevronRight, Search, Ticket } from 'lucide-react';
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
 import { BookingStatusBadge } from '@/features/trips';
-import { flightsApi, isApiError } from '@/shared/api';
+import { flightsApi } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { formatLongDate, formatTime, formatMoney } from '@/shared/lib/format';
 import { useAsync } from '@/shared/lib/useAsync';
@@ -15,14 +14,10 @@ const t = es.trips;
 
 /** Lista de viajes del usuario. La ruta exige sesión (RequireAuth). */
 export function TripsPage() {
-  const { session, logout } = useAuth();
-  const token = session?.token;
-  const trips = useAsync(() => (token ? flightsApi.listBookings(token) : Promise.resolve([])), [token]);
-
-  // Sesión vencida en el servidor: se cierra localmente y RequireAuth pide ingresar de nuevo.
-  useEffect(() => {
-    if (trips.status === 'error' && isApiError(trips.error) && trips.error.status === 401) logout();
-  }, [trips.status, trips.error, logout]);
+  // Con sesión: si el token venció se renueva solo; si la sesión no se puede renovar, el módulo de
+  // sesión la cierra y RequireAuth pide ingresar de nuevo.
+  const { authorized } = useAuth();
+  const trips = useAsync(() => authorized(() => flightsApi.listBookings()), []);
 
   let content;
   if (trips.status === 'loading' || trips.status === 'idle') {

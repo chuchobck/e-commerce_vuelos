@@ -64,15 +64,32 @@ describe('phoneField', () => {
   });
 });
 
-describe('emailField y passwordField', () => {
-  it('valida correo', () => {
-    expect(emailField.safeParse('ana@correo.ec').success).toBe(true);
+describe('emailField y passwordField (idénticos al backend: credenciales.dto.ts y correo.decorator.ts)', () => {
+  it('correo: normaliza como el backend (recorta y minúsculas)', () => {
+    expect(emailField.parse('  Ana@Correo.EC ')).toBe('ana@correo.ec');
     expect(firstError(emailField.safeParse('ana@'))).toBe(v.emailInvalid);
+    expect(firstError(emailField.safeParse('   '))).toBe(v.required);
   });
-  it('contraseña solo exige longitud (sin reglas de composición)', () => {
-    expect(passwordField.safeParse('abcdefgh').success).toBe(true);
-    expect(firstError(passwordField.safeParse('corta'))).toBe(v.passwordLength);
-    expect(firstError(passwordField.safeParse('x'.repeat(65)))).toBe(v.passwordMax);
+  it('correo: rechaza lo que el backend rechaza', () => {
+    expect(firstError(emailField.safeParse('ana@correo'))).toBe(v.emailInvalid); // require_tld
+    expect(firstError(emailField.safeParse('ana@[127.0.0.1]'))).toBe(v.emailInvalid); // allow_ip_domain: false
+    expect(firstError(emailField.safeParse('Ana <ana@correo.ec>'))).toBe(v.emailInvalid); // sin display name
+    expect(firstError(emailField.safeParse(`an${String.fromCodePoint(0x200b)}a@correo.ec`))).toBe(v.emailInvalid); // invisible
+    expect(firstError(emailField.safeParse(`${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(63)}.ec`))).toBe(v.emailLength);
+  });
+  it('contraseña: 12 a 128 caracteres y nada más (sin reglas de composición)', () => {
+    expect(passwordField.safeParse('una frase larga').success).toBe(true);
+    expect(passwordField.safeParse('x'.repeat(12)).success).toBe(true);
+    expect(passwordField.safeParse('x'.repeat(128)).success).toBe(true);
+    expect(firstError(passwordField.safeParse('x'.repeat(11)))).toBe(v.passwordLength);
+    expect(firstError(passwordField.safeParse('x'.repeat(129)))).toBe(v.passwordMax);
+    expect(firstError(passwordField.safeParse(''))).toBe(v.required);
+  });
+  it('contraseña: no recorta espacios y mide tras NFKC, como el backend', () => {
+    // 11 letras + 1 espacio al borde = 12: vale (el backend no recorta).
+    expect(passwordField.parse('abcdefghijk ')).toBe('abcdefghijk ');
+    // "ﬁ" (U+FB01) pasa a "fi" en NFKC: 6 × "ﬁ" = 12 caracteres para el backend.
+    expect(passwordField.safeParse('ﬁ'.repeat(6)).success).toBe(true);
   });
 });
 

@@ -9,12 +9,15 @@
  *   El tiempo agotado cuenta porque el arranque en frío de Render (~52 s medidos) supera los 45 s:
  *   al reintentar, el servidor ya despertó.
  * - Si una petición tarda más de 3 s se marca como "servidor despertando" (ver activity.ts).
+ * - Deduplicación: dos lecturas idénticas (`retry: true`, mismo método, URL, cuerpo y token) que
+ *   coinciden en vuelo comparten la misma promesa. Así el doble montaje de StrictMode o un doble
+ *   clic hacen una sola petición. Las escrituras nunca se deduplican.
  */
 import { ApiError } from '../errors';
 import { serverActivity } from './activity';
 import { problemToApiError } from './problem';
 
-export const REQUEST_TIMEOUT_MS = 45_000;
+const REQUEST_TIMEOUT_MS = 45_000;
 export const SLOW_AFTER_MS = 3_000;
 export const MAX_RETRY_WAIT_S = 10;
 const DEFAULT_RETRY_WAIT_S = 1;
@@ -27,11 +30,13 @@ export interface RequestOptions {
   retry?: boolean;
   /** No cuenta para el aviso de "servidor despertando" (p. ej. el ping de salud). */
   silent?: boolean;
+  /** Petición con sesión: lleva Authorization: Bearer. Las rutas públicas nunca llevan token. */
+  auth?: boolean;
 }
 
 export interface HttpClientOptions {
   baseUrl: string;
-  /** Punto de inyección del token de acceso (se conecta en F3). */
+  /** Token de acceso vigente; solo se envía en peticiones con `auth: true`. */
   getAccessToken?: () => string | undefined;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
@@ -64,8 +69,10 @@ export function createHttpClient({
 
     const headers: Record<string, string> = { Accept: 'application/json', ...options.headers };
     if (options.body !== undefined) headers['Content-Type'] = 'application/json';
-    const token = getAccessToken?.();
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (options.auth) {
+      const token = getAccessToken?.();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -117,18 +124,36 @@ export function createHttpClient({
     };
   }
 
+  async function withRetry<T>(method: string, path: string, options: RequestOptions): Promise<T> {
+    try {
+      return await attempt<T>(method, path, options);
+    } catch (error) {
+      const retryable =
+        error instanceof ApiError && (error.code === 'NETWORK' || error.code === 'TIMEOUT' || error.status === 503);
+      if (!options.retry || !retryable) throw error;
+      const waitS = Math.min(error.retryAfter ?? DEFAULT_RETRY_WAIT_S, MAX_RETRY_WAIT_S);
+      await sleep(waitS * 1000);
+      return attempt<T>(method, path, options);
+    }
+  }
+
+  const inflight = new Map<string, Promise<unknown>>();
+
   return {
-    async request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
-      try {
-        return await attempt<T>(method, path, options);
-      } catch (error) {
-        const retryable =
-          error instanceof ApiError && (error.code === 'NETWORK' || error.code === 'TIMEOUT' || error.status === 503);
-        if (!options.retry || !retryable) throw error;
-        const waitS = Math.min(error.retryAfter ?? DEFAULT_RETRY_WAIT_S, MAX_RETRY_WAIT_S);
-        await sleep(waitS * 1000);
-        return attempt<T>(method, path, options);
-      }
+    request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+      if (!options.retry) return withRetry<T>(method, path, options);
+      const key = JSON.stringify([
+        method,
+        path,
+        options.query ?? null,
+        options.body ?? null,
+        options.auth ? (getAccessToken?.() ?? null) : null,
+      ]);
+      const pending = inflight.get(key);
+      if (pending) return pending as Promise<T>;
+      const promise = withRetry<T>(method, path, options).finally(() => inflight.delete(key));
+      inflight.set(key, promise);
+      return promise;
     },
   };
 }

@@ -1,27 +1,37 @@
 import { es } from '@/shared/i18n';
 import { checkInWindow } from '@/shared/lib/checkin';
+import { isValidEmail, normalizeEmail, normalizePassword, passwordLengthIssue } from '@/shared/lib/credentials';
 import { addMoney } from '@/shared/lib/money';
 import type { FlightsApi } from '../FlightsApi';
 import { ApiError } from '../errors';
 import { mapFlightStatus, mapOffer, mapSearchResponse, toAirportLocalIso, toSearchRequest } from '../mapping';
 import type {
-  AuthSession,
+  AuthTokens,
   BoardingPass,
   Booking,
   CheckInRequest,
   CheckInResult,
   CreateBookingRequest,
   CreateHoldRequest,
+  Credentials,
   FlightStatus,
   Hold,
-  LoginRequest,
-  RegisterRequest,
   SearchParams,
   SearchResult,
   SeatMap,
   SelectedLeg,
   User,
 } from '../types';
+import {
+  ACCESS_TOKEN_SECONDS,
+  badRequest,
+  CLIENT_SCOPES,
+  issueAccessToken,
+  newRefreshToken,
+  REFRESH_TOKEN_SECONDS,
+  unauthorized,
+  userIdFromAccessToken,
+} from './auth';
 import { HOLD_MINUTES } from './data/fares';
 import { mockFlightStatus, mockOfferFromId, mockSearch, mockSeatMap } from './generators';
 import { simulate } from './network';
@@ -29,14 +39,11 @@ import { randomCode, randomId, seeded } from './random';
 import { refreshSeed, seedDb } from './seed';
 import { hashPassword, loadDb, saveDb, type MockDb, type StoredUser } from './store';
 
-const SESSION_HOURS = 12;
-
-function publicUser({ passwordHash: _hash, ...user }: StoredUser): User {
+function publicUser({ passwordHash: _hash, active: _active, ...user }: StoredUser): User {
   return user;
 }
 
 const notFound = (detail: string) => new ApiError({ status: 404, code: 'VALIDATION_FAILED', detail });
-const unauthorized = () => new ApiError({ status: 401, code: 'VALIDATION_FAILED', detail: 'Invalid session' });
 const conflict = (detail: string) => new ApiError({ status: 409, code: 'CONFLICT', detail });
 
 /**
@@ -45,6 +52,9 @@ const conflict = (detail: string) => new ApiError({ status: 409, code: 'CONFLICT
  * y pasan por el mismo mapeo que la API real. Latencia 300–800 ms y errores ocasionales.
  */
 export class MockFlightsApi implements FlightsApi {
+  /** El token de acceso lo pone la sesión (features/auth), igual que en la API real. */
+  constructor(private readonly getAccessToken: () => string | undefined = () => undefined) {}
+
   private get db(): MockDb {
     return loadDb(seedDb, refreshSeed);
   }
@@ -55,11 +65,17 @@ export class MockFlightsApi implements FlightsApi {
     saveDb(db);
   }
 
-  private userFromToken(token: string | undefined): StoredUser | null {
-    if (!token) return null;
-    const session = this.db.sessions.find((s) => s.token === token);
-    if (!session || new Date(session.expiresAt).getTime() < Date.now()) return null;
-    return this.db.users.find((u) => u.id === session.user.id) ?? null;
+/** Usuario del token de acceso vigente, o null (sin sesión, vencido o cuenta inactiva). */
+  private currentUser(): StoredUser | null {
+    const id = userIdFromAccessToken(this.getAccessToken());
+    return this.db.users.find((u) => u.id === id && u.active) ?? null;
+  }
+
+  /** Como la API: sin token válido, 401. */
+  private requireUser(): StoredUser {
+    const user = this.currentUser();
+    if (!user) throw unauthorized('The access token is invalid');
+    return user;
   }
 
   private refreshHoldStatus(hold: Hold): Hold {
@@ -127,7 +143,7 @@ export class MockFlightsApi implements FlightsApi {
     });
   }
 
-  async createBooking(request: CreateBookingRequest, token?: string): Promise<Booking> {
+  async createBooking(request: CreateBookingRequest): Promise<Booking> {
     await simulate('createBooking', [409, 422, 503]);
     const hold = this.db.holds.find((h) => h.id === request.holdId);
     if (!hold) throw notFound('Hold not found');
@@ -139,7 +155,7 @@ export class MockFlightsApi implements FlightsApi {
       throw new ApiError({ status: 422, code: 'VALIDATION_FAILED', detail: 'Wrong number of passengers' });
     }
 
-    const user = this.userFromToken(token);
+    const user = this.currentUser();
     const segment = hold.outbound.itinerary.segments[0];
     const seatMap = mockSeatMap(hold.offerId, segment.id);
     const free = (seatMap.cabins ?? [])
@@ -178,10 +194,9 @@ export class MockFlightsApi implements FlightsApi {
     return booking;
   }
 
-  async listBookings(token: string): Promise<Booking[]> {
+  async listBookings(): Promise<Booking[]> {
     await simulate('listBookings', [503]);
-    const user = this.userFromToken(token);
-    if (!user) throw unauthorized();
+    const user = this.requireUser();
     const departure = (b: Booking) => new Date(b.outbound.itinerary.segments[0].departureTime).getTime();
     return this.db.bookings.filter((b) => b.userId === user.id).sort((a, b) => departure(a) - departure(b));
   }
@@ -194,13 +209,13 @@ export class MockFlightsApi implements FlightsApi {
     return structuredClone(found);
   }
 
-  async cancelBooking(bookingId: string, token?: string): Promise<Booking> {
+  async cancelBooking(bookingId: string): Promise<Booking> {
     await simulate('cancelBooking', [409, 503]);
     const found = this.db.bookings.find((b) => b.id === bookingId);
     if (!found) throw notFound('Booking not found');
     if (found.userId) {
-      const user = this.userFromToken(token);
-      if (!user || user.id !== found.userId) throw unauthorized();
+      const user = this.requireUser();
+      if (user.id !== found.userId) throw notFound('Booking not found');
     }
     if (found.status === 'CANCELLED') throw new ApiError({ status: 409, code: 'ALREADY_CANCELLED', detail: 'Already cancelled' });
     this.commit(() => {
@@ -210,9 +225,8 @@ export class MockFlightsApi implements FlightsApi {
   }
 
   /** Reserva del usuario de la sesión. Como la API: sin sesión 401; ajena o inexistente 404. */
-  private ownedBooking(bookingId: string, token: string | undefined): Booking {
-    const user = this.userFromToken(token);
-    if (!user) throw unauthorized();
+  private ownedBooking(bookingId: string): Booking {
+    const user = this.requireUser();
     const found = this.db.bookings.find((b) => b.id === bookingId && b.userId === user.id);
     if (!found) throw notFound('Booking not found');
     return found;
@@ -242,9 +256,9 @@ export class MockFlightsApi implements FlightsApi {
       }));
   }
 
-  async checkIn(request: CheckInRequest, token?: string): Promise<CheckInResult> {
+  async checkIn(request: CheckInRequest): Promise<CheckInResult> {
     await simulate('checkIn', [409, 503]);
-    const booking = this.ownedBooking(request.bookingId, token);
+    const booking = this.ownedBooking(request.bookingId);
     if (booking.status === 'CANCELLED') throw conflict('Booking cancelled');
     const checkin = checkInWindow(booking.outbound.itinerary.segments[0].departureTime);
     if (checkin.status !== 'open') {
@@ -259,45 +273,105 @@ export class MockFlightsApi implements FlightsApi {
     return { booking: structuredClone(booking), boardingPasses: this.buildBoardingPasses(booking) };
   }
 
-  async getBoardingPasses(bookingId: string, token?: string): Promise<BoardingPass[]> {
+  async getBoardingPasses(bookingId: string): Promise<BoardingPass[]> {
     await simulate('getBoardingPasses', [503]);
-    const booking = this.ownedBooking(bookingId, token);
+    const booking = this.ownedBooking(bookingId);
     if (booking.status !== 'CHECKED_IN') throw new ApiError({ status: 409, code: 'BOARDING_PASS_NOT_AVAILABLE', detail: 'Not checked in' });
     return this.buildBoardingPasses(booking);
   }
 
-  async login(request: LoginRequest): Promise<AuthSession> {
-    await simulate('login', [503]);
-    const user = this.db.users.find((u) => u.email.toLowerCase() === request.email.trim().toLowerCase());
-    const hash = await hashPassword(request.password);
-    if (!user || user.passwordHash !== hash) {
-      throw new ApiError({ status: 401, code: 'INVALID_CREDENTIALS', detail: 'Invalid credentials' });
-    }
-    return this.openSession(user);
+  /* Cuenta: mismas reglas, respuestas y errores que /auth/* de la API. */
+
+  /** Valida como los DTO del backend (400 por campo) y devuelve el correo normalizado. */
+  private checkCredentials({ email, password }: Credentials): { email: string; password: string } {
+    const normalized = normalizeEmail(email);
+    if (!isValidEmail(normalized)) throw badRequest('email', 'email must be an email');
+    const issue = passwordLengthIssue(password);
+    if (issue === 'short') throw badRequest('password', 'password must be longer than or equal to 12 characters');
+    if (issue === 'long') throw badRequest('password', 'password must be shorter than or equal to 128 characters');
+    return { email: normalized, password: normalizePassword(password) };
   }
 
-  async register(request: RegisterRequest): Promise<AuthSession> {
-    await simulate('register', [503]);
-    const email = request.email.trim().toLowerCase();
-    if (this.db.users.some((u) => u.email.toLowerCase() === email)) {
-      throw new ApiError({ status: 409, code: 'EMAIL_TAKEN', detail: 'Email taken', fieldErrors: [{ field: 'email', message: 'taken' }] });
+  async register(credentials: Credentials): Promise<User> {
+    await simulate('register', [429, 503]);
+    const { email, password } = this.checkCredentials(credentials);
+    if (this.db.users.some((u) => u.email === email)) {
+      throw new ApiError({ status: 409, code: 'VALIDATION_FAILED', title: 'Conflict', detail: 'An account with this email already exists' });
     }
-    const { password, ...data } = request;
-    const user: StoredUser = { ...data, email, id: randomId('usr'), passwordHash: await hashPassword(password) };
-    this.commit((db) => db.users.push(user));
-    return this.openSession(user);
-  }
-
-  private openSession(user: StoredUser): AuthSession {
-    const session: AuthSession = {
-      token: randomId('tok'),
-      user: publicUser(user),
-      expiresAt: new Date(Date.now() + SESSION_HOURS * 3_600_000).toISOString(),
+    const user: StoredUser = {
+      id: crypto.randomUUID(),
+      email,
+      roles: ['cliente'],
+      scopes: [...CLIENT_SCOPES],
+      createdAt: new Date().toISOString(),
+      passwordHash: await hashPassword(password),
+      active: true,
     };
-    this.commit((db) => {
-      db.sessions = db.sessions.filter((s) => new Date(s.expiresAt).getTime() > Date.now());
-      db.sessions.push(session);
+    this.commit((db) => db.users.push(user));
+    return publicUser(user);
+  }
+
+  async login(credentials: Credentials): Promise<AuthTokens> {
+    await simulate('login', [429, 503]);
+    const { email, password } = this.checkCredentials(credentials);
+    const user = this.db.users.find((u) => u.email === email);
+    const hash = await hashPassword(password);
+    // Correo inexistente, contraseña errónea y cuenta inactiva responden igual.
+    if (!user || !user.active || user.passwordHash !== hash) throw unauthorized('Invalid email or password');
+    return this.issueTokens(user, crypto.randomUUID());
+  }
+
+  async refresh(refreshToken: string): Promise<AuthTokens> {
+    await simulate('refresh', [503]);
+    const stored = this.db.refreshTokens.find((t) => t.token === refreshToken);
+    const invalid = () => unauthorized('The refresh token is invalid or expired');
+    if (!stored || stored.revoked || new Date(stored.expiresAt).getTime() <= Date.now()) throw invalid();
+    if (stored.replaced) {
+      // Reutilización de un token ya rotado: alguien más lo tiene. Se revoca la familia completa.
+      this.commit((db) => db.refreshTokens.filter((t) => t.family === stored.family).forEach((t) => (t.revoked = true)));
+      throw invalid();
+    }
+    const user = this.db.users.find((u) => u.id === stored.userId && u.active);
+    if (!user) throw invalid();
+    this.commit(() => {
+      stored.replaced = true;
     });
-    return session;
+    return this.issueTokens(user, stored.family);
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    await simulate('logout', [503]);
+    const user = this.requireUser();
+    const stored = this.db.refreshTokens.find((t) => t.token === refreshToken);
+    // Siempre 204: un token ajeno o desconocido no se distingue de uno válido.
+    if (!stored || stored.userId !== user.id) return;
+    this.commit((db) => db.refreshTokens.filter((t) => t.family === stored.family).forEach((t) => (t.revoked = true)));
+  }
+
+  async me(): Promise<User> {
+    await simulate('me', [503]);
+    return publicUser(this.requireUser());
+  }
+
+  private issueTokens(user: StoredUser, family: string): AuthTokens {
+    const refreshToken = newRefreshToken();
+    this.commit((db) => {
+      // Se descartan los vencidos para que el almacenamiento no crezca sin fin.
+      db.refreshTokens = db.refreshTokens.filter((t) => new Date(t.expiresAt).getTime() > Date.now());
+      db.refreshTokens.push({
+        token: refreshToken,
+        family,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_SECONDS * 1000).toISOString(),
+        replaced: false,
+        revoked: false,
+      });
+    });
+    return {
+      accessToken: issueAccessToken(user.id, user.scopes),
+      refreshToken,
+      expiresIn: ACCESS_TOKEN_SECONDS,
+      scope: user.scopes.join(' '),
+    };
   }
 }

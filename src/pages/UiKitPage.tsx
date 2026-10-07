@@ -97,7 +97,7 @@ export function UiKitPage() {
           <Field label={k.sampleDisabled}>
             <Input disabled defaultValue="QD7K2M" />
           </Field>
-          <Field label={k.sampleCedula} hint={es.auth.cedulaHint} required>
+          <Field label={k.sampleCedula} hint={es.documents.cedulaHint} required>
             <NumericInput value={cedula} onValueChange={setCedula} maxDigits={10} />
           </Field>
           <Field label={k.sampleSelect}>
@@ -119,8 +119,8 @@ export function UiKitPage() {
           value={doc}
           onValueChange={setDoc}
           options={[
-            { value: 'CEDULA', label: es.auth.cedula, hint: es.auth.cedulaHint },
-            { value: 'PASSPORT', label: es.auth.passport, hint: es.auth.passportHint },
+            { value: 'CEDULA', label: es.documents.cedula, hint: es.documents.cedulaHint },
+            { value: 'PASSPORT', label: es.documents.passport, hint: es.documents.passportHint },
           ]}
         />
       </Block>

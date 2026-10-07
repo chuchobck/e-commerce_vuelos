@@ -142,7 +142,7 @@ export function TripPage() {
                     <span className="text-sm text-muted">
                       {t[`type${pax.type}`]} ·{' '}
                       {fmt(t.document, {
-                        type: pax.documentType === 'CEDULA' ? es.auth.cedula : es.auth.passport,
+                        type: pax.documentType === 'CEDULA' ? es.documents.cedula : es.documents.passport,
                         number: pax.documentNumber,
                       })}
                     </span>

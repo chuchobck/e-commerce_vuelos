@@ -106,7 +106,8 @@ export function ErrorState({
         </ul>
       ) : null}
       <div className="flex flex-wrap justify-center gap-4">
-        {onRetry ? <RetryButton onRetry={onRetry} waitSeconds={waitSeconds} /> : null}
+        {/* Reintentar no sirve si la función aún no está conectada a la API real. */}
+        {onRetry && apiError?.code !== 'NOT_CONNECTED' ? <RetryButton onRetry={onRetry} waitSeconds={waitSeconds} /> : null}
         {action}
       </div>
     </div>

@@ -13,7 +13,8 @@ async function mockOnlyWith(apiUrl: string) {
   );
 }
 
-describe('pistas "Para probar"', () => {
+// La primera importación en frío del módulo (y de shared/api) puede tardar varios segundos.
+describe('pistas "Para probar"', { timeout: 30_000 }, () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });

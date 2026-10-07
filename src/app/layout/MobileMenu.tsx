@@ -2,7 +2,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { LogIn, LogOut, Menu, UserPlus, UserRound, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/features/auth';
 import { routes, safeReturnTo } from '@/app/routes';
 import { es } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
@@ -16,7 +16,7 @@ import { isNavItemActive, NAV_ITEMS } from './nav-items';
  */
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
-  const { session, logout } = useAuth();
+  const { status, user, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const returnTo = safeReturnTo(pathname + search) ?? undefined;
@@ -73,13 +73,11 @@ export function MobileMenu() {
           </nav>
 
           <div className="mt-auto flex flex-col gap-4 border-t-2 border-border pt-6">
-            {session ? (
+            {status === 'restoring' ? null : user ? (
               <>
                 <p className="flex flex-col">
                   <span className="text-sm text-muted">{es.nav.accountTitle}</span>
-                  <span className="font-bold">
-                    {session.user.firstName} {session.user.lastName}
-                  </span>
+                  <span className="break-all font-bold">{user.email}</span>
                 </p>
                 <Button asChild fullWidth>
                   <Link to={routes.profile()} onClick={close}>
@@ -91,10 +89,11 @@ export function MobileMenu() {
                   variant="secondary"
                   fullWidth
                   onClick={() => {
-                    logout();
                     close();
-                    toast({ title: es.nav.loggedOut, variant: 'success' });
-                    navigate(routes.home());
+                    void logout().then(() => {
+                      toast({ title: es.nav.loggedOut, variant: 'success' });
+                      navigate(routes.home());
+                    });
                   }}
                 >
                   <LogOut aria-hidden="true" />

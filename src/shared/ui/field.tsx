@@ -98,7 +98,7 @@ function FieldLabel({
 export function FieldError({ id, message }: { id?: string; message?: string }) {
   if (!message) return null;
   return (
-    <p id={id} className="flex items-start gap-2 text-sm font-bold text-error">
+    <p id={id} role="alert" className="flex items-start gap-2 text-sm font-bold text-error">
       <AlertCircle aria-hidden="true" className="size-6 shrink-0" />
       <span>{message}</span>
     </p>

@@ -1,15 +1,15 @@
-import type { FlightStatusDto, SearchResponseDto, SeatMapDto } from './contract';
+import type { FlightStatusDto, SearchResponseDto, SeatMapDto, TokenResponseDto, UserResponseDto } from './contract';
 import { NotYetConnectedError } from './errors';
 import type { FlightsApi } from './FlightsApi';
 import type { HttpClient } from './http/client';
 import { deviceFingerprint } from './http/deviceFingerprint';
-import { mapFlightStatus, mapSearchResponse, toSearchRequest } from './mapping';
-import type { FlightStatus, SearchParams, SearchResult, SeatMap } from './types';
+import { mapFlightStatus, mapSearchResponse, mapTokens, mapUser, toSearchRequest } from './mapping';
+import type { AuthTokens, Credentials, FlightStatus, SearchParams, SearchResult, SeatMap, User } from './types';
 
 /**
- * Implementación contra la API real. En F2 solo están conectadas las operaciones públicas
- * (búsqueda, mapa de asientos y estado de vuelo); las demás lanzan NotYetConnectedError, que la
- * interfaz muestra con su patrón de errores sin romper la pantalla. Se conectan en F3, F4 y F6.
+ * Implementación contra la API real: las operaciones públicas (búsqueda, mapa de asientos y
+ * estado de vuelo, F2) y la cuenta (F3). Hold, reservas y postventa lanzan NotYetConnectedError,
+ * que la interfaz explica sin romper la pantalla; se conectan en F4 y F6.
  */
 export class RealFlightsApi implements FlightsApi {
   constructor(private readonly http: HttpClient) {}
@@ -37,6 +37,28 @@ export class RealFlightsApi implements FlightsApi {
       retry: true,
     });
     return mapFlightStatus(dto);
+  }
+
+  /* Cuenta. Las escrituras no se reintentan solas; /auth/me es una lectura. */
+
+  async register({ email, password }: Credentials): Promise<User> {
+    return mapUser(await this.http.request<UserResponseDto>('POST', '/auth/register', { body: { email, password } }));
+  }
+
+  async login({ email, password }: Credentials): Promise<AuthTokens> {
+    return mapTokens(await this.http.request<TokenResponseDto>('POST', '/auth/login', { body: { email, password } }));
+  }
+
+  async refresh(refreshToken: string): Promise<AuthTokens> {
+    return mapTokens(await this.http.request<TokenResponseDto>('POST', '/auth/refresh', { body: { refresh_token: refreshToken } }));
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    await this.http.request('POST', '/auth/logout', { body: { refresh_token: refreshToken }, auth: true });
+  }
+
+  async me(): Promise<User> {
+    return mapUser(await this.http.request<UserResponseDto>('GET', '/auth/me', { auth: true, retry: true }));
   }
 
   /** GET /health sin aviso de "despertando": despierta el servidor mientras el usuario escribe. */
@@ -70,11 +92,5 @@ export class RealFlightsApi implements FlightsApi {
   }
   async getBoardingPasses(): Promise<never> {
     throw new NotYetConnectedError('getBoardingPasses');
-  }
-  async login(): Promise<never> {
-    throw new NotYetConnectedError('login');
-  }
-  async register(): Promise<never> {
-    throw new NotYetConnectedError('register');
   }
 }

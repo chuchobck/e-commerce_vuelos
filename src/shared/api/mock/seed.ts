@@ -3,10 +3,14 @@ import { CHECKIN_CLOSES_MINUTES, CHECKIN_OPENS_HOURS } from '@/shared/lib/checki
 import { mapOffer } from '../mapping';
 import type { Booking, PassengerCount, SelectedLeg } from '../types';
 import { mockSearch } from './generators';
+import { CLIENT_SCOPES } from './auth';
 import { DB_VERSION, type MockDb } from './store';
 
-/** Hash de "quinde2026" (cuenta de prueba documentada en la pantalla de ingreso). */
-const DEMO_HASH = 'dc6515ef8bcbcf58716f4db57317cc72f1c5e0c95fdb6444455d887e648370f5';
+/**
+ * Hash de "quinde-demo-2026" (cuenta de prueba documentada en la pantalla de ingreso, solo con el mock).
+ * La API exige contraseñas de 12 a 128 caracteres: la de F0 ("quinde2026") ya no serviría.
+ */
+const DEMO_HASH = 'a1a285f035ec0aa1980c435d6d3b2219ee295acff8a6ecde8ec2fd4207b7b4d2';
 
 const DEMO_USER_ID = 'usr_demo';
 
@@ -92,16 +96,14 @@ export function seedDb(): MockDb {
       {
         id: DEMO_USER_ID,
         email: 'demo@quinde.ec',
-        firstName: 'María José',
-        lastName: 'Andrade Pérez',
-        documentType: 'CEDULA',
-        documentNumber: '1710034065',
-        phone: '991234567',
-        birthDate: '1990-04-18',
+        roles: ['cliente'],
+        scopes: [...CLIENT_SCOPES],
+        createdAt: new Date().toISOString(),
         passwordHash: DEMO_HASH,
+        active: true,
       },
     ],
-    sessions: [],
+    refreshTokens: [],
     holds: [],
     bookings: demoBookings(),
   };

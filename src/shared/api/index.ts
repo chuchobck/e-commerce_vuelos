@@ -22,7 +22,18 @@ export * from './types';
 export { apiConfig } from './config';
 export { apiModeFor, type ApiMode } from './select';
 export { AIRPORTS, cityOf, destinationsFrom, findAirport, hasFlights, type Airport, type RegionId } from './airports';
-export { ApiError, errorMessage, fieldErrorMessage, isApiError, NotYetConnectedError, type FieldError } from './errors';
+export {
+  ApiError,
+  authErrorMessage,
+  authFieldErrors,
+  errorMessage,
+  fieldErrorMessage,
+  isApiError,
+  NotYetConnectedError,
+  type AuthAction,
+  type FieldError,
+} from './errors';
+export { setAccessTokenProvider } from './authBridge';
 export { faresForCabin, itinerarySignature } from './mapping';
 export { useServerWaking } from './http/useServerWaking';
 export {

@@ -1,4 +1,5 @@
 import type { FlightsApi } from './FlightsApi';
+import { currentAccessToken } from './authBridge';
 import { createHttpClient } from './http/client';
 import { MockFlightsApi } from './mock/MockFlightsApi';
 import { RealFlightsApi } from './RealFlightsApi';
@@ -11,10 +12,11 @@ export function apiModeFor(apiUrl: string): ApiMode {
 }
 
 export function createFlightsApi(apiUrl: string, { dev = false } = {}): FlightsApi {
-  if (apiModeFor(apiUrl) === 'mock') return new MockFlightsApi();
+  if (apiModeFor(apiUrl) === 'mock') return new MockFlightsApi(currentAccessToken);
   return new RealFlightsApi(
     createHttpClient({
       baseUrl: apiUrl.trim(),
+      getAccessToken: currentAccessToken,
       // El detalle técnico de los errores solo va a la consola de desarrollo, nunca a la pantalla.
       log: dev ? (message, detail) => console.warn(message, detail) : undefined,
     }),

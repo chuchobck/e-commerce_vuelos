@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight, Search, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
 import {
   AccountBlock,
@@ -25,11 +25,11 @@ const p = es.purchase;
  * con sesión se crea el hold y arranca el temporizador. El formulario de pasajeros llega en F4.
  */
 export function CheckoutDetailsPage() {
-  const { session } = useAuth();
+  const { status, user } = useAuth();
   const navigate = useNavigate();
   const [selection] = useState(loadSelection);
   // Con la API real el hold aún no existe (F4): no se intenta.
-  const { hold, active, statusProps } = useCheckoutHold(apiConfig.usingMock ? selection : null, { create: !!session });
+  const { hold, active, statusProps } = useCheckoutHold(apiConfig.usingMock ? selection : null, { create: !!user });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -82,21 +82,17 @@ export function CheckoutDetailsPage() {
   return (
     <Page title={p.detailsTitle} heading={p.detailsHeading}>
       <CheckoutSteps current={1} />
-      {apiConfig.usingMock ? (
-        <>
-          {session ? <HoldStatus {...statusProps} searchAgain={searchAgain} /> : null}
-          <AccountBlock
-            userName={session?.user.firstName.split(' ')[0]}
-            loginHref={routes.login(here)}
-            registerHref={routes.register(here)}
-          />
-        </>
-      ) : (
-        // Con la API real, cuenta y hold se conectan en F3 y F4: se explica en vez de fallar.
+      {apiConfig.usingMock && user ? <HoldStatus {...statusProps} searchAgain={searchAgain} /> : null}
+      {/* Mientras se restaura la sesión no se muestra nada: ni "Ingresa" ni "Compras como" parpadean. */}
+      {status === 'restoring' ? null : (
+        <AccountBlock email={user?.email} loginHref={routes.login(here)} registerHref={routes.register(here)} />
+      )}
+      {!apiConfig.usingMock ? (
+        // Con la API real, apartar el precio y pagar se conectan en F4: se explica en vez de fallar.
         <Alert variant="info" title={p.notConnectedTitle}>
           <p>{p.notConnectedText}</p>
         </Alert>
-      )}
+      ) : null}
 
       <CheckoutSummary
         outbound={hold?.outbound ?? selection.outbound}

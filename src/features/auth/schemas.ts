@@ -1,33 +1,22 @@
 import { z } from 'zod';
 import { es } from '@/shared/i18n';
-import { cedulaField, emailField, nameField, passportField, passwordField, phoneField } from '@/shared/lib/schemas';
+import { emailField, passwordField } from '@/shared/lib/schemas';
 
 const v = es.validation;
 
+/**
+ * La cuenta de la API es solo correo y contraseña (sin nombre, documento ni teléfono: esos datos
+ * se piden por pasajero en la compra). Las reglas son las del backend: ver shared/lib/credentials.ts.
+ */
 export const LoginSchema = z.object({
   email: emailField,
-  // Al ingresar no se exige longitud mínima: solo que no esté vacía.
-  password: z.string().min(1, v.required),
+  password: passwordField,
+  /** "Mantener mi sesión iniciada": guarda el refresh token en localStorage en vez de sessionStorage. */
+  remember: z.boolean(),
 });
-export type LoginInput = z.infer<typeof LoginSchema>;
+export type LoginInput = z.input<typeof LoginSchema>;
 
-export const RegisterSchema = z
-  .object({
-    firstName: nameField,
-    lastName: nameField,
-    documentType: z.enum(['CEDULA', 'PASSPORT']),
-    documentNumber: z.string().trim().min(1, v.required),
-    email: emailField,
-    phone: phoneField,
-    password: passwordField,
-    terms: z.boolean().refine((b) => b, v.termsRequired),
-  })
-  .superRefine((data, ctx) => {
-    if (!data.documentNumber) return;
-    const field = data.documentType === 'CEDULA' ? cedulaField : passportField;
-    const result = field.safeParse(data.documentNumber);
-    if (!result.success) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['documentNumber'], message: result.error.issues[0].message });
-    }
-  });
-export type RegisterInput = z.infer<typeof RegisterSchema>;
+export const RegisterSchema = LoginSchema.extend({
+  terms: z.boolean().refine((b) => b, v.termsRequired),
+});
+export type RegisterInput = z.input<typeof RegisterSchema>;
