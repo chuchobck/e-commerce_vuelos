@@ -5,10 +5,13 @@
  */
 export { AccountBlock } from './AccountBlock';
 export { CheckoutSteps } from './CheckoutSteps';
-export { CheckoutSummary } from './CheckoutSummary';
-export { HoldPanel } from './HoldPanel';
+export { BookingCode } from './BookingCode';
+export { CheckoutAside } from './CheckoutAside';
+export { CheckoutLayout } from './CheckoutLayout';
+export { HoldNotice } from './HoldNotice';
 export { PassengersForm } from './PassengersForm';
 export { PaymentForm } from './PaymentForm';
+export { PaymentReview } from './PaymentReview';
 export {
   clearSelection,
   loadSelection,
@@ -23,3 +26,4 @@ export { useReleaseOnExit } from './useReleaseOnExit';
 export { holdOf, type CheckoutState, type HoldEnd, type PaymentProblem } from './machine';
 export { purchaseNotice } from './messages';
 export { isDraftComplete } from './passengers';
+export { passengersLine } from './CheckoutAside';

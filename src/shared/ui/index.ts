@@ -15,7 +15,7 @@ export { RadioGroup, type RadioOption } from './radio-group';
 export { Select, type SelectOption } from './select';
 export { ServerWakingNotice } from './server-waking';
 export { Skeleton } from './skeleton';
-export { EmptyState, ErrorState, LoadingState } from './states';
+export { EmptyState, ErrorState, LoadingState, RetryButton } from './states';
 export { Stepper } from './stepper';
 export { Timer } from './timer';
 export { Toaster, toast } from './toast';

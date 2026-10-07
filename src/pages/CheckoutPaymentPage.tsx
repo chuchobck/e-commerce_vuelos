@@ -6,21 +6,23 @@ import { routes } from '@/app/routes';
 import { useAuth } from '@/features/auth';
 import {
   checkout,
+  CheckoutAside,
+  CheckoutLayout,
   CheckoutSteps,
-  CheckoutSummary,
-  HoldPanel,
+  HoldNotice,
   holdOf,
   isDraftComplete,
   loadSelection,
   PaymentForm,
-  selectionTotal,
+  PaymentReview,
   useCheckout,
 } from '@/features/checkout';
-import { es } from '@/shared/i18n';
-import { Alert, Button, EmptyState } from '@/shared/ui';
+import { es, fmt } from '@/shared/i18n';
+import { Alert, Button, EmptyState, toast } from '@/shared/ui';
 
 const p = es.purchase;
 const f = es.checkoutForms;
+const title = fmt(p.stepTitle, { current: 3, name: p.paymentHeading });
 
 /** Paso 3: revisar y pagar (pago simulado). Al terminar lleva a la confirmación. */
 export function CheckoutPaymentPage() {
@@ -62,7 +64,7 @@ export function CheckoutPaymentPage() {
 
   if (!selection) {
     return (
-      <Page title={p.paymentTitle} heading={p.paymentHeading}>
+      <Page title={title} heading={p.paymentHeading}>
         <EmptyState
           title={p.emptyTitle}
           text={p.emptyText}
@@ -83,27 +85,42 @@ export function CheckoutPaymentPage() {
   const hold = holdOf(state);
   const needsPassengers = state.step === 'selected' || (state.step === 'held' && !state.passengersReady);
   const canPay = (state.step === 'held' && state.passengersReady) || state.step === 'rejected' || state.step === 'paying';
+  const cancel = async () => {
+    const query = await checkout.cancel();
+    toast({ title: p.cancelled, variant: 'success' });
+    navigate(routes.results(query ?? selection.searchQuery));
+  };
 
   return (
-    <Page title={p.paymentTitle} heading={p.paymentHeading}>
+    <Page
+      title={title}
+      heading={
+        <>
+          <span className="sr-only">{fmt(p.stepOf, { current: 3, total: 3 })}. </span>
+          {p.paymentHeading}
+        </>
+      }
+    >
       <CheckoutSteps current={2} />
-      <HoldPanel
-        state={state}
-        onSearchAgain={() => navigate(routes.results(checkout.searchAgain() ?? selection.searchQuery))}
-        onRetryHold={start}
-        onRetryPayment={() => void checkout.retryPayment()}
-      />
-      {needsPassengers ? (
-        <Alert variant="warning" title={f.needsPassengersTitle} action={backToDetails}>
-          <p>{f.needsPassengersText}</p>
-        </Alert>
-      ) : null}
+      <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} onCancel={cancel} />}>
+        <HoldNotice
+          state={state}
+          onSearchAgain={() => navigate(routes.results(checkout.searchAgain() ?? selection.searchQuery))}
+          onRetryHold={start}
+          onRetryPayment={() => void checkout.retryPayment()}
+        />
+        {needsPassengers ? (
+          <Alert variant="warning" title={f.needsPassengersTitle} action={backToDetails}>
+            <p>{f.needsPassengersText}</p>
+          </Alert>
+        ) : (
+          <PaymentReview selection={selection} passengers={checkout.passengersDraft()} />
+        )}
 
-      <CheckoutSummary outbound={selection.outbound} inbound={selection.inbound} total={hold?.lockedPrice ?? selectionTotal(selection)} held={!!hold} />
+        {canPay && hold ? <PaymentForm amount={hold.lockedPrice} busy={state.step === 'paying'} onPay={(reference) => void checkout.pay(reference)} /> : null}
 
-      {canPay && hold ? <PaymentForm amount={hold.lockedPrice} busy={state.step === 'paying'} onPay={(reference) => void checkout.pay(reference)} /> : null}
-
-      {state.step === 'paying' ? null : <div>{backToDetails}</div>}
+        {state.step === 'paying' ? null : <div>{backToDetails}</div>}
+      </CheckoutLayout>
     </Page>
   );
 }

@@ -3,35 +3,33 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
-import { useAuth } from '@/features/auth';
+import { LoginForm, RegisterForm, useAuth } from '@/features/auth';
 import {
   AccountBlock,
   checkout,
+  CheckoutAside,
+  CheckoutLayout,
   CheckoutSteps,
-  CheckoutSummary,
-  HoldPanel,
-  holdOf,
+  HoldNotice,
   loadSelection,
   PassengersForm,
-  selectionTotal,
   useCheckout,
 } from '@/features/checkout';
-import { es } from '@/shared/i18n';
-import { Button, ConfirmDialog, EmptyState, toast } from '@/shared/ui';
+import { es, fmt } from '@/shared/i18n';
+import { Button, EmptyState, toast } from '@/shared/ui';
 
 const p = es.purchase;
+const title = fmt(p.stepTitle, { current: 2, name: p.detailsTitle });
 
 /**
- * Paso 2: cuenta y pasajeros. Sin sesión se pide ingresar aquí mismo (la selección se conserva);
- * con sesión se aparta el precio una sola vez y se piden los datos de quienes viajan.
+ * Paso 2: cuenta y pasajeros. Sin sesión, ingresar o crear la cuenta ocurre aquí mismo (la
+ * selección se conserva); con sesión se aparta el precio una sola vez y se piden los datos.
  */
 export function CheckoutDetailsPage() {
   const { status, user, authorized } = useAuth();
   const navigate = useNavigate();
   const state = useCheckout();
   const [selection] = useState(loadSelection);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
   const authorizedRef = useRef(authorized);
   authorizedRef.current = authorized;
 
@@ -43,7 +41,7 @@ export function CheckoutDetailsPage() {
 
   if (!selection) {
     return (
-      <Page title={p.detailsTitle} heading={p.detailsHeading}>
+      <Page title={title} heading={p.detailsHeading}>
         <EmptyState
           title={p.emptyTitle}
           text={p.emptyText}
@@ -61,68 +59,64 @@ export function CheckoutDetailsPage() {
     );
   }
 
-  const here = routes.checkoutDetails();
-  const hold = holdOf(state);
   const editing = state.step === 'held' || state.step === 'rejected';
-
   const searchAgain = () => navigate(routes.results(checkout.searchAgain() ?? selection.searchQuery));
   const cancel = async () => {
-    setCancelling(true);
     const query = await checkout.cancel();
-    setCancelling(false);
-    setConfirmOpen(false);
     toast({ title: p.cancelled, variant: 'success' });
     navigate(routes.results(query ?? selection.searchQuery));
   };
 
   return (
-    <Page title={p.detailsTitle} heading={p.detailsHeading}>
+    <Page
+      title={title}
+      heading={
+        <>
+          <span className="sr-only">{fmt(p.stepOf, { current: 2, total: 3 })}. </span>
+          {p.detailsHeading}
+        </>
+      }
+    >
       <CheckoutSteps current={1} />
-      {/* Mientras se restaura la sesión no se muestra nada: ni "Ingresa" ni "Compras como" parpadean. */}
-      {status === 'restoring' ? null : <AccountBlock email={user?.email} loginHref={routes.login(here)} registerHref={routes.register(here)} />}
-      {status === 'authenticated' ? <HoldPanel state={state} onSearchAgain={searchAgain} onRetryHold={start} /> : null}
+      <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} onCancel={cancel} />}>
+        {/* Mientras se restaura la sesión no se muestra nada: ni las opciones ni "Compras como" parpadean. */}
+        {status === 'restoring' ? null : (
+          <AccountBlock
+            email={user?.email}
+            loginForm={<LoginForm idPrefix="checkout-login" onSuccess={(u) => toast({ title: fmt(es.auth.welcome, { email: u.email }), variant: 'success' })} />}
+            registerForm={<RegisterForm idPrefix="checkout-register" onSuccess={(u) => toast({ title: fmt(es.auth.registered, { email: u.email }), variant: 'success' })} />}
+          />
+        )}
+        {status === 'authenticated' ? <HoldNotice state={state} onSearchAgain={searchAgain} onRetryHold={start} /> : null}
 
-      <CheckoutSummary outbound={selection.outbound} inbound={selection.inbound} total={hold?.lockedPrice ?? selectionTotal(selection)} held={!!hold}>
-        {hold ? (
-          <Button variant="secondary" onClick={() => setConfirmOpen(true)}>
-            {p.cancelHold}
-          </Button>
+        {editing && status === 'authenticated' ? (
+          <section aria-labelledby="passengers-heading" className="flex flex-col gap-4">
+            <h2 id="passengers-heading" className="text-2xl">
+              {p.passengersTitle}
+            </h2>
+            <PassengersForm
+              selection={selection}
+              draft={checkout.passengersDraft()}
+              accountEmail={user?.email}
+              rejected={state.step === 'held' ? state.passengerErrors : []}
+              onDraft={(passengers) => checkout.setPassengers(passengers, false)}
+              onDone={(passengers) => {
+                checkout.setPassengers(passengers, true);
+                navigate(routes.checkoutPayment());
+              }}
+            />
+          </section>
         ) : null}
-      </CheckoutSummary>
 
-      {editing && status === 'authenticated' ? (
-        <PassengersForm
-          selection={selection}
-          draft={checkout.passengersDraft()}
-          accountEmail={user?.email}
-          rejected={state.step === 'held' ? state.passengerErrors : []}
-          onDone={(passengers) => {
-            checkout.setPassengers(passengers, true);
-            navigate(routes.checkoutPayment());
-          }}
-        />
-      ) : null}
-
-      <div>
-        <Button asChild variant="ghost">
-          <Link to={routes.results(selection.searchQuery)}>
-            <ArrowLeft aria-hidden="true" />
-            {p.backToResults}
-          </Link>
-        </Button>
-      </div>
-
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={p.cancelHoldConfirmTitle}
-        description={p.cancelHoldConfirmText}
-        confirmLabel={p.cancelHoldConfirm}
-        cancelLabel={p.cancelHoldKeep}
-        loading={cancelling}
-        destructive
-        onConfirm={() => void cancel()}
-      />
+        <div>
+          <Button asChild variant="ghost">
+            <Link to={routes.results(selection.searchQuery)}>
+              <ArrowLeft aria-hidden="true" />
+              {p.backToResults}
+            </Link>
+          </Button>
+        </div>
+      </CheckoutLayout>
     </Page>
   );
 }

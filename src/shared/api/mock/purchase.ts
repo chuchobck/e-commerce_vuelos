@@ -4,6 +4,7 @@
  * cupo apartado 15 minutos, pago simulado por el prefijo de la referencia y emisión asíncrona del
  * pago pendiente. Trabaja sobre la forma del contrato; MockFlightsApi la mapea igual que la API real.
  */
+import { isBookableCountry } from '@/shared/lib/countries';
 import { isValidCedula } from '@/shared/lib/validators';
 import { addMoney, toDecimalString } from '@/shared/lib/money';
 import { stableHash } from '@/shared/lib/stableHash';
@@ -130,6 +131,9 @@ function checkPassengers(passengers: PassengerItemDto[], hold: StoredHold, first
     }
     if (p.documentType === 'NATIONAL_ID' && p.nationality === 'EC' && !isValidCedula(p.documentNumber)) {
       throw problem(400, 'VALIDATION_FAILED', `${field}.documentNumber: is not a valid Ecuadorian national ID`, `${field}.documentNumber`, 'is not a valid Ecuadorian national ID');
+    }
+    if (!isBookableCountry(p.nationality)) {
+      throw problem(422, 'VALIDATION_FAILED', `${field}.nationality: is not a country this API knows`, `${field}.nationality`, 'is not a country this API knows');
     }
     if (p.documentType === 'PASSPORT' && !p.documentExpiryDate) {
       throw problem(400, 'VALIDATION_FAILED', `${field}.documentExpiryDate: is required for a PASSPORT`, `${field}.documentExpiryDate`, 'is required for a PASSPORT');
