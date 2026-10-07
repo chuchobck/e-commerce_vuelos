@@ -3,7 +3,11 @@
  * Regla: ningún texto visible se escribe directamente en un componente.
  * Para interpolar valores usa `fmt(es.x.y, { clave: valor })` desde src/shared/i18n/fmt.ts.
  */
+import { seatsEs } from './seats';
+
 export const es = {
+  seats: seatsEs,
+
   app: {
     name: 'Quinde',
     titleSuffix: 'Quinde',
