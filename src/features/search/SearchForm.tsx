@@ -5,6 +5,7 @@ import { ArrowLeftRight, ChevronDown, PlaneLanding, PlaneTakeoff, Search, Users 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useForm, type FieldErrors } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { routes } from '@/app/routes';
 import { flightsApi } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
@@ -140,7 +141,7 @@ export function SearchForm() {
 
   const onValid = (values: SearchFormInput) => {
     setSummary([]);
-    navigate(`/resultados?${formToQuery(values)}`);
+    navigate(routes.results(formToQuery(values)));
   };
 
   const onInvalid = (formErrors: FieldErrors<SearchFormInput>) => {

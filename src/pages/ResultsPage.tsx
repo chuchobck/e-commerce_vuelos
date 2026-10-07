@@ -2,25 +2,21 @@ import { Pencil, PlaneTakeoff, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { SEARCH_ANCHOR_ID } from '@/app/layout/RootLayout';
+import { routes } from '@/app/routes';
+import { saveSelection, type SelectedLeg } from '@/features/checkout';
 import { cityOf, OfferCard } from '@/features/results';
 import { queryToSearch } from '@/features/search';
-import { errorMessage, flightsApi, isApiError, type Fare, type FlightOffer, type SearchParams } from '@/shared/api';
+import { flightsApi, type Fare, type FlightOffer, type SearchParams } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { formatLongDate, formatTime } from '@/shared/lib/format';
 import { useAsync } from '@/shared/lib/useAsync';
-import { Alert, Button, EmptyState, ErrorState, LoadingState, toast } from '@/shared/ui';
+import { Alert, Button, EmptyState, ErrorState, LoadingState } from '@/shared/ui';
 
 const r = es.results;
 
 function passengersText(p: SearchParams['passengers']) {
   const n = p.adults + p.children + p.infants;
   return n === 1 ? r.passengersOne : fmt(r.passengersMany, { count: n });
-}
-
-interface Selection {
-  offer: FlightOffer;
-  fare: Fare;
 }
 
 export function ResultsPage() {
@@ -38,8 +34,7 @@ export function ResultsPage() {
     [queryString],
   );
 
-  const [outbound, setOutbound] = useState<Selection | null>(null);
-  const [pendingFareId, setPendingFareId] = useState<string | null>(null);
+  const [outbound, setOutbound] = useState<SelectedLeg | null>(null);
   const [status, setStatus] = useState('');
 
   // Nueva búsqueda = nueva selección.
@@ -50,25 +45,13 @@ export function ResultsPage() {
   const originCity = params ? cityOf(airports, params.origin) : '';
   const destinationCity = params ? cityOf(airports, params.destination) : '';
   const heading = params ? fmt(r.heading, { origin: originCity, destination: destinationCity }) : r.headingFallback;
-  const modifyHref = `/?${queryString}#${SEARCH_ANCHOR_ID}`;
+  const modifyHref = routes.search(queryString);
 
-  const hold = async (out: Selection, back?: Selection) => {
+  /** Paso 1 listo: se guarda la selección (aún sin hold) y se pasa al paso 2. */
+  const choose = (out: SelectedLeg, back?: SelectedLeg) => {
     if (!params) return;
-    setPendingFareId((back ?? out).fare.id);
-    try {
-      const h = await flightsApi.createHold({
-        outbound: { offerId: out.offer.id, fareId: out.fare.id },
-        inbound: back ? { offerId: back.offer.id, fareId: back.fare.id } : undefined,
-        passengers: params.passengers,
-      });
-      navigate(`/compra?reserva=${encodeURIComponent(h.id)}`);
-    } catch (error) {
-      toast({ title: errorMessage(error), variant: 'error' });
-      // 409: la tarifa cambió; se refrescan los resultados.
-      if (isApiError(error) && error.status === 409) void data.execute();
-    } finally {
-      setPendingFareId(null);
-    }
+    saveSelection({ outbound: out, inbound: back, passengers: params.passengers, searchQuery: queryString });
+    navigate(routes.checkoutDetails());
   };
 
   const chooseOutbound = (offer: FlightOffer, fare: Fare) => {
@@ -84,7 +67,7 @@ export function ResultsPage() {
       requestAnimationFrame(() => document.getElementById('vuelta-title')?.focus());
       return;
     }
-    void hold({ offer, fare });
+    choose({ offer, fare });
   };
 
   const summary = params
@@ -122,7 +105,7 @@ export function ResultsPage() {
           icon={<Search className="size-8" />}
           action={
             <Button asChild>
-              <Link to={`/#${SEARCH_ANCHOR_ID}`}>{es.common.searchFlights}</Link>
+              <Link to={routes.search()}>{es.common.searchFlights}</Link>
             </Button>
           }
         />
@@ -158,8 +141,6 @@ export function ResultsPage() {
                     offer={offer}
                     airports={airports}
                     selectedFareId={outbound?.offer.id === offer.id ? outbound.fare.id : undefined}
-                    pendingFareId={pendingFareId}
-                    disabled={!!pendingFareId}
                     onChoose={chooseOutbound}
                   />
                 </li>
@@ -189,9 +170,7 @@ export function ResultsPage() {
                         <OfferCard
                           offer={offer}
                           airports={airports}
-                          pendingFareId={pendingFareId}
-                          disabled={!!pendingFareId}
-                          onChoose={(o, f) => void hold(outbound, { offer: o, fare: f })}
+                          onChoose={(o, f) => choose(outbound, { offer: o, fare: f })}
                         />
                       </li>
                     ))}

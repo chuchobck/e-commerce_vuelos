@@ -1,6 +1,6 @@
 import { CreditCard, Ticket, UserRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { SEARCH_ANCHOR_ID } from '@/app/layout/RootLayout';
+import { routes, SEARCH_ANCHOR_ID } from '@/app/routes';
 import { Escapes, Panorama, REGION_BG, REGIONS, RegionArt } from '@/features/home';
 import { SearchForm } from '@/features/search';
 import { es, fmt } from '@/shared/i18n';
@@ -78,7 +78,7 @@ export function HomePage() {
                         return (
                           <li key={code}>
                             <Link
-                              to={`/?destino=${code}#${SEARCH_ANCHOR_ID}`}
+                              to={routes.search(`destino=${code}`)}
                               aria-label={fmt(h.flyTo, { city })}
                               className="inline-flex min-h-12 items-center rounded-full border-2 border-input px-4 text-sm font-bold text-foreground no-underline hover:border-primary hover:bg-primary-tint"
                             >

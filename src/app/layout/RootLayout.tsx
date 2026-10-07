@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { paths, routes, SEARCH_ANCHOR_ID } from '@/app/routes';
 import { es } from '@/shared/i18n';
 import { Toaster } from '@/shared/ui';
 import { Footer } from './Footer';
 import { Header } from './Header';
 
 const MAIN_ID = 'contenido';
-/** Ancla del buscador de vuelos (atajo Alt + B). */
-export const SEARCH_ANCHOR_ID = 'buscador';
 
 function focusElement(el: HTMLElement | null) {
   if (!el) return false;
@@ -54,8 +53,8 @@ function useSearchShortcut() {
     const onKey = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey || e.key.toLowerCase() !== 'b') return;
       e.preventDefault();
-      if (location.pathname === '/') focusElement(document.getElementById(SEARCH_ANCHOR_ID));
-      else navigate(`/#${SEARCH_ANCHOR_ID}`);
+      if (location.pathname === paths.home) focusElement(document.getElementById(SEARCH_ANCHOR_ID));
+      else navigate(routes.search());
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

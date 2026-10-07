@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { es } from '@/shared/i18n';
 import { ageOn, maxBookingDate, parseDisplayDate, today } from './dates';
 import {
-  BOOKING_CODE_PATTERN,
   FLIGHT_NUMBER_PATTERN,
   NAME_PATTERN,
   PASSPORT_PATTERN,
@@ -43,13 +42,6 @@ export const phoneField = z.string().trim().min(1, v.required).regex(PHONE_EC_PA
 
 /** Contraseña: sin reglas de composición cognitivas; solo longitud (WCAG 3.3.8). */
 export const passwordField = z.string().min(1, v.required).min(8, v.passwordLength).max(64, v.passwordMax);
-
-export const bookingCodeField = z
-  .string()
-  .trim()
-  .min(1, v.required)
-  .regex(BOOKING_CODE_PATTERN, v.bookingCode)
-  .transform((s) => s.toUpperCase());
 
 export const flightNumberField = z
   .string()

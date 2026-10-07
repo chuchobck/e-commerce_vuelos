@@ -80,7 +80,7 @@ export function UiKitPage() {
           <Button loading loadingText={k.buttonsLoading}>
             {es.common.confirm}
           </Button>
-          <Button size="icon" variant="secondary" aria-label={es.nav.search}>
+          <Button size="icon" variant="secondary" aria-label={es.common.searchFlights}>
             <Plane aria-hidden="true" />
           </Button>
         </div>
@@ -159,16 +159,16 @@ export function UiKitPage() {
 
       <Block title={k.badges}>
         <div className="flex flex-wrap gap-4">
-          <Badge tone="success">{es.booking.status.CONFIRMED}</Badge>
-          <Badge tone="info">{es.booking.status.CHECKED_IN}</Badge>
+          <Badge tone="success">{es.trip.status.CONFIRMED}</Badge>
+          <Badge tone="info">{es.trip.status.CHECKED_IN}</Badge>
           <Badge tone="warning">{es.status.states.DELAYED}</Badge>
-          <Badge tone="error">{es.booking.status.CANCELLED}</Badge>
+          <Badge tone="error">{es.trip.status.CANCELLED}</Badge>
           <Badge tone="neutral">{es.status.states.SCHEDULED}</Badge>
         </div>
       </Block>
 
       <Block title={k.stepperTitle}>
-        <Stepper steps={[es.purchase.steps.fare, es.purchase.steps.passenger, es.purchase.steps.payment]} current={1} />
+        <Stepper steps={[es.purchase.steps.flight, es.purchase.steps.account, es.purchase.steps.payment]} current={1} />
       </Block>
 
       <Block title={k.timerTitle}>
@@ -182,7 +182,7 @@ export function UiKitPage() {
 
       <Block title={k.statesTitle}>
         <LoadingState />
-        <EmptyState title={es.bookings.emptyTitle} text={es.bookings.emptyText} headingLevel="h3" />
+        <EmptyState title={es.trips.emptyTitle} text={es.trips.emptyText} headingLevel="h3" />
         <ErrorState error={new ApiError(503, 'SERVICE_UNAVAILABLE')} onRetry={() => undefined} headingLevel="h3" />
         <p className="font-bold">{k.skeletonTitle}</p>
         <Skeleton className="h-12 w-full" />

@@ -182,9 +182,9 @@ export interface Booking {
   userId?: string;
 }
 
+/** El check-in se hace por bookingId y solo lo puede hacer el dueño de la reserva (con sesión). */
 export interface CheckInRequest {
-  bookingCode: string;
-  lastName: string;
+  bookingId: string;
 }
 
 export interface BoardingPass {

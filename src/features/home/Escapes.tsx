@@ -3,6 +3,7 @@ import { addDays, nextFriday } from 'date-fns';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { routes } from '@/app/routes';
 import { flightsApi, type FlightOffer } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
@@ -91,7 +92,7 @@ function resultsHref(origin: string, destination: string) {
     infantes: '0',
     cabina: 'ECONOMY',
   });
-  return `/resultados?${q.toString()}`;
+  return routes.results(q.toString());
 }
 
 /** "Escápate este fin de semana": pensada para quien ya vive en Ecuador. */

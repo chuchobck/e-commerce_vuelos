@@ -17,3 +17,4 @@ export { EmptyState, ErrorState, LoadingState } from './states';
 export { Stepper } from './stepper';
 export { Timer } from './timer';
 export { Toaster, toast } from './toast';
+export { TripSummary } from './trip-summary';

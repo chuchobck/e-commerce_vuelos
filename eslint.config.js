@@ -24,8 +24,15 @@ const boundaries = [
   },
   {
     target: './src/features',
-    from: ['./src/app', './src/pages'],
-    message: 'features solo usa shared. Lo que venga de app o pages se recibe por props.',
+    from: './src/pages',
+    message: 'features no importa de pages.',
+  },
+  {
+    // Única excepción: la tabla de rutas (sin dependencias) para enlazar sin escribir rutas sueltas.
+    target: './src/features',
+    from: './src/app',
+    except: ['./routes.ts'],
+    message: 'features solo usa shared (y app/routes.ts). Lo demás de app se recibe por props.',
   },
   ...FEATURES.map((name) => ({
     target: `./src/features/${name}`,
