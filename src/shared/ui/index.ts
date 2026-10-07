@@ -13,6 +13,7 @@ export { NumericInput, QuantityInput } from './numeric-input';
 export { PasswordInput } from './password-input';
 export { RadioGroup, type RadioOption } from './radio-group';
 export { Select, type SelectOption } from './select';
+export { ServerWakingNotice } from './server-waking';
 export { Skeleton } from './skeleton';
 export { EmptyState, ErrorState, LoadingState } from './states';
 export { Stepper } from './stepper';

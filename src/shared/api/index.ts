@@ -25,6 +25,7 @@ export { apiConfig } from './config';
 export { AIRPORTS, cityOf, destinationsFrom, findAirport, hasFlights, type Airport, type RegionId } from './airports';
 export { ApiError, errorMessage, fieldErrorMessage, isApiError, NotYetConnectedError, type FieldError } from './errors';
 export { faresForCabin, itinerarySignature } from './mapping';
+export { useServerWaking } from './http/useServerWaking';
 export {
   MOCK_OPERATIONS,
   SIMULATED_STATUSES,

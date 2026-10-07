@@ -1,7 +1,7 @@
 import { Inbox, RefreshCw, XCircle } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { errorMessage } from '@/shared/api';
-import { es } from '@/shared/i18n';
+import { useEffect, useState, type ReactNode } from 'react';
+import { errorMessage, fieldErrorMessage, isApiError } from '@/shared/api';
+import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { Button } from './button';
 import { Skeleton } from './skeleton';
@@ -85,6 +85,11 @@ export function ErrorState({
   className?: string;
 }) {
   const Heading = headingLevel;
+  const apiError = isApiError(error) ? error : undefined;
+  // 400 con invalidParams: un mensaje en español por campo, sin repetir.
+  const fieldMessages = [...new Set((apiError?.status === 400 ? apiError.fieldErrors : []).map(fieldErrorMessage))];
+  // 429 y 503 con Retry-After: el botón se habilita cuando pasa el tiempo indicado.
+  const waitSeconds = apiError && (apiError.status === 429 || apiError.status === 503) ? (apiError.retryAfter ?? 0) : 0;
   return (
     <div
       role="alert"
@@ -93,15 +98,41 @@ export function ErrorState({
       <XCircle aria-hidden="true" className="size-12 text-error" />
       <Heading className="text-xl">{title}</Heading>
       <p>{errorMessage(error)}</p>
+      {fieldMessages.length > 0 ? (
+        <ul className="flex list-disc flex-col gap-1 pl-6 text-left">
+          {fieldMessages.map((m) => (
+            <li key={m}>{m}</li>
+          ))}
+        </ul>
+      ) : null}
       <div className="flex flex-wrap justify-center gap-4">
-        {onRetry ? (
-          <Button variant="primary" onClick={onRetry}>
-            <RefreshCw aria-hidden="true" />
-            {es.common.retry}
-          </Button>
-        ) : null}
+        {onRetry ? <RetryButton onRetry={onRetry} waitSeconds={waitSeconds} /> : null}
         {action}
       </div>
+    </div>
+  );
+}
+
+/** Reintentar; si la API pidió esperar (Retry-After), se habilita al terminar la cuenta. */
+function RetryButton({ onRetry, waitSeconds }: { onRetry: () => void; waitSeconds: number }) {
+  const [left, setLeft] = useState(waitSeconds);
+  useEffect(() => {
+    setLeft(waitSeconds);
+    if (waitSeconds <= 0) return;
+    const id = setInterval(() => setLeft((s) => (s <= 1 ? (clearInterval(id), 0) : s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [waitSeconds]);
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <Button variant="primary" onClick={onRetry} disabled={left > 0} aria-describedby={left > 0 ? 'retry-wait' : undefined}>
+        <RefreshCw aria-hidden="true" />
+        {es.common.retry}
+      </Button>
+      {left > 0 ? (
+        <p id="retry-wait" className="text-sm tabular-nums">
+          {fmt(es.errors.retryIn, { seconds: left })}
+        </p>
+      ) : null}
     </div>
   );
 }

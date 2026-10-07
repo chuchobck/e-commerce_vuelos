@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { paths, routes, SEARCH_ANCHOR_ID } from '@/app/routes';
 import { es } from '@/shared/i18n';
-import { Toaster } from '@/shared/ui';
+import { ServerWakingNotice, Toaster } from '@/shared/ui';
 import { Footer } from './Footer';
 import { Header } from './Header';
 
@@ -78,6 +78,7 @@ export function RootLayout() {
         {es.a11y.skipToContent}
       </a>
       <Header />
+      <ServerWakingNotice />
       <main id={MAIN_ID} tabIndex={-1} className="flex flex-1 flex-col outline-none">
         <Outlet />
       </main>
