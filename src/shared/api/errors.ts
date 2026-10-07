@@ -3,17 +3,10 @@ import type { ProblemCode } from './contract';
 
 /**
  * Códigos que no vienen del contrato: fallas de transporte y los del mock que aún no tienen
- * equivalente en la API (sesión y compra se conectan en F3 y F4).
+ * equivalente en la API (la compra se conecta en F4). Los errores de cuenta (/auth/*) no tienen
+ * código propio: la API manda VALIDATION_FAILED y el status dice qué pasó (ver authErrorMessage).
  */
-export type LocalErrorCode =
-  | 'NETWORK'
-  | 'TIMEOUT'
-  | 'NOT_CONNECTED'
-  | 'INVALID_CREDENTIALS'
-  | 'EMAIL_TAKEN'
-  | 'HOLD_EXPIRED'
-  | 'CONFLICT'
-  | 'SERVICE_UNAVAILABLE';
+export type LocalErrorCode = 'NETWORK' | 'TIMEOUT' | 'NOT_CONNECTED' | 'HOLD_EXPIRED' | 'CONFLICT' | 'SERVICE_UNAVAILABLE';
 
 export type ApiErrorCode = ProblemCode | LocalErrorCode;
 
@@ -83,10 +76,6 @@ export function errorMessage(error: unknown): string {
       return e.timeout;
     case 'NETWORK':
       return e.network;
-    case 'INVALID_CREDENTIALS':
-      return es.auth.invalidCredentials;
-    case 'EMAIL_TAKEN':
-      return es.auth.emailTaken;
     case 'HOLD_EXPIRED':
       return es.purchase.holdExpiredText;
     case 'CHECK_IN_NOT_AVAILABLE':
@@ -117,4 +106,32 @@ export function fieldErrorMessage({ field, message }: FieldError): string {
   if (/passengers\.infants/.test(field)) return es.validation.infantsPerAdult;
   if (/passengers/.test(field)) return es.validation.maxPassengers;
   return f.other;
+}
+
+export type AuthAction = 'login' | 'register';
+
+/**
+ * Mensaje para un error de ingreso o registro. 401 al ingresar es genérico (no revela si el correo
+ * existe); 409 al registrar = correo ya registrado; 429 trae el tiempo de Retry-After si viene.
+ */
+export function authErrorMessage(error: unknown, action: AuthAction): string {
+  if (!isApiError(error)) return e.unknown;
+  if (action === 'login' && error.status === 401) return es.auth.invalidCredentials;
+  if (action === 'register' && error.status === 409) return es.auth.emailTaken;
+  if (error.status === 429) {
+    return error.retryAfter ? fmt(es.auth.tooManyAttempts, { seconds: error.retryAfter }) : es.auth.tooManyAttemptsNoTime;
+  }
+  if (error.status === 400) return es.auth.invalidData;
+  return errorMessage(error);
+}
+
+/** Errores por campo de un 400 de /auth/* (correo o contraseña), en español. */
+export function authFieldErrors(error: unknown): { email?: string; password?: string } {
+  if (!isApiError(error) || error.status !== 400) return {};
+  const out: { email?: string; password?: string } = {};
+  for (const { field, message } of error.fieldErrors) {
+    if (/email/i.test(field)) out.email ??= es.validation.emailInvalid;
+    if (/password/i.test(field)) out.password ??= /shorter|max/i.test(message) ? es.validation.passwordMax : es.validation.passwordLength;
+  }
+  return out;
 }

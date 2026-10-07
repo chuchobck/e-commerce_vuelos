@@ -1,7 +1,7 @@
 import { LogIn, Ticket } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
 import { CheckoutSteps } from '@/features/checkout';
 import { flightsApi, isApiError } from '@/shared/api';
@@ -14,11 +14,11 @@ const p = es.purchase;
 /** Pantalla final de la compra (no es un paso): código de reserva y acceso a Mis viajes. */
 export function CheckoutConfirmationPage() {
   const { id = '' } = useParams();
-  const { session } = useAuth();
-  const booking = useAsync(() => (session ? flightsApi.getBooking(id) : Promise.resolve(null)), [id, session?.token]);
+  const { user } = useAuth();
+  const booking = useAsync(() => (user ? flightsApi.getBooking(id) : Promise.resolve(null)), [id, user?.id]);
 
   let content;
-  if (!session) {
+  if (!user) {
     content = (
       <EmptyState
         title={p.confirmationTitle}

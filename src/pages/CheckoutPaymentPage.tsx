@@ -2,7 +2,7 @@ import { ArrowLeft, CreditCard, Search, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
 import { CheckoutSteps, CheckoutSummary, HoldStatus, loadSelection, selectionTotal, useCheckoutHold } from '@/features/checkout';
 import { apiConfig } from '@/shared/api';
@@ -13,10 +13,10 @@ const p = es.purchase;
 
 /** Paso 3: revisar y pagar. El pago simulado llega en F4; aquí se conservan resumen y temporizador. */
 export function CheckoutPaymentPage() {
-  const { session } = useAuth();
+  const { user } = useAuth();
   const [selection] = useState(loadSelection);
   // En el paso 3 nunca se crea un hold: solo se recupera el del paso 2.
-  const ready = apiConfig.usingMock && !!session && !!selection?.holdId;
+  const ready = apiConfig.usingMock && !!user && !!selection?.holdId;
   const { hold, active, statusProps } = useCheckoutHold(ready ? selection : null, { create: false });
 
   const backToDetails = (

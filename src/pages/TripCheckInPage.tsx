@@ -2,7 +2,7 @@ import { ArrowLeft, CalendarCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
 import { BoardingPassCard, checkInStatus } from '@/features/checkin';
 import { TripFallback } from '@/features/trips';
@@ -18,7 +18,7 @@ type State = { status: 'idle' } | { status: 'loading' } | { status: 'error'; err
 /** Check-in de un viaje propio: se hace por bookingId y para todos los pasajeros de la reserva. */
 export function TripCheckInPage() {
   const { id = '' } = useParams();
-  const { session } = useAuth();
+  const { authorized } = useAuth();
   const trip = useAsync(() => flightsApi.getBooking(id), [id]);
   const [state, setState] = useState<State>({ status: 'idle' });
   const booking = trip.status === 'success' ? trip.data : null;
@@ -26,7 +26,7 @@ export function TripCheckInPage() {
   const checkIn = async (bookingId: string) => {
     setState({ status: 'loading' });
     try {
-      const data = await flightsApi.checkIn({ bookingId }, session?.token);
+      const data = await authorized(() => flightsApi.checkIn({ bookingId }));
       setState({ status: 'success', data });
     } catch (error) {
       setState({ status: 'error', error });

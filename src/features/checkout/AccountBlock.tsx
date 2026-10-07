@@ -6,8 +6,8 @@ import { Button, Card, CardTitle } from '@/shared/ui';
 const p = es.purchase;
 
 interface AccountBlockProps {
-  /** Nombre de quien compra si hay sesión. */
-  userName?: string;
+  /** Correo de la cuenta si hay sesión (la API no guarda nombre). */
+  email?: string;
   /** Enlaces que ya incluyen a dónde volver. */
   loginHref: string;
   registerHref: string;
@@ -17,12 +17,12 @@ interface AccountBlockProps {
  * Bloque de cuenta del paso 2. Sin sesión pide ingresar o crear la cuenta sin perder la
  * selección; con sesión se reduce a "Compras como …".
  */
-export function AccountBlock({ userName, loginHref, registerHref }: AccountBlockProps) {
-  if (userName) {
+export function AccountBlock({ email, loginHref, registerHref }: AccountBlockProps) {
+  if (email) {
     return (
       <Card className="flex items-center gap-4">
         <UserRound aria-hidden="true" className="size-8 shrink-0 text-primary" />
-        <p className="text-lg font-bold">{fmt(p.buyingAs, { name: userName })}</p>
+        <p className="min-w-0 break-words text-lg font-bold">{fmt(p.buyingAs, { email })}</p>
       </Card>
     );
   }

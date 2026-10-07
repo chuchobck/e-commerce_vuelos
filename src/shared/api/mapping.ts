@@ -15,8 +15,21 @@ import type {
   SearchRequestDto,
   SearchResponseDto,
   SegmentDto,
+  TokenResponseDto,
+  UserResponseDto,
 } from './contract';
-import type { Fare, FlightOffer, FlightStatus, Itinerary, PassengerCount, SearchParams, SearchResult, Segment } from './types';
+import type {
+  AuthTokens,
+  Fare,
+  FlightOffer,
+  FlightStatus,
+  Itinerary,
+  PassengerCount,
+  SearchParams,
+  SearchResult,
+  Segment,
+  User,
+} from './types';
 
 /** "2026-10-09T11:00:00.000Z" en un aeropuerto UTC−5 → "2026-10-09T06:00:00-05:00". */
 export function toAirportLocalIso(utcIso: string, airport: string): string {
@@ -153,4 +166,12 @@ export function faresForCabin(itinerary: Itinerary, cabin: SearchParams['cabin']
 /** Firma de un itinerario: mismos vuelos a la misma hora (sirve para agrupar ofertas de ida y vuelta). */
 export function itinerarySignature(itinerary: Itinerary): string {
   return itinerary.segments.map((s) => `${s.flightNumber}@${s.departureTime}`).join('+');
+}
+
+export function mapTokens(dto: TokenResponseDto): AuthTokens {
+  return { accessToken: dto.access_token, refreshToken: dto.refresh_token, expiresIn: dto.expires_in, scope: dto.scope };
+}
+
+export function mapUser(dto: UserResponseDto): User {
+  return { id: dto.id, email: dto.email, roles: dto.roles, scopes: dto.scopes, createdAt: dto.createdAt };
 }

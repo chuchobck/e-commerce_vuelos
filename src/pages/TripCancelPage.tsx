@@ -2,7 +2,7 @@ import { ArrowLeft, Ban } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
 import { TripFallback } from '@/features/trips';
 import { errorMessage, flightsApi } from '@/shared/api';
@@ -16,7 +16,7 @@ const t = es.trip;
 /** Cancelación de un viaje. La propia pantalla es la confirmación: explica la consecuencia antes de actuar. */
 export function TripCancelPage() {
   const { id = '' } = useParams();
-  const { session } = useAuth();
+  const { authorized } = useAuth();
   const navigate = useNavigate();
   const trip = useAsync(() => flightsApi.getBooking(id), [id]);
   const [cancelling, setCancelling] = useState(false);
@@ -25,7 +25,7 @@ export function TripCancelPage() {
   const cancel = async (bookingId: string) => {
     setCancelling(true);
     try {
-      const updated = await flightsApi.cancelBooking(bookingId, session?.token);
+      const updated = await authorized(() => flightsApi.cancelBooking(bookingId));
       toast({ title: fmt(t.cancelled, { code: updated.code }), variant: 'success' });
       navigate(routes.trip(updated.id), { replace: true });
     } catch (error) {

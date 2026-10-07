@@ -1,8 +1,20 @@
-import type { AuthSession, Booking, Hold, User } from '../types';
+import type { Booking, Hold, User } from '../types';
 
 /** Base de datos simulada persistida en localStorage (solo para el mock). */
 export interface StoredUser extends User {
   passwordHash: string;
+  active: boolean;
+}
+
+/** Refresh token del mock, con las reglas de la API: rotación por familia y detección de reutilización. */
+export interface StoredRefreshToken {
+  token: string;
+  family: string;
+  userId: string;
+  expiresAt: string;
+  /** Ya se usó para renovar: volver a usarlo es una reutilización. */
+  replaced: boolean;
+  revoked: boolean;
 }
 
 export interface MockDb {
@@ -10,13 +22,13 @@ export interface MockDb {
   /** Día (yyyy-MM-dd) en que se generaron las reservas de demostración. */
   seededOn: string;
   users: StoredUser[];
-  sessions: AuthSession[];
+  refreshTokens: StoredRefreshToken[];
   holds: Hold[];
   bookings: Booking[];
 }
 
 const KEY = 'quinde.mock.db';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 let memory: MockDb | null = null;
 

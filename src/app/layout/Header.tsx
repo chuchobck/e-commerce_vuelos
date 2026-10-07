@@ -1,7 +1,7 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ChevronDown, CircleHelp, LogIn, LogOut, Moon, Sun, Ticket, User, UserRound } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/features/auth';
 import { useTheme } from '@/app/providers/ThemeProvider';
 import { routes, safeReturnTo } from '@/app/routes';
 import { es, fmt } from '@/shared/i18n';
@@ -43,10 +43,12 @@ const MENU_ITEM =
 
 /** Sin sesión: "Ingresar" (vuelve a esta página después). Con sesión: Mis viajes, Mi perfil y Cerrar sesión. */
 function UserMenu() {
-  const { session, logout } = useAuth();
+  const { status, user, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
-  if (!session) {
+  // Mientras se restaura la sesión se reserva el espacio: ni "Ingresar" ni el menú parpadean.
+  if (status === 'restoring') return <span aria-hidden="true" className="hidden h-12 w-32 lg:inline-block" />;
+  if (!user) {
     return (
       <Button asChild variant="secondary" className="hidden lg:inline-flex">
         <Link to={routes.login(safeReturnTo(pathname + search) ?? undefined)}>
@@ -56,13 +58,18 @@ function UserMenu() {
       </Button>
     );
   }
-  const name = session.user.firstName.split(' ')[0];
+  // La cuenta de la API no tiene nombre: se muestra el correo (abreviado; completo en el nombre accesible).
+  const shortName = user.email.split('@')[0];
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button variant="secondary" className="hidden lg:inline-flex" aria-label={fmt(es.nav.userMenu, { name })}>
+        <Button
+          variant="secondary"
+          className="hidden max-w-60 lg:inline-flex"
+          aria-label={fmt(es.nav.userMenu, { name: user.email })}
+        >
           <User aria-hidden="true" />
-          {name}
+          <span className="truncate">{shortName}</span>
           <ChevronDown aria-hidden="true" />
         </Button>
       </DropdownMenu.Trigger>
@@ -87,9 +94,10 @@ function UserMenu() {
           <DropdownMenu.Separator className="my-2 h-px bg-border" />
           <DropdownMenu.Item
             onSelect={() => {
-              logout();
-              toast({ title: es.nav.loggedOut, variant: 'success' });
-              navigate(routes.home());
+              void logout().then(() => {
+                toast({ title: es.nav.loggedOut, variant: 'success' });
+                navigate(routes.home());
+              });
             }}
             className={MENU_ITEM}
           >

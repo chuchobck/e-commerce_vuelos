@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { es, fmt } from '@/shared/i18n';
+import { EMAIL_MAX_LENGTH, isValidEmail, normalizeEmail, passwordLengthIssue } from './credentials';
 import { ageOn, lastFlightDate, parseDisplayDate, toDisplayDate, today } from './dates';
 import {
   FLIGHT_NUMBER_PATTERN,
@@ -35,13 +36,30 @@ export const cedulaField = z
 
 export const passportField = z.string().trim().min(1, v.required).regex(PASSPORT_PATTERN, v.passportInvalid);
 
-export const emailField = z.string().trim().min(1, v.required).max(100, v.emailLength).email(v.emailInvalid);
+/** Correo: misma normalización y validación que el backend (shared/lib/credentials.ts). */
+export const emailField = z
+  .string()
+  .transform(normalizeEmail)
+  .pipe(
+    z
+      .string()
+      .min(1, v.required)
+      .max(EMAIL_MAX_LENGTH, v.emailLength)
+      .refine(isValidEmail, v.emailInvalid),
+  );
 
 /** Solo los 9 dígitos posteriores a +593 (el prefijo se muestra fijo). */
 export const phoneField = z.string().trim().min(1, v.required).regex(PHONE_EC_PATTERN, v.phoneInvalid);
 
-/** Contraseña: sin reglas de composición cognitivas; solo longitud (WCAG 3.3.8). */
-export const passwordField = z.string().min(1, v.required).min(8, v.passwordLength).max(64, v.passwordMax);
+/**
+ * Contraseña: solo longitud, de 12 a 128 caracteres tras normalizar a NFKC y sin recortar, como el
+ * backend. Sin reglas de composición (WCAG 3.3.8 y NIST SP 800-63B). Se envía tal cual la escribió.
+ */
+export const passwordField = z.string().superRefine((value, ctx) => {
+  if (value.length === 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: v.required });
+  else if (passwordLengthIssue(value) === 'short') ctx.addIssue({ code: z.ZodIssueCode.custom, message: v.passwordLength });
+  else if (passwordLengthIssue(value) === 'long') ctx.addIssue({ code: z.ZodIssueCode.custom, message: v.passwordMax });
+});
 
 export const flightNumberField = z
   .string()

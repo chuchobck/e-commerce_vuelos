@@ -1,12 +1,12 @@
 import { RouterProvider } from 'react-router-dom';
-import { AuthProvider } from './providers/AuthProvider';
+import { AuthProvider, session } from '@/features/auth';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { router } from './router';
 
 export function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
+      <AuthProvider manager={session}>
         <RouterProvider router={router} />
       </AuthProvider>
     </ThemeProvider>
