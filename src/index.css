@@ -1,0 +1,270 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * ─────────────────────────────────────────────────────────────
+ *  Quinde · Tokens de diseño
+ *  Valores en canales RGB para permitir opacidad en Tailwind.
+ *  Contrastes verificados (ver README › Tokens de color).
+ * ─────────────────────────────────────────────────────────────
+ */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --color-background: 247 250 251; /* #F7FAFB */
+    --color-surface: 255 255 255; /* #FFFFFF */
+    --color-foreground: 18 38 58; /* #12263A  · 15.4:1 sobre superficie */
+    --color-muted: 68 86 106; /* #44566A  ·  7.5:1 texto secundario */
+    --color-input: 107 124 141; /* #6B7C8D  ·  4.3:1 borde de campos */
+    --color-border: 203 213 220; /* #CBD5DC  · borde decorativo */
+
+    --color-primary: 11 92 107; /* #0B5C6B  ·  7.6:1 */
+    --color-primary-hover: 8 74 87; /* #084A57 */
+    --color-primary-foreground: 255 255 255; /* #FFFFFF */
+    --color-primary-tint: 227 242 244; /* #E3F2F4 */
+
+    /* Acento: SOLO relleno de botón destacado con texto #12263A */
+    --color-accent: 245 165 36; /* #F5A524  ·  7.5:1 con su texto */
+    --color-accent-hover: 232 148 22; /* #E89416 */
+    --color-accent-foreground: 18 38 58; /* #12263A */
+
+    --color-success: 27 127 75; /* #1B7F4B  ·  5.0:1 */
+    --color-success-foreground: 255 255 255;
+    --color-success-tint: 237 247 241; /* #EDF7F1 */
+    --color-error: 179 38 30; /* #B3261E  ·  6.5:1 */
+    --color-error-foreground: 255 255 255;
+    --color-error-tint: 251 233 231; /* #FBE9E7 */
+    --color-warning: 107 69 0; /* #6B4500 texto de aviso */
+    --color-warning-tint: 255 241 208; /* #FFF1D0 fondo de aviso · 7.6:1 */
+
+    --color-focus: 31 79 216; /* #1F4FD8  ·  6.3:1 sobre fondo */
+    --color-overlay: 18 38 58; /* velo de diálogos (se usa con opacidad) */
+    --color-shadow: 18 38 58;
+
+    /* Pie de página: bloque oscuro que se separa claramente del contenido. */
+    --color-footer: 18 38 58; /* #12263A */
+    --color-footer-foreground: 255 255 255;
+    --color-footer-muted: 179 195 208; /* #B3C3D0 */
+    --color-footer-link: 158 223 229; /* #9EDFE5 */
+    --color-footer-border: 43 66 85; /* #2B4255 */
+
+    /* Panorámica "cuatro mundos" del inicio (día). */
+    --sky-top: 214 239 243; /* #D6EFF3 */
+    --sky-bottom: 255 243 224; /* #FFF3E0 */
+    --pano-sun: 245 165 36;
+    --pano-cloud: 255 255 255;
+    --pano-star-opacity: 0;
+    --pano-sea: 20 151 166;
+    --pano-sea-light: 94 198 208;
+    --pano-island: 46 125 95;
+    --pano-island-dark: 31 94 70;
+    --pano-sand: 240 214 160;
+    --pano-palm: 42 120 78;
+    --pano-trunk: 140 98 57;
+    --pano-mount-far: 150 178 190;
+    --pano-mount: 74 112 128;
+    --pano-mount-dark: 52 84 99;
+    --pano-snow: 255 255 255;
+    --pano-jungle: 31 107 58;
+    --pano-jungle-dark: 20 78 44;
+    --pano-jungle-light: 61 140 80;
+    --pano-river: 170 222 230;
+
+    /* Color de cada región (puntos y acentos; el texto siempre va en foreground). */
+    --region-costa: 245 165 36;
+    --region-andes: 74 112 128;
+    --region-amazonia: 31 107 58;
+    --region-galapagos: 20 151 166;
+
+    --radius: 12px;
+    --header-height: 5rem;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --color-background: 13 27 38; /* #0D1B26 */
+    --color-surface: 20 38 52; /* #142634 */
+    --color-foreground: 234 241 245; /* #EAF1F5  · 13.6:1 */
+    --color-muted: 179 195 208; /* #B3C3D0  ·  8.6:1 */
+    --color-input: 131 151 168; /* #8397A8  ·  5.1:1 */
+    --color-border: 43 66 85; /* #2B4255 */
+
+    --color-primary: 92 198 208; /* #5CC6D0  ·  7.7:1 */
+    --color-primary-hover: 130 214 222; /* #82D6DE */
+    --color-primary-foreground: 10 39 48; /* #0A2730 · 7.8:1 sobre primario */
+    --color-primary-tint: 19 58 66; /* #133A42 */
+
+    --color-accent: 245 165 36; /* #F5A524 */
+    --color-accent-hover: 247 183 80; /* #F7B750 */
+    --color-accent-foreground: 18 38 58; /* #12263A */
+
+    --color-success: 93 211 158; /* #5DD39E  ·  8.3:1 */
+    --color-success-foreground: 10 42 28;
+    --color-success-tint: 18 52 42; /* #12342A */
+    --color-error: 255 143 134; /* #FF8F86  ·  7.0:1 */
+    --color-error-foreground: 42 11 8;
+    --color-error-tint: 61 26 24; /* #3D1A18 */
+    --color-warning: 255 213 138; /* #FFD58A */
+    --color-warning-tint: 61 46 10; /* #3D2E0A  · 9.5:1 */
+
+    --color-focus: 141 180 255; /* #8DB4FF  ·  8.4:1 sobre fondo */
+    --color-overlay: 0 0 0;
+    --color-shadow: 0 0 0;
+
+    --color-footer: 5 11 17; /* #050B11: casi negro; la silueta de los Andes marca el borde */
+    --color-footer-foreground: 234 241 245;
+    --color-footer-muted: 179 195 208;
+    --color-footer-link: 158 223 229;
+    --color-footer-border: 34 52 68; /* #223444 */
+
+    /* Panorámica de noche: luna, estrellas y colores apagados. */
+    --sky-top: 8 18 32; /* #081220 */
+    --sky-bottom: 27 43 74; /* #1B2B4A */
+    --pano-sun: 236 232 210;
+    --pano-cloud: 60 80 110;
+    --pano-star-opacity: 1;
+    --pano-sea: 12 74 92;
+    --pano-sea-light: 30 110 125;
+    --pano-island: 22 70 60;
+    --pano-island-dark: 14 50 42;
+    --pano-sand: 120 104 80;
+    --pano-palm: 22 74 52;
+    --pano-trunk: 80 60 40;
+    --pano-mount-far: 44 62 88;
+    --pano-mount: 32 48 70;
+    --pano-mount-dark: 22 34 52;
+    --pano-snow: 200 214 230;
+    --pano-jungle: 16 60 40;
+    --pano-jungle-dark: 10 42 28;
+    --pano-jungle-light: 26 84 54;
+    --pano-river: 60 100 130;
+
+    --region-costa: 245 165 36;
+    --region-andes: 131 170 186;
+    --region-amazonia: 93 191 120;
+    --region-galapagos: 92 198 208;
+  }
+
+  html {
+    /* 16 px raíz para que 1rem respete la preferencia del usuario; el cuerpo usa 18 px. */
+    font-size: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Nada fijo tapa el foco (WCAG 2.4.11): margen de desplazamiento al enfocar. */
+    scroll-padding-block: 6rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  body {
+    @apply bg-background font-sans text-base text-foreground antialiased;
+    line-height: 1.5;
+    min-width: 320px;
+    overflow-wrap: break-word;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-bold text-foreground;
+    text-wrap: balance;
+  }
+
+  h1,
+  h2 {
+    @apply font-display font-semibold tracking-tight;
+  }
+
+  p {
+    max-width: 70ch;
+  }
+
+  a {
+    @apply text-primary underline underline-offset-4;
+  }
+
+  a:hover {
+    @apply decoration-2;
+  }
+
+  img,
+  svg,
+  video {
+    max-width: 100%;
+  }
+
+  /* Foco visible de 3 px y alto contraste en todos los elementos interactivos. */
+  :focus-visible {
+    outline: 3px solid rgb(var(--color-focus));
+    outline-offset: 2px;
+  }
+
+  /* Evita que el foco de un encabezado programático muestre anillo innecesario. */
+  [tabindex='-1']:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Modo de alto contraste de Windows: conserva el foco. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 3px solid CanvasText;
+    }
+  }
+
+  /* Respeta prefers-reduced-motion en todo el sitio. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Sobre el pie oscuro el foco usa el azul claro para mantener el contraste. */
+  .site-footer {
+    --color-focus: 141 180 255;
+  }
+
+  .container-page {
+    @apply mx-auto w-full max-w-content px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Cielo del inicio: amanecer de día, noche estrellada en modo oscuro. */
+  .hero-sky {
+    background: linear-gradient(180deg, rgb(var(--sky-top)) 0%, rgb(var(--sky-bottom)) 100%);
+  }
+
+  /* Capas de la panorámica (SVG): el color sale de los tokens para cambiar con el tema. */
+  .pano-sun { fill: rgb(var(--pano-sun)); }
+  .pano-cloud { fill: rgb(var(--pano-cloud)); }
+  .pano-star { fill: #fff; opacity: var(--pano-star-opacity); }
+  .pano-sea { fill: rgb(var(--pano-sea)); }
+  .pano-sea-light { fill: rgb(var(--pano-sea-light)); }
+  .pano-island { fill: rgb(var(--pano-island)); }
+  .pano-island-dark { fill: rgb(var(--pano-island-dark)); }
+  .pano-sand { fill: rgb(var(--pano-sand)); }
+  .pano-palm { fill: rgb(var(--pano-palm)); }
+  .pano-trunk { stroke: rgb(var(--pano-trunk)); fill: none; }
+  .pano-mount-far { fill: rgb(var(--pano-mount-far)); }
+  .pano-mount { fill: rgb(var(--pano-mount)); }
+  .pano-mount-dark { fill: rgb(var(--pano-mount-dark)); }
+  .pano-snow { fill: rgb(var(--pano-snow)); }
+  .pano-jungle { fill: rgb(var(--pano-jungle)); }
+  .pano-jungle-dark { fill: rgb(var(--pano-jungle-dark)); }
+  .pano-jungle-light { fill: rgb(var(--pano-jungle-light)); }
+  .pano-river { fill: none; stroke: rgb(var(--pano-river)); }
+  .pano-bird { fill: none; stroke: rgb(var(--pano-mount-dark)); }
+}

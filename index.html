@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es-EC">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Sin maximum-scale ni user-scalable=no: el zoom siempre está permitido. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quinde · Vuelos en Ecuador</title>
+    <meta
+      name="description"
+      content="Quinde: compra vuelos dentro de Ecuador en 3 pasos. Quito, Guayaquil, Cuenca, Galápagos y más, con precios en dólares y una experiencia accesible."
+    />
+    <meta name="theme-color" content="#0B5C6B" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0D1B26" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" href="/brand/favicon.png" />
+    <link rel="apple-touch-icon" href="/brand/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600;1,9..144,700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Aplica el tema antes de pintar para evitar parpadeo (respeta prefers-color-scheme).
+      (function () {
+        try {
+          var stored = localStorage.getItem('quinde.theme');
+          var dark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript>Para usar Quinde necesitas activar JavaScript en tu navegador.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
