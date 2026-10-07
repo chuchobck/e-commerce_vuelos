@@ -205,6 +205,29 @@ Pago simulado: la pantalla lo dice de forma visible. Los datos de tarjeta no sal
 - **CORS:** el origen del frontend (por ejemplo `http://localhost:5173` y el dominio publicado) debe estar en `CORS_ORIGINS` del backend.
 - Ante la duda, manda el contrato. Las diferencias conocidas están en `docs/DISCREPANCIAS-CONTRATO.md` del backend.
 
+### Aeropuertos y rutas (verificado contra la API el 2026-10-07)
+
+La API pública no tiene endpoint de aeropuertos: la lista del buscador es **estática** (`src/shared/api/airports.ts`), sale de la semilla del backend y **hay que mantenerla sincronizada a mano** si el backend cambia su red. Una prueba la compara con los códigos de la semilla y otra comprueba que el mock tiene exactamente la misma red que la tabla.
+
+Aeropuertos: UIO Quito, GYE Guayaquil, CUE Cuenca, LOH Loja, MEC Manta, ESM Esmeraldas, LGQ Nueva Loja (Lago Agrio), OCC Coca, GPS Baltra y SCY San Cristóbal. Latacunga (LTX) y Macas (XMS) **no existen** en la API y se quitaron.
+
+No todos los pares tienen vuelos. El buscador solo ofrece como destino los que devolvieron ofertas en al menos una de 7 fechas consecutivas (búsquedas reales, 90 pares, 389 consultas):
+
+| Desde | Destinos con vuelos |
+|---|---|
+| UIO | GYE, CUE, LOH, MEC, ESM, LGQ, OCC, GPS, SCY |
+| GYE | UIO, CUE, MEC, ESM, OCC, GPS, SCY |
+| CUE | UIO, GYE, GPS, SCY |
+| LOH | UIO, GYE, CUE, MEC, ESM |
+| MEC | UIO, GYE |
+| ESM | UIO, GYE, CUE, OCC |
+| LGQ | UIO, GYE, CUE, MEC, OCC |
+| OCC | UIO, GYE, LOH, MEC, ESM |
+| GPS | UIO, GYE |
+| SCY | UIO, GYE |
+
+Hay rutas de un solo sentido por los horarios de conexión (por ejemplo CUE→GPS existe, GPS→CUE no).
+
 ---
 
 ## 7. Diseño, accesibilidad y validaciones
