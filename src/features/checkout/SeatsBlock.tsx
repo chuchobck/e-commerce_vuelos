@@ -29,10 +29,11 @@ export function SeatsBlock({ lines, forceOpen = false, children }: SeatsBlockPro
   const chosen = anySeatChosen(lines);
 
   return (
-    <Card className="flex flex-col gap-4">
-      <h3 className="text-xl font-bold">{f.seatsTitle}</h3>
+    // Sin título propio: abierto, el selector trae el suyo ("Elige tus asientos"); plegado, basta el texto.
+    <Card role="group" aria-label={f.seatsTitle} className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="min-w-0 flex-1 text-muted">{chosen ? f.seatsChosenIntro : f.seatsAutoText}</p>
+        {/* El texto no se encoge por debajo de 14rem: en pantallas angostas el botón baja a la línea siguiente. */}
+        <p className="min-w-[14rem] flex-1 text-muted">{chosen ? f.seatsChosenIntro : f.seatsAutoText}</p>
         <button
           type="button"
           aria-expanded={open}

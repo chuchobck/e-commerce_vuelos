@@ -421,9 +421,9 @@ export const es = {
     seatsChange: 'Cambiar asientos',
     seatsHide: 'Ocultar asientos',
     seatsTakenTitle: 'Revisa tus asientos',
-    seatsTakenText: 'Alguien eligió antes un asiento de tu compra. Mantuvimos los demás: elige otro y vuelve a continuar. Tu precio sigue apartado.',
-    seatsInvalidText: 'La aerolínea no aceptó uno de los asientos elegidos. Elige otro o deja la asignación automática. Tu precio sigue apartado.',
-    seatsCabinText: 'Un asiento elegido no corresponde a tu tarifa. Mantuvimos los demás: elige otro y vuelve a continuar. Tu precio sigue apartado.',
+    seatsTakenText: 'Alguien eligió antes uno de los asientos de tu compra. Revisamos el mapa: quitamos el que ya no está disponible y conservamos los demás. Elige otro y vuelve a continuar. Tu precio sigue apartado.',
+    seatsInvalidText: 'La aerolínea no aceptó uno de los asientos elegidos. Revisa tus asientos o deja la asignación automática, y vuelve a continuar. Tu precio sigue apartado.',
+    seatsCabinText: 'La aerolínea dice que un asiento no corresponde a la cabina de tu tarifa. Revisamos el mapa y conservamos lo que sí sirve: revisa tus asientos y vuelve a continuar. Tu precio sigue apartado.',
     birthRule: {
       ADULT: 'Desde 18 años.',
       YOUTH: 'De 12 a 17 años.',

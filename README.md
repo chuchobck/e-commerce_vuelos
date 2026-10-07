@@ -14,10 +14,10 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 
 ---
 
-## 1. Estado actual (2026-10-07, cierre de F4b)
+## 1. Estado actual (2026-10-07, cierre de F5)
 
-- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 4b. 211 archivos en `src`, unas 17.700 líneas de TypeScript (sin contar los tipos generados).
-- 384 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
+- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 5. 242 archivos en `src`, unas 21.400 líneas de TypeScript (sin contar los tipos generados).
+- 446 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
 - **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, "Escápate", estado de vuelo, la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas) **y la compra** (hold, reserva, pago simulado y confirmación); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
 - Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para `/auth/*`, `contracts/backend-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
 - **Sesión** (sección 6, "Modelo de seguridad de la sesión"): access token solo en memoria, renovación única entre pestañas, cierre de sesión que se propaga a las demás pestañas, restauración al recargar sin parpadeo.
@@ -28,7 +28,7 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 - Camino feliz con sesión: **3 clics** desde "Elegir tarifa" hasta la confirmación (Elegir, Continuar al pago, Pagar), más escribir los datos del pasajero y de la tarjeta. Sin sesión se suman los de la cuenta.
 - Mis viajes: lista, detalle con estado del vuelo, check-in por viaje (ventana 48 h / 60 min) y cancelación (mock). Pases, equipaje y cambio de fecha son pantallas de espera (F6).
 - Ofertas es una pantalla inicial (F7). Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
-- **F5 (rama `fase-5-asientos`, sin fusionar):** selector de asientos como módulo independiente (`features/seats`) con demo en `/componentes/asientos`. Aún no está en el paso 2 y no se verificó con la API real (sección 5b). 306 pruebas en verde.
+- **Asientos (F5, secciones 5b y 6):** el selector (`features/seats`) está dentro del paso 2 como un bloque **opcional y plegado** ("Asignaremos tus asientos automáticamente. Elegir asientos (opcional)"): sin abrirlo no se pide ningún mapa y el camino sigue en 3 clics. Elige un asiento por pasajero en **cada tramo** (ida, vuelta y escalas) y viaja como `assignedSeats`; el panel lateral, la revisión del pago y la confirmación muestran los asientos de cada pasajero. Verificado con la API real (sección 6, "Lo que aprendimos de asientos").
 
 > Regla de mantenimiento: al cerrar cada fase se actualiza esta sección y las columnas "Estado" de las tablas. Si este README y el código no coinciden, se corrige el README en el mismo commit.
 
@@ -129,7 +129,7 @@ Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `np
 | `results` | Resultados y familias tarifarias reales | Hecho (mock y API real) |
 | `auth` | Sesión (`SessionManager`: tokens, renovación, pestañas, restauración), `AuthProvider`/`useAuth`, formularios de ingreso y registro (`RequireAuth` vive en `app/`) | Hecho (mock y API real) |
 | `checkout` | Compra en 3 pasos: selección, máquina de estados (`machine.ts` + `flow.ts`), claves de idempotencia, hold con tiempo del servidor, pasajeros, pago, seguimiento de la reserva | Hecho (mock y API real) |
-| `seats` | Selector de asientos (mapa en forma de avión, lista alternativa, filtros, recomendación, conflictos 409/422) | Hecho como módulo independiente (F5, rama `fase-5-asientos`); se enchufa al paso 2 en F4 (ver sección 5b) |
+| `seats` | Selector de asientos (mapa en forma de avión, lista alternativa, filtros, recomendación, conflictos 409/422) | Hecho (mock y API real); dentro del paso 2 como bloque opcional (sección 5b) |
 | `trips` | Mis viajes y detalle del viaje | Parcial (mock) |
 | `checkin` | Check-in dentro del viaje y pases de abordar | Parcial (check-in por viaje; pases en F6) |
 | `aftersale` | Equipaje, cambio de fecha, cancelación | Parcial (cancelación en la página del viaje) |
@@ -153,7 +153,7 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo**. A la de
 | `/` | Inicio con buscador | Público | `POST /search` | Hecho (mock y API real) |
 | `/resultados` | Vuelos y tarifas (paso 1) | Público | `POST /search` | Hecho (mock y API real) |
 | `/ofertas` | Precios más bajos por destino | Público | `POST /search` | Pantalla de espera (F7) |
-| `/compra/datos` | Cuenta y pasajeros (paso 2) | Sesión dentro del paso | `/auth/*`, `POST`/`GET`/`DELETE /offers/hold` | Hecho (mock y API real); el asiento se elige en F5 (hoy, asignación automática) |
+| `/compra/datos` | Cuenta y pasajeros (paso 2) | Sesión dentro del paso | `/auth/*`, `POST`/`GET`/`DELETE /offers/hold`, `GET /offers/{id}/seatmap` | Hecho (mock y API real); asientos opcionales por tramo |
 | `/compra/pago` | Pago (paso 3) | Sesión dentro del paso | `POST /bookings`, `GET /offers/hold/{id}` | Hecho (mock y API real) |
 | `/compra/confirmacion/:id` | Confirmada, en proceso o fallida | Sesión | `GET /bookings/{id}` | Hecho (mock y API real) |
 | `/mis-viajes` | Lista de viajes | Sesión | `GET /bookings` | Hecho (mock) |
@@ -262,7 +262,7 @@ const [seats, setSeats] = useState<SeatAssignments>({});        // {} = todo aut
 | `onConflict` | Avisa un asiento elegido que dejó de servir (`SEAT_TAKEN` o `CABIN_MISMATCH`) con `segmentId`, `passengerId`, `seatNumber` y `alternative` (el libre más cercano de la cabina correcta). Llega **después** de que `onChange` entregó el valor sin ese asiento |
 | `serverError` | El error de la reserva. Con `SEAT_TAKEN` (409) o `SEAT_CABIN_MISMATCH` (422) el selector vuelve a pedir los mapas de los tramos con asientos elegidos, quita lo que ya no sirve, conserva lo demás y lo explica. Cualquier otro error se ignora. Se procesa al cambiar la referencia del objeto |
 
-**Mapeo a `PassengerItem`:** `toAssignedSeats(value, passengerId, segments)` devuelve `{ segmentId, seatNumber }[]`, exactamente `PassengerItem.assignedSeats` (una prueba lo comprueba contra los tipos generados). Si queda vacío, **omitir el campo**. Los bebés nunca tienen entrada. Cuidado: el `PassengerData.seatId` del mock actual guarda un solo asiento (solo el primer tramo); F4 debe pasar a `assignedSeats` por tramo.
+**Mapeo a `PassengerItem`:** `toAssignedSeats(value, passengerId, segments)` devuelve `{ segmentId, seatNumber }[]`, exactamente `PassengerItem.assignedSeats` (una prueba lo comprueba contra los tipos generados). Si queda vacío, **omitir el campo**. Los bebés nunca tienen entrada. La compra (`features/checkout`) ya lo usa así: `BookingPassenger.seats` es `assignedSeats` por tramo y el formulario guarda la elección como `passengerId → segmentId → asiento`.
 
 ### Qué hace
 
@@ -280,7 +280,7 @@ const [seats, setSeats] = useState<SeatAssignments>({});        // {} = todo aut
 - **"Más espacio"** incluye `EXTRA_LEGROOM` y `EMERGENCY_EXIT`. **"Juntos"** busca tiras de asientos libres seguidas, sin cruzar el pasillo, para el total de pasajeros con asiento.
 - **Reglas de salida de emergencia:** el contrato no define restricciones. La interfaz no inventa ninguna; solo evita recomendar una salida si viaja un niño y avisa en la leyenda. Hay que confirmar con la aerolínea/API si debe bloquearse.
 - **409 y 422 no dicen qué asiento falló.** Por eso el selector compara lo elegido con un mapa recién pedido; si no encuentra nada, muestra un aviso general. El `detail` técnico nunca se muestra ni se interpreta.
-- **Mock:** ya existía `getSeatMap` en `FlightsApi` y el diseño de cabinas de la semilla (A320, A319, ATR72). Su ocupación es determinista pero con semilla por vuelo y fecha (no por `offerId`+`segmentId`): el mismo vuelo muestra la misma ocupación aunque cambie la oferta, como en un avión real. Se agregó `shared/api/mock/seatSimulation.ts` (asientos ocupados simulados y los errores 409/422) y los botones de la demo lo usan.
+- **Mock:** el diseño de cabinas es el de la semilla (A320, A319, ATR72), igual que la API. Desde la integración (F5) el mapa nace **todo libre** y solo ocupan las reservas hechas en el propio mock, como la API real; `shared/api/mock/seatSimulation.ts` (asientos ocupados simulados y errores 409/422) sigue sirviendo a la demo y a las pruebas.
 - **Textos:** viven en `shared/i18n/seats.ts` (se incluye como `es.seats`) para no chocar con F4 en `es.ts`; se pueden mover a `es.ts` al fusionar.
 - Fuera de esta fase: copiar la elección de un tramo al siguiente y bloquear por tipo de pasajero.
 
@@ -376,6 +376,39 @@ Verificado contra el **backend local** el 2026-10-07 (en Render no se crean hold
 - **Nacionalidad:** la tabla `pais` del backend solo trae Ecuador (`db/semilla_vuelos.sql`). Con cualquier otro código la reserva responde 422 `VALIDATION_FAILED` con `invalidParams: passengers[n].nationality` "is not a country this API knows" (comprobado con CO, PE, US, ES, AR, BR y JP, y con un documento válido). Por eso el formulario solo deja elegir Ecuador y marca el resto como no disponible.
 - **Reloj:** durante la prueba el reloj de este equipo iba ~5 minutos adelantado al del backend. Por eso el temporizador nunca compara `expiresAt` con la hora local: usa `remainingSeconds` (o `ttlMinutes` al crear) contado desde que llegó la respuesta, y se vuelve a sincronizar con `GET` del hold.
 
+### Lo que aprendimos de asientos (F5)
+
+Verificado contra el **backend local** el 2026-10-07 (en Render no se crean reservas). Con ida y vuelta con escala (4 tramos, 2 adultos) y con el selector del navegador:
+
+- **Forma real de `SeatMapResponse`:** `{ segmentId, cabins: [{ cabinClass, rows: [{ rowNumber, seats: [{ seatNumber, isAvailable, characteristics }] }] }] }`. Todos los campos vienen siempre; sin precios; `characteristics` ⊂ `WINDOW`, `AISLE`, `EXTRA_LEGROOM`, `EMERGENCY_EXIT`. Cada mapa trae **todas las cabinas del avión**, con `isAvailable` también en las que no son la tuya.
+- **Aviones:** A320 (negocios filas 1–3 `ACDF`; economía filas 10–30 `ABCDEF`, salidas 12 y 13, espacio extra en la 10), A319 (1–2 y 7–26) y ATR72 (1–18 `ACDF`, salidas 9 y 10, espacio extra en la 1). El mock tiene el mismo diseño.
+- **`isAvailable`:** `false` solo en los asientos de reservas hechas (verificado: tras reservar 11A y 11B, el mapa pasó de 126 a 124 libres). **No hay ocupación inventada**: un vuelo sin reservas viene todo libre.
+- **Asignación automática:** sin elegir nada, la API da el primer asiento libre de la cabina por fila y letra (`10A`, el de espacio extra) en **cada** tramo; el infante queda con `assignedSeats: []`.
+- **Errores al reservar con asientos** (el hold sigue `HELD` en todos y la referencia de pago se puede reusar):
+
+| Caso | Respuesta real |
+|---|---|
+| Asiento ocupado | **409** `SEAT_TAKEN`, `detail` "Seat 11A is already taken on this flight", **sin `invalidParams`**. La interfaz no interpreta el `detail`: compara contra un mapa nuevo |
+| Asiento de otra cabina | **422** `SEAT_CABIN_MISMATCH`, `invalidParams: passengers[n].assignedSeats` (sin decir el asiento) |
+| Asiento que no existe (`99Z`) | 422 `VALIDATION_FAILED`, `passengers[n].assignedSeats` |
+| Tramo que no es del hold | 422 `VALIDATION_FAILED`, `passengers[n].assignedSeats[m].segmentId` |
+| El mismo asiento para dos pasajeros | 400 `VALIDATION_FAILED`, `passengers[1].assignedSeats[0].seatNumber` |
+| Formato inválido (`12`) | 400 `VALIDATION_FAILED`, `...seatNumber` |
+| Infante con asiento | 422 `INFANT_SEAT_NOT_ALLOWED`, `passengers[n].assignedSeats` |
+
+- **Cómo lo maneja el paso 2:** ante `SEAT_TAKEN`, `SEAT_CABIN_MISMATCH` o cualquier rechazo de `assignedSeats`, el paso 3 devuelve al paso 2 con el bloque de asientos abierto y un aviso ("Revisa tus asientos"); el selector pide mapas nuevos de los tramos con asientos elegidos, quita solo lo que ya no sirve y **conserva el resto**; el hold no se toca y el pago siguiente es un pedido nuevo (otra clave y otra referencia). Se comprobó en el navegador: otra sesión reservó el 26A del primer tramo mientras se pagaba, y las otras 7 elecciones se conservaron. El 422 de cabina se comprobó con la respuesta real interceptada una vez.
+- **Límites:** cada consulta del mapa cuesta del límite global (100 por minuto por IP). Abrir el selector de un viaje de 4 tramos pide 4 mapas; tras un error de asiento, otros 4.
+- **Nacionalidad** (F4b): la API solo conoce Ecuador; ver "Lo que aprendimos de hold y reserva".
+
+**Diferencias entre el mock y la API real encontradas en esta fase** (todas corregidas en el mock):
+
+| Qué | Mock antes | API real / mock ahora |
+|---|---|---|
+| Ocupación | ~35 % de asientos ocupados al azar | Todo libre; solo ocupan las reservas hechas |
+| Asignación automática | `free[i]` de cualquier cabina | Primer libre de **la cabina de la tarifa**, por fila y letra |
+| Asientos elegidos | Se aceptaban sin validar | 400/422/409 con los códigos de la tabla |
+| `SEAT_TAKEN` | Solo por la simulación de la demo | También por una reserva anterior del mismo asiento |
+
 ### Modelo de seguridad de la sesión
 
 | Qué | Dónde | Por qué |
@@ -459,7 +492,7 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 
 ## 8. Pruebas
 
-- **Hoy:** 384 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva. Desde F4b, las pantallas: formulario de pasajeros por tipo, temporizador con avisos a 5 y 2 minutos, tarjeta, y la ruta completa de la compra con sesión, que cuenta los clics y falla si pasan de 3 (no hay Playwright instalado: es una prueba de componentes de las cuatro pantallas), con la cuenta incrustada, volver atrás, los errores del pago y los estados de la confirmación.
+- **Hoy:** 446 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva. Desde F4b, las pantallas: formulario de pasajeros por tipo, temporizador con avisos a 5 y 2 minutos, tarjeta, y la ruta completa de la compra con sesión, que cuenta los clics y falla si pasan de 3 (no hay Playwright instalado: es una prueba de componentes de las cuatro pantallas), con la cuenta incrustada, volver atrás, los errores del pago y los estados de la confirmación.
 - **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. La de compra, también solo local: búsqueda real, hold y `GET`, `PAY-OK` 201 con boletos y el mismo envío dos veces con la misma clave = **una sola reserva** (`Idempotent-Replayed: true`), `PAY-REJ` 422 con el hold aún `HELD`, `PAY-PEND` 202 seguido hasta `CONFIRMED`, y liberar el hold. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 y reservas 10 por minuto).
 - **E2E:** `e2e/seats-demo.mjs` (selector de asientos, mock, 320/768/1280 px).
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
@@ -477,7 +510,7 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 | F3 | Cuenta: ingreso, registro, renovación de sesión y rutas protegidas contra la API real | Hecha (tag `fase-3`) |
 | F4a | Núcleo de la compra: hold, reserva, pago simulado, máquina de estados, idempotencia | Hecha (tag `fase-4a`) |
 | F4b | Pantallas finales de la compra (cuenta incrustada, pasajeros, pago, confirmación) | Hecha (tag `fase-4b`) |
-| F5 | Selector de asientos (mapa en forma de avión, lista, filtros, conflictos 409/422) | En integración con el paso 2 y la API real |
+| F5 | Selector de asientos (mapa en forma de avión, lista, filtros, conflictos 409/422), integrado en el paso 2 y verificado con la API real | Hecha (tag `fase-5`) |
 | F6 | Mis viajes: detalle, check-in, pases, equipaje, cambio de fecha, cancelación | Pendiente |
 | F7 | Ofertas y pulido del inicio | Pendiente |
 | F8 | Calidad y entrega: pruebas de extremo a extremo, accesibilidad, despliegue | Pendiente |

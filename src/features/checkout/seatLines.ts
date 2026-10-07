@@ -35,8 +35,9 @@ export interface SeatLine {
  */
 export function seatLines(passengers: SeatedPassenger[], outbound: LegLike, inbound?: LegLike): SeatLine[] {
   const segments = [...outbound.itinerary.segments, ...(inbound?.itinerary.segments ?? [])];
-  return passengers.map((p) => {
-    const name = `${p.firstName} ${p.lastName}`.trim();
+  return passengers.map((p, i) => {
+    // Sin nombre escrito todavía, "Pasajero 1" (no una línea que empiece con dos puntos).
+    const name = `${p.firstName} ${p.lastName}`.trim() || fmt(f.passengerShort, { number: i + 1 });
     if (p.type === 'INFANT') return { passengerId: p.id, name, text: f.seatInfant, chosen: false };
     const parts = segments.flatMap((s) => {
       const seat = p.seats?.find((x) => x.segmentId === s.id)?.seatNumber;

@@ -31,6 +31,8 @@ describe('asientos por pasajero y tramo', () => {
     ]);
     expect(anySeatChosen(lines)).toBe(true);
     expect(anySeatChosen(seatLines([pax('PAX1', 'ADULT', 'Ana')], OUT))).toBe(false);
+    // Aún sin nombre: "Pasajero 1".
+    expect(seatLines([{ ...pax('PAX1', 'ADULT', ''), lastName: '' }], OUT)[0].name).toBe('Pasajero 1');
   });
 
   it('toBookingPassengers: assignedSeats por tramo; se omite sin elección y los infantes nunca llevan', () => {
@@ -118,6 +120,6 @@ describe('errores de asiento al reservar', () => {
     expect(notice('SEAT_TAKEN', 409)).toMatchObject({ title: f.seatsTakenTitle, text: f.seatsTakenText });
     expect(notice('SEAT_CABIN_MISMATCH', 422)).toMatchObject({ text: f.seatsCabinText });
     expect(notice('VALIDATION_FAILED', 422)).toMatchObject({ text: f.seatsInvalidText });
-    expect(f.seatsTakenText).toMatch(/Mantuvimos los demás/);
+    expect(f.seatsTakenText).toMatch(/conservamos los demás/);
   });
 });
