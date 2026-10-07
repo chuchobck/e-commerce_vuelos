@@ -2,9 +2,19 @@
  * Validadores puros (sin dependencias de UI). Se usan desde los esquemas zod.
  */
 
-/** Letras (incluye tildes y ñ), espacios, apóstrofe y guion. */
-export const NAME_PATTERN = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]+$/;
-export const PASSPORT_PATTERN = /^[A-Za-z0-9]{6,12}$/;
+/**
+ * Nombre como el DTO del backend (PasajeroReservaDto): empieza con una letra y sigue con letras
+ * (cualquier alfabeto, con tildes), espacios, apóstrofe, punto o guion; sin dígitos.
+ */
+export const NAME_PATTERN = /^\p{L}[\p{L}\p{M} '.-]*$/u;
+export const NAME_MAX_LENGTH = 60;
+/** Documento como el backend: 5 a 20 letras o dígitos, después de quitar espacios y guiones y pasar a mayúsculas. */
+export const PASSPORT_PATTERN = /^[A-Z0-9]{5,20}$/;
+
+/** Como el backend: quita espacios, guiones, puntos y paréntesis ("AB-123 456" → "AB123456"). */
+export function compactDocument(value: string): string {
+  return value.replace(/[\s().-]/g, '').toUpperCase();
+}
 export const PHONE_EC_PATTERN = /^9\d{8}$/;
 /** Como la API: aerolínea IATA (2 caracteres) y número sin ceros a la izquierda, p. ej. LA1400 o AV45. */
 export const FLIGHT_NUMBER_PATTERN = /^[A-Z0-9]{2}[1-9][0-9]{0,3}$/i;

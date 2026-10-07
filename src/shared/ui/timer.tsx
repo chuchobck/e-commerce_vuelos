@@ -9,8 +9,11 @@ import { Button } from './button';
 const TIMER_WARNING_SECONDS = 120;
 
 interface TimerProps {
-  /** Fecha ISO en que termina el tiempo. */
-  expiresAt: string;
+  /**
+   * Momento en que termina el tiempo, en el reloj de ESTE equipo (Date.now()). Se calcula con el
+   * tiempo restante que da el servidor, nunca comparando la hora del servidor con la local.
+   */
+  deadline: number;
   onExpire?: () => void;
   /** Si se pasa, muestra "Necesito más tiempo" durante el aviso (WCAG 2.2.1). */
   onExtend?: () => void;
@@ -18,8 +21,8 @@ interface TimerProps {
   className?: string;
 }
 
-function secondsLeft(expiresAt: string) {
-  return Math.max(0, Math.round((new Date(expiresAt).getTime() - Date.now()) / 1000));
+function secondsLeft(deadline: number) {
+  return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
 }
 
 /**
@@ -28,8 +31,8 @@ function secondsLeft(expiresAt: string) {
  * - Una región cortés anuncia los minutos restantes cada 5 minutos.
  * - Al llegar a 2 minutos aparece un aviso visible y se anuncia de forma asertiva una sola vez.
  */
-export function Timer({ expiresAt, onExpire, onExtend, extending = false, className }: TimerProps) {
-  const [left, setLeft] = useState(() => secondsLeft(expiresAt));
+export function Timer({ deadline, onExpire, onExtend, extending = false, className }: TimerProps) {
+  const [left, setLeft] = useState(() => secondsLeft(deadline));
   const [announcement, setAnnouncement] = useState('');
   const expired = useRef(false);
   const lastMinuteAnnounced = useRef<number | null>(null);
@@ -39,7 +42,7 @@ export function Timer({ expiresAt, onExpire, onExtend, extending = false, classN
   useEffect(() => {
     expired.current = false;
     const tick = () => {
-      const s = secondsLeft(expiresAt);
+      const s = secondsLeft(deadline);
       setLeft(s);
       const minutes = Math.ceil(s / 60);
       if (s > TIMER_WARNING_SECONDS && minutes % 5 === 0 && lastMinuteAnnounced.current !== minutes) {
@@ -54,7 +57,7 @@ export function Timer({ expiresAt, onExpire, onExtend, extending = false, classN
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [expiresAt]);
+  }, [deadline]);
 
   const warning = left > 0 && left <= TIMER_WARNING_SECONDS;
   const done = left <= 0;

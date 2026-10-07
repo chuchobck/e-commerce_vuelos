@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { paths, routes, SEARCH_ANCHOR_ID } from '@/app/routes';
+import { useReleaseOnExit } from '@/features/checkout';
 import { es } from '@/shared/i18n';
 import { ServerWakingNotice, Toaster } from '@/shared/ui';
 import { Footer } from './Footer';
@@ -65,6 +66,7 @@ function useSearchShortcut() {
 export function RootLayout() {
   useRouteFocus();
   useSearchShortcut();
+  useReleaseOnExit(useLocation().pathname);
 
   return (
     <div className="flex min-h-dvh flex-col">

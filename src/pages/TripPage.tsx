@@ -46,7 +46,7 @@ function CheckInAction({ booking }: { booking: Booking }) {
 function TripActions({ booking }: { booking: Booking }) {
   if (booking.status === 'CANCELLED') return null;
   const links = [
-    booking.status === 'CHECKED_IN' ? { to: routes.tripPasses(booking.id), label: t.passes, icon: QrCode } : null,
+    booking.status === 'CONFIRMED' ? { to: routes.tripPasses(booking.id), label: t.passes, icon: QrCode } : null,
     { to: routes.tripBaggage(booking.id), label: t.baggage, icon: Luggage },
     { to: routes.tripDateChange(booking.id), label: t.dateChange, icon: CalendarClock },
     { to: routes.tripCancel(booking.id), label: t.cancel, icon: Ban },
@@ -119,9 +119,9 @@ export function TripPage() {
             </Card>
             <Card className="flex flex-col gap-4">
               <CardTitle>{t.total}</CardTitle>
-              <p className="text-3xl font-bold tabular-nums">{formatMoney(data.totalPaid)}</p>
+              <p className="text-3xl font-bold tabular-nums">{formatMoney(data.total)}</p>
               <p className="text-muted">
-                {t.contact}: {data.contact.email}
+                {t.contact}: {data.passengers[0]?.email}
               </p>
             </Card>
           </div>
@@ -142,13 +142,13 @@ export function TripPage() {
                     <span className="text-sm text-muted">
                       {t[`type${pax.type}`]} ·{' '}
                       {fmt(t.document, {
-                        type: pax.documentType === 'CEDULA' ? es.documents.cedula : es.documents.passport,
+                        type: pax.documentType === 'NATIONAL_ID' ? es.documents.cedula : es.documents.passport,
                         number: pax.documentNumber,
                       })}
                     </span>
                   </div>
                   <span className="text-sm">
-                    {pax.type === 'INF' ? t.infantSeat : pax.seat ? fmt(t.seat, { seat: pax.seat }) : t.seatAuto}
+                    {pax.type === 'INFANT' ? t.infantSeat : pax.seats[0] ? fmt(t.seat, { seat: pax.seats.map((s) => s.seatNumber).join(' · ') }) : t.seatAuto}
                   </span>
                 </li>
               ))}

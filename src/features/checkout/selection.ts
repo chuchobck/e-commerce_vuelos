@@ -5,7 +5,9 @@ export type { SelectedLeg } from '@/shared/api';
 
 /** Lo elegido en el paso 1. Sobrevive a ir a ingresar/registrarse y a refrescar la página. */
 export interface CheckoutSelection {
-  /** Oferta de la API que contiene los dos tramos (el hold la pide en F4). */
+  /** Identifica esta elección (se asigna al guardarla): otra elección es otra compra. */
+  id?: string;
+  /** Oferta de la API que contiene los dos tramos (la pide el hold). */
   offerId: string;
   outbound: SelectedLeg;
   inbound?: SelectedLeg;
@@ -56,7 +58,8 @@ function isSelection(value: unknown): value is CheckoutSelection {
   );
 }
 
-export function saveSelection(selection: CheckoutSelection): void {
+export function saveSelection(input: CheckoutSelection): void {
+  const selection = input.id ? input : { ...input, id: crypto.randomUUID() };
   memory = selection;
   try {
     storage()?.setItem(KEY, JSON.stringify(selection));

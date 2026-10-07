@@ -29,8 +29,8 @@ describe('nameField', () => {
   });
   it('explica el error con mensajes específicos', () => {
     expect(firstError(nameField.safeParse(''))).toBe(v.required);
-    expect(firstError(nameField.safeParse('A'))).toBe(v.nameLength);
-    expect(firstError(nameField.safeParse('A'.repeat(41)))).toBe(v.nameLength);
+    expect(nameField.safeParse('A').success).toBe(true);
+    expect(firstError(nameField.safeParse('A'.repeat(61)))).toBe(v.nameLength);
     expect(firstError(nameField.safeParse('Juan 2'))).toBe(v.nameInvalid);
   });
 });
@@ -47,8 +47,8 @@ describe('cedulaField', () => {
 
 describe('documentSchema', () => {
   it('valida cédula con módulo 10 y pasaporte con patrón', () => {
-    expect(documentSchema.safeParse({ documentType: 'CEDULA', documentNumber: '1710034065' }).success).toBe(true);
-    expect(documentSchema.safeParse({ documentType: 'CEDULA', documentNumber: '1710034066' }).success).toBe(false);
+    expect(documentSchema.safeParse({ documentType: 'NATIONAL_ID', documentNumber: '1710034065' }).success).toBe(true);
+    expect(documentSchema.safeParse({ documentType: 'NATIONAL_ID', documentNumber: '1710034066' }).success).toBe(false);
     expect(documentSchema.safeParse({ documentType: 'PASSPORT', documentNumber: 'AB123456' }).success).toBe(true);
     expect(documentSchema.safeParse({ documentType: 'PASSPORT', documentNumber: 'AB1' }).success).toBe(false);
   });
@@ -116,16 +116,20 @@ describe('fechas futuras', () => {
 
 describe('birthDateMessage', () => {
   const flight = new Date(2026, 11, 1);
-  it('clasifica adulto, niño e infante según la edad en la fecha del vuelo', () => {
-    expect(birthDateMessage('18/04/1990', 'ADT', flight)).toBeNull();
-    expect(birthDateMessage('01/01/2020', 'ADT', flight)).toBe(v.birthAdult);
-    expect(birthDateMessage('01/01/2020', 'CHD', flight)).toBeNull();
-    expect(birthDateMessage('01/06/2025', 'CHD', flight)).toBe(v.birthChild);
-    expect(birthDateMessage('01/06/2025', 'INF', flight)).toBeNull();
-    expect(birthDateMessage('01/01/2020', 'INF', flight)).toBe(v.birthInfant);
+  it('clasifica como el backend: adulto ≥ 18, joven 12–17, niño 2–11, infante < 2', () => {
+    expect(birthDateMessage('18/04/1990', 'ADULT', flight)).toBeNull();
+    expect(birthDateMessage('01/01/2010', 'ADULT', flight)).toBe(v.birthAdult);
+    expect(birthDateMessage('01/01/2010', 'YOUTH', flight)).toBeNull();
+    expect(birthDateMessage('01/01/2020', 'CHILD', flight)).toBeNull();
+    expect(birthDateMessage('01/06/2025', 'CHILD', flight)).toBe(v.birthChild);
+    expect(birthDateMessage('01/06/2025', 'INFANT', flight)).toBeNull();
+    expect(birthDateMessage('01/01/2020', 'INFANT', flight)).toBe(v.birthInfant);
+  });
+  it('un infante que cumple 2 antes del regreso necesita asiento', () => {
+    expect(birthDateMessage('15/12/2024', 'INFANT', flight, new Date(2026, 11, 20))).toBe(v.birthInfant);
   });
   it('rechaza fechas inválidas', () => {
-    expect(birthDateMessage('32/01/2000', 'ADT', flight)).toBe(v.dateInvalid);
+    expect(birthDateMessage('32/01/2000', 'ADULT', flight)).toBe(v.dateInvalid);
   });
 });
 

@@ -19,6 +19,12 @@ export type SeatMapDto = Schemas['SeatMapResponse'];
 export type FlightStatusDto = Schemas['FlightStatus'];
 export type ProblemDetailsDto = Schemas['ProblemDetails'];
 export type HoldRequestDto = Schemas['HoldRequest'];
+export type HoldResponseDto = Schemas['HoldResponse'];
+export type HoldStatusDto = Schemas['HoldStatusResponse'];
+export type BookingRequestDto = Schemas['BookingRequest'];
+export type PassengerItemDto = Schemas['PassengerItem'];
+export type BookingDetailDto = Schemas['BookingDetail'];
+export type TicketDto = Schemas['Ticket'];
 
 /** Cabinas del contrato. */
 export type CabinClass = CabinPricingDto['cabinClass'];

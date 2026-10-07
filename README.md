@@ -14,16 +14,17 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 
 ---
 
-## 1. Estado actual (2026-10-07, cierre de F3)
+## 1. Estado actual (2026-10-07, cierre de F4a)
 
-- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 3. 171 archivos en `src`, unas 13.300 líneas de TypeScript (sin contar los tipos generados).
-- 262 pruebas en verde con `npm run test` y 17 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta, solo contra el backend local). Lint, typecheck y build sin errores.
-- **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, "Escápate", estado de vuelo y la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
+- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 4a. 200 archivos en `src`, unas 16.400 líneas de TypeScript (sin contar los tipos generados).
+- 340 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
+- **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, "Escápate", estado de vuelo, la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas) **y la compra** (hold, reserva, pago simulado y confirmación); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
 - Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para `/auth/*`, `contracts/backend-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
 - **Sesión** (sección 6, "Modelo de seguridad de la sesión"): access token solo en memoria, renovación única entre pestañas, cierre de sesión que se propaga a las demás pestañas, restauración al recargar sin parpadeo.
-- Compra y postventa siguen en el mock; con la API real muestran "se conecta en una fase posterior" (F4 y F6). El bloque de cuenta del paso 2 ya usa la sesión real.
+- **Compra (F4a, sección 5):** máquina de estados pura (`features/checkout/machine.ts`), hold una sola vez por selección, tiempo del servidor, claves de idempotencia por intención, pago simulado reemplazable (`shared/payments`), seguimiento de reservas en proceso. Los formularios de pasajeros y de pago son **provisionales**: F4b trae las pantallas finales.
+- Mis viajes y la postventa siguen en el mock (usan ya la reserva con la forma del contrato); con la API real muestran "se conecta en una fase posterior" (F6).
 - Navegación (sección 4): menú por momento del viajero, rutas centralizadas en `src/app/routes.ts`, rutas protegidas con `RequireAuth` (espera a que la sesión se restaure y conserva `?volver=`).
-- Compra: los 3 pasos tienen pantalla, indicador, resumen y temporizador; la selección del paso 1 sobrevive a ingresar, a refrescar y a un cierre de sesión por seguridad. Faltan el formulario de pasajeros, el asiento y el pago (F4).
+- Camino feliz con sesión: **3 clics** desde "Elegir tarifa" hasta la confirmación (Elegir, Continuar al pago, Pagar), más escribir los datos del pasajero y de la tarjeta. Sin sesión se suman los de la cuenta.
 - Mis viajes: lista, detalle con estado del vuelo, check-in por viaje (ventana 48 h / 60 min) y cancelación (mock). Pases, equipaje y cambio de fecha son pantallas de espera (F6).
 - Ofertas es una pantalla inicial (F7). Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
 
@@ -49,7 +50,7 @@ npm run dev               # http://localhost:5173
 | `npm run typecheck` | Revisión de tipos |
 | `npm run lint` | ESLint: accesibilidad (jsx-a11y) y reglas de arquitectura de la sección 3 |
 | `npm run api:types` | Regenera los tipos del contrato en `src/shared/api/generated/` |
-| `npm run test:api` | Integración contra la API real: búsqueda, asientos, estado y errores validados contra el contrato con Ajv y, **solo con un backend local**, la cuenta (crea un usuario `@example.test`). No es parte de `npm run test` |
+| `npm run test:api` | Integración contra la API real: búsqueda, asientos, estado y errores validados contra el contrato con Ajv y, **solo con un backend local**, la cuenta y la compra (crea un usuario `@example.test`, holds y reservas). No es parte de `npm run test` |
 
 ### Contrato y tipos generados
 
@@ -63,7 +64,7 @@ Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
 
 - **`VITE_API_URL`** elige el modo, sin mezclas:
   - **Vacía → mock completo.** Todo funciona sin backend y se ven las pistas "Para probar".
-  - **Con valor → API real.** Búsqueda, mapa de asientos, estado de vuelo y cuenta van a la API; compra y postventa muestran "se conecta en una fase posterior" hasta F4 y F6. Las pistas "Para probar" (incluida la cuenta demo del mock) no se ven.
+  - **Con valor → API real.** Búsqueda, mapa de asientos, estado de vuelo, cuenta y compra van a la API; Mis viajes y la postventa muestran "se conecta en una fase posterior" hasta F6. Las pistas "Para probar" (incluida la cuenta demo del mock) no se ven; las tarjetas de prueba del pago simulado se ven con el mock o en desarrollo.
 - **`VITE_LAST_FLIGHT_DATE`**: último día con salidas de la semilla del backend (la semilla genera 90 días desde su carga y esa ventana es fija). El buscador no deja elegir fechas posteriores; vacía = hoy + 89 días.
 - **`VITE_MOCK_ERROR_RATE`**: frecuencia de errores simulados. Solo afecta al mock; sirve para diseñar los estados de error.
 
@@ -71,8 +72,8 @@ Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
 
 | Backend | URL | Para qué |
 |---|---|---|
-| Local (recomendado en desarrollo) | `http://localhost:3010/flights/v1` | Navegador y `npm run test:api` (incluida la cuenta). El backend debe tener `CORS_ORIGINS=http://localhost:5173`. Con el backend en WSL, desde Windows funciona `localhost` (no `127.0.0.1`). |
-| Render | `https://quinde-vuelos-api.onrender.com/flights/v1` | Solo verificación de lectura con `npm run test:api` (corre en Node, no necesita CORS); la suite de cuenta se omite sola porque escribe. **No se crean usuarios en Render.** Su CORS no incluye `localhost`. Duerme tras 15 min: la primera petición tarda cerca de un minuto. |
+| Local (recomendado en desarrollo) | `http://localhost:3010/flights/v1` | Navegador y `npm run test:api` (incluidas la cuenta y la compra). El backend debe tener `CORS_ORIGINS=http://localhost:5173`. Con el backend en WSL, desde Windows funciona `localhost` (no `127.0.0.1`). |
+| Render | `https://quinde-vuelos-api.onrender.com/flights/v1` | Solo verificación de lectura con `npm run test:api` (corre en Node, no necesita CORS); las suites de cuenta y compra se omiten solas porque escriben. **No se crean usuarios, holds ni reservas en Render.** Su CORS no incluye `localhost`. Duerme tras 15 min: la primera petición tarda cerca de un minuto. |
 
 `npm run test:api` toma la URL de `API_TEST_URL` o, si no está, de `VITE_API_URL` del `.env`. Ejemplo contra Render: `API_TEST_URL=https://quinde-vuelos-api.onrender.com/flights/v1 npm run test:api`.
 
@@ -100,6 +101,7 @@ src/
 └─ shared/
    ├─ api/                    FlightsApi, contract.ts (nombres de los tipos generados), mapping.ts (contrato → interfaz),
    │                          http/ (cliente: único lugar con fetch), RealFlightsApi, mock/, airports.ts (catálogo estático)
+   ├─ payments/               pago simulado (PaymentProvider reemplazable por la Payment API real)
    ├─ i18n/                   todos los textos en español
    ├─ lib/                    fechas, dinero en centavos, formatos, validadores, esquemas, caché, ventana de check-in, hooks
    └─ ui/                     componentes base (incluye el resumen de viaje y MockOnly)
@@ -124,7 +126,7 @@ Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `np
 | `search` | Buscador (solo pares con vuelos y fechas dentro de la ventana) | Hecho (mock y API real) |
 | `results` | Resultados y familias tarifarias reales | Hecho (mock y API real) |
 | `auth` | Sesión (`SessionManager`: tokens, renovación, pestañas, restauración), `AuthProvider`/`useAuth`, formularios de ingreso y registro (`RequireAuth` vive en `app/`) | Hecho (mock y API real) |
-| `checkout` | Compra en 3 pasos: selección, hold, cuenta, resumen | Parcial (faltan pasajeros y pago) |
+| `checkout` | Compra en 3 pasos: selección, máquina de estados (`machine.ts` + `flow.ts`), claves de idempotencia, hold con tiempo del servidor, pasajeros, pago, seguimiento de la reserva | Lógica hecha (mock y API real); pantallas provisionales hasta F4b |
 | `seats` | Mapa de asientos (avión) | Planificado (carpeta creada) |
 | `trips` | Mis viajes y detalle del viaje | Parcial (mock) |
 | `checkin` | Check-in dentro del viaje y pases de abordar | Parcial (check-in por viaje; pases en F6) |
@@ -149,9 +151,9 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo**. A la de
 | `/` | Inicio con buscador | Público | `POST /search` | Hecho (mock y API real) |
 | `/resultados` | Vuelos y tarifas (paso 1) | Público | `POST /search` | Hecho (mock y API real) |
 | `/ofertas` | Precios más bajos por destino | Público | `POST /search` | Pantalla de espera (F7) |
-| `/compra/datos` | Cuenta y pasajeros (paso 2) | Sesión dentro del paso | hold, `/auth/*`, mapa de asientos | Parcial: cuenta con la sesión real; hold, temporizador y resumen en el mock; pasajeros en F4 |
-| `/compra/pago` | Pago (paso 3) | Sesión dentro del paso | `POST /bookings` | Parcial: resumen y temporizador; pago en F4 |
-| `/compra/confirmacion/:id` | Compra lista | Sesión | `GET /bookings/{id}` | Hecho (mock); se llega a ella en F4 |
+| `/compra/datos` | Cuenta y pasajeros (paso 2) | Sesión dentro del paso | `/auth/*`, `POST`/`GET`/`DELETE /offers/hold` | Hecho (mock y API real); formulario provisional hasta F4b; asiento en F5 |
+| `/compra/pago` | Pago (paso 3) | Sesión dentro del paso | `POST /bookings`, `GET /offers/hold/{id}` | Hecho (mock y API real); formulario provisional hasta F4b |
+| `/compra/confirmacion/:id` | Confirmada, en proceso o fallida | Sesión | `GET /bookings/{id}` | Hecho (mock y API real) |
 | `/mis-viajes` | Lista de viajes | Sesión | `GET /bookings` | Hecho (mock) |
 | `/mis-viajes/:id` | Detalle del viaje (centro de postventa) | Sesión | detalle, boletos, estado | Hecho (mock), con estado del vuelo |
 | `/mis-viajes/:id/check-in` | Check-in | Sesión | `POST .../check-in` | Hecho (mock) |
@@ -189,12 +191,25 @@ Reglas del flujo:
 - Los datos de la cuenta se precargan en el primer pasajero. No se pide dos veces el mismo dato.
 - El registro dentro de la compra pide lo mínimo.
 - El asiento es opcional. Si no se elige, se asigna solo.
-- Si la oferta venció mientras el usuario se registraba, se vuelve a buscar y se avisa si el precio cambió.
+- Si la oferta venció o se quedó sin cupo mientras el usuario se registraba (409 al apartar), se explica y se ofrece volver a los resultados con la búsqueda intacta, donde se ve el precio actual.
 - El temporizador avisa cuando quedan 2 minutos. Si el hold vence, se explica qué pasó y se ofrece buscar de nuevo, sin perder los datos de los pasajeros.
 - El botón de pagar se desactiva mientras se procesa. Un reintento usa la misma clave de idempotencia para no cobrar dos veces.
 - Se puede volver al paso anterior sin perder lo escrito.
 
 Pago simulado: la pantalla lo dice de forma visible. Los datos de tarjeta no salen del navegador ni se guardan; a la API solo se envía una referencia de pago.
+
+### Cómo funciona por dentro (F4a)
+
+- **Máquina de estados** (`features/checkout/machine.ts`, pura y probada): sin selección → selección guardada → creando hold → hold activo → pasajeros completos → pagando → confirmada | en proceso | pago rechazado | hold vencido | sin cupo | error. `flow.ts` ejecuta los efectos y `useCheckout()` es el adaptador de React.
+- **Hold una sola vez por selección.** Se crea al entrar al paso 2 con sesión; su id queda en la selección (sessionStorage). Refrescar o volver lo verifica con `GET` en vez de crear otro; si venció, se informa.
+- **Tiempo del servidor.** El temporizador cuenta `remainingSeconds` desde que llegó la respuesta y se resincroniza con `GET` cada minuto y al volver a la pestaña. Al llegar a cero se pregunta al servidor antes de dar el hold por vencido.
+- **Claves de idempotencia por intención** (`idempotency.ts`): la del hold se liga a la selección; la de la reserva al hold más pasajeros y referencia de pago. Mismo contenido = misma clave (un reintento o doble clic no duplica nada); contenido nuevo = clave nueva. Se guarda solo una huella del contenido. Las claves caducan al terminar la intención (hold vencido, liberado o usado) o la compra.
+- **Reintentar un pago** tras un error de red reenvía exactamente el mismo pedido con la misma clave. Si la página se recarga con el pago en curso, el hold aparece `CONSUMED`: se reenvía el último pedido (hold y referencia guardados, nunca la tarjeta) con la misma clave y la API devuelve la reserva que sí se creó.
+- **Pago rechazado (422):** se verifica con `GET` que el hold sigue vivo (la API lo deja `HELD`) y se vuelve a pagar con otra tarjeta (otra referencia, otra clave).
+- **En proceso (202):** `GET /bookings/{id}` a 2, 4, 8, 16 s y luego cada 30 s, con tope de 2 minutos; pasado el tope: "Seguimos procesando tu compra; la verás en Mis viajes", sin reintentar la compra.
+- **Liberar el hold:** al pulsar "Cancelar" y al salir del flujo a otra sección (el hold se libera; la selección y lo escrito se conservan). Un 404/409 al liberar no se muestra. **No** se libera en `pagehide`: el navegador no distingue una recarga de un cierre, y recargar debe reutilizar el hold; si se cierra la pestaña, el hold vence solo en ≤ 15 minutos.
+- **Pasajeros** como borrador en sessionStorage: sobreviven a refrescar, a un hold vencido y a buscar de nuevo; se borran al confirmar o cancelar.
+- **Tarjetas de prueba** (ficticias, Luhn válido; se muestran solo con el mock o en desarrollo): `4111111111111111` aprobada, `4000000000000002` rechazada, `4000000000003220` pago pendiente; cualquier otra válida se aprueba. Cualquier vencimiento futuro y CVV de 3 dígitos.
 
 ---
 
@@ -202,7 +217,7 @@ Pago simulado: la pantalla lo dice de forma visible. Los datos de tarjeta no sal
 
 - **Rutas públicas:** búsqueda, mapa de asientos y estado de vuelo. Todo lo demás exige sesión.
 - **Sesión:** token de acceso de 15 minutos y token de renovación de 7 días que rota en cada uso. Reutilizar un token de renovación viejo cierra la sesión (toda su familia de tokens), así que la renovación se hace una sola vez a la vez, nunca en paralelo, ni siquiera entre pestañas.
-- **Hold:** dura 15 minutos y aparta cupo real. Si el usuario abandona la compra, se libera.
+- **Hold:** dura 15 minutos y aparta cupo real. Si el usuario cancela o sale del flujo, se libera.
 - **Reservas:** solo las ve su dueño. Una reserva ajena responde 404.
 - **Pago simulado por prefijo de la referencia:** `PAY-OK-` aprobado (201), `PAY-PEND-` pendiente (202), `PAY-REJ-` rechazado (422).
 - **Check-in:** abre 48 horas antes de la salida y cierra 60 minutos antes.
@@ -251,6 +266,35 @@ Verificado con curl y `npm run test:api` contra el **backend local** (en Render 
 - **Errores:** credenciales incorrectas = 401 genérico (no dice si el correo existe); correo ya registrado = **409 con `code: VALIDATION_FAILED`** (no hay un código propio); datos inválidos = 400.
 - **Límites por IP:** ingreso 5 por minuto (los fallidos cuentan), registro 10 cada 10 minutos, renovación 30 por minuto. El 429 trae `Retry-After` (60 s medidos en el ingreso) y la pantalla dice cuánto esperar.
 - Las rutas públicas ignoran un `Authorization` inválido, pero el frontend igual **no envía el token** en ellas.
+
+### Lo que aprendimos de hold y reserva (F4a)
+
+Verificado contra el **backend local** el 2026-10-07 (en Render no se crean holds ni reservas):
+
+| Caso | Respuesta real |
+|---|---|
+| `POST /offers/hold` | 201 `HoldResponse` (`HELD`, `expiresAt`, `ttlMinutes: 15`, `lockedPrice` con `baseFare` y `taxes`) |
+| Misma `Idempotency-Key` y mismo cuerpo | 201 con **el mismo hold** y la cabecera `Idempotent-Replayed: true` (la respuesta original, aunque haya pasado tiempo) |
+| Misma clave, cuerpo distinto | 422 `VALIDATION_FAILED`, `invalidParams: Idempotency-Key` |
+| Sin `Idempotency-Key` (o no es UUID) | 400 `VALIDATION_FAILED` |
+| Oferta inexistente o vencida, tarifa sin cupo | 409 `OFFER_NO_LONGER_AVAILABLE` |
+| `GET /offers/hold/{id}` | 200 `HoldStatusResponse` con `remainingSeconds` (calculado por el servidor). No repite el `holdId`. Ajeno o inexistente: 404 |
+| `DELETE` de un hold vivo, vencido o ya liberado | 204 (liberar dos veces no es error) |
+| `DELETE` de un hold usado en una reserva | **409** (fuera del contrato) |
+| `POST /bookings` con `PAY-OK-…` | 201 `CONFIRMED` con un boleto `ISSUED` por pasajero y número de 13 dígitos |
+| Con `PAY-PEND-…` | 202 `PENDING_PAYMENT`, boletos `PENDING`; a los ~20 s `GET /bookings/{id}` ya da `CONFIRMED` (el proceso de emisión corre cada 30 s) |
+| Con `PAY-REJ-…` | 422 `PAYMENT_NOT_AUTHORIZED`; **el hold sigue `HELD`** con el mismo tiempo: se puede pagar otra vez |
+| Referencia que no es `PAY-(OK\|PEND\|REJ)-…` | 422 `PAYMENT_REFERENCE_INVALID` |
+| Referencia ya usada en otra reserva | 409 `PAYMENT_REFERENCE_INVALID` (cada intento de pago necesita una referencia nueva) |
+| Reserva repetida con la misma clave y cuerpo | 201 con **la misma reserva** e `Idempotent-Replayed: true` |
+| Hold ya usado, con otra clave | 409 `OFFER_NO_LONGER_AVAILABLE` |
+| Hold vencido o liberado | 410 `OFFER_NO_LONGER_AVAILABLE` |
+| Hold inexistente o ajeno | 422 `VALIDATION_FAILED` (`invalidParams: holdId`), no 404 |
+| Límites por IP | 30 holds y **10 reservas por minuto** (además del global de 100); el 429 trae `Retry-After` |
+
+- La reserva devuelve la familia vendida **sin precios por tipo** (`pricePerPassengerType: []`) y el `grandTotal` congelado del hold; los pasajeros vuelven con su documento y contacto.
+- Reglas del pasajero (las del DTO del backend): nombre con letras, espacios, `'`, `.` y `-` (hasta 60); documento de 5 a 20 letras o dígitos; cédula ecuatoriana con módulo 10; pasaporte con vencimiento obligatorio y posterior al último vuelo; nacionalidad ISO alfa-2; teléfono de 7 a 15 dígitos con `+` opcional; **edad el día del primer vuelo: infante < 2, niño 2–11, joven 12–17, adulto ≥ 18**; cada infante va con un adulto distinto (`associatedAdultId`).
+- **Reloj:** durante la prueba el reloj de este equipo iba ~5 minutos adelantado al del backend. Por eso el temporizador nunca compara `expiresAt` con la hora local: usa `remainingSeconds` (o `ttlMinutes` al crear) contado desde que llegó la respuesta, y se vuelve a sincronizar con `GET` del hold.
 
 ### Modelo de seguridad de la sesión
 
@@ -317,13 +361,14 @@ Hay rutas de un solo sentido por los horarios de conexión (por ejemplo CUE→GP
 | Campo | Regla |
 |---|---|
 | Numéricos | Solo dígitos al teclear y al pegar, con longitud máxima |
-| Nombres y apellidos | Letras, tildes, espacios, apóstrofe y guion; 2 a 40 caracteres |
+| Nombres y apellidos | Como el backend: empieza con letra; letras (con tildes), espacios, apóstrofe, punto y guion; hasta 60 caracteres |
 | Cédula | 10 dígitos con verificación de módulo 10 |
-| Pasaporte | Alfanumérico, 6 a 12 caracteres |
+| Pasaporte (y documento extranjero) | 5 a 20 letras o dígitos, sin espacios ni guiones (se quitan); el pasaporte vence después del último vuelo |
 | Correo | Como el backend: se recorta, NFC y minúsculas; máximo 254 caracteres, con dominio y TLD, sin IP, nombre visible, caracteres de control, invisibles ni etiquetas HTML |
 | Contraseña | 12 a 128 caracteres medidos tras NFKC, sin recortar y sin reglas de composición; se puede pegar y mostrar |
 | Teléfono | +593 y 9 dígitos |
-| Fecha de nacimiento | Coherente con el tipo de pasajero (adulto, niño de 2 a 11, infante menor de 2) |
+| Fecha de nacimiento | Como el backend, el día del primer vuelo: adulto ≥ 18, joven 12–17, niño 2–11, infante < 2 (y aún < 2 el día del último vuelo) |
+| Nacionalidad | Código ISO de 2 letras (EC); la cédula se valida con módulo 10 solo con nacionalidad EC |
 | Tarjeta (simulada) | Luhn, vencimiento futuro, CVV de 3 o 4 dígitos |
 | Búsqueda | Origen distinto de destino y con vuelos entre ambos, fechas no pasadas y dentro de la ventana de la semilla, máximo 9 pasajeros, infantes ≤ adultos |
 | Número de vuelo | Como la API: aerolínea (2 caracteres) y número sin ceros a la izquierda, por ejemplo `LA1400` |
@@ -334,8 +379,8 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 
 ## 8. Pruebas
 
-- **Hoy:** 262 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429).
-- **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 por minuto).
+- **Hoy:** 340 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva.
+- **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. La de compra, también solo local: búsqueda real, hold y `GET`, `PAY-OK` 201 con boletos y el mismo envío dos veces con la misma clave = **una sola reserva** (`Idempotent-Replayed: true`), `PAY-REJ` 422 con el hold aún `HELD`, `PAY-PEND` 202 seguido hasta `CONFIRMED`, y liberar el hold. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 y reservas 10 por minuto).
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
 - Al cerrar cada fase: lint, typecheck, build, pruebas, recorrido solo con teclado, 320 px, zoom al 200 % y modo oscuro.
 
@@ -349,7 +394,8 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 | F1 | Orden: repositorio git, navegación y rutas nuevas, limpieza | Hecha (tag `fase-1`) |
 | F2 | Contrato: tipos generados desde el OpenAPI, `FlightsApi` alineada, API real en lo público (búsqueda, asientos, estado) | Hecha (tag `fase-2`) |
 | F3 | Cuenta: ingreso, registro, renovación de sesión y rutas protegidas contra la API real | Hecha (tag `fase-3`) |
-| F4 | Compra en 3 pasos completa | Siguiente |
+| F4a | Núcleo de la compra: hold, reserva, pago simulado, máquina de estados, idempotencia (pantallas provisionales) | Hecha (tag `fase-4a`) |
+| F4b | Pantallas finales de la compra (pasajeros, pago, confirmación) | Siguiente |
 | F5 | Mapa de asientos en forma de avión | Pendiente |
 | F6 | Mis viajes: detalle, check-in, pases, equipaje, cambio de fecha, cancelación | Pendiente |
 | F7 | Ofertas y pulido del inicio | Pendiente |

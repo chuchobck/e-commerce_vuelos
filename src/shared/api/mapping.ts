@@ -5,24 +5,39 @@
 import { addMoney, multiplyMoney, parseMoney, zeroMoney, type Money } from '@/shared/lib/money';
 import { airportOffsetMinutes } from './airports';
 import type {
+  BookingDetailDto,
+  BookingRequestDto,
   CabinPricingDto,
   FlightOfferDto,
   FlightStatusDto,
+  HoldRequestDto,
+  HoldResponseDto,
+  HoldStatusDto,
   ItineraryDto,
   MoneyDto,
   PassengerBreakdownDto,
+  PassengerItemDto,
   PassengerTypeDto,
   SearchRequestDto,
   SearchResponseDto,
   SegmentDto,
+  TicketDto,
   TokenResponseDto,
   UserResponseDto,
 } from './contract';
 import type {
   AuthTokens,
+  BookedFare,
+  BookedLeg,
+  BookedPassenger,
+  Booking,
+  BookingPassenger,
+  CreateBookingRequest,
+  CreateHoldRequest,
   Fare,
   FlightOffer,
   FlightStatus,
+  Hold,
   Itinerary,
   PassengerCount,
   SearchParams,
@@ -174,4 +189,129 @@ export function mapTokens(dto: TokenResponseDto): AuthTokens {
 
 export function mapUser(dto: UserResponseDto): User {
   return { id: dto.id, email: dto.email, roles: dto.roles, scopes: dto.scopes, createdAt: dto.createdAt };
+}
+
+/* ------------------------------------- Hold y reserva (F4a) ------------------------------------- */
+
+export function toHoldRequest(request: CreateHoldRequest): HoldRequestDto {
+  return {
+    offerId: request.offerId,
+    itinerarySelections: request.itinerarySelections.map(({ itineraryId, cabinClass, fareBrand }) => ({ itineraryId, cabinClass, fareBrand })),
+    passengersBreakdown: toPassengerBreakdown(request.passengers),
+  };
+}
+
+/** POST /offers/hold. Recién creado, le quedan exactamente `ttlMinutes` (la respuesta no trae remainingSeconds). */
+export function mapHoldCreated(dto: HoldResponseDto, receivedAt: number): Hold {
+  return {
+    id: dto.holdId,
+    status: dto.status,
+    expiresAt: dto.expiresAt,
+    remainingSeconds: dto.ttlMinutes * 60,
+    receivedAt,
+    lockedPrice: mapMoney(dto.lockedPrice),
+  };
+}
+
+/** GET /offers/hold/{id}: la respuesta no repite el id. */
+export function mapHoldStatus(dto: HoldStatusDto, holdId: string, receivedAt: number): Hold {
+  return {
+    id: holdId,
+    status: dto.status,
+    expiresAt: dto.expiresAt ?? null,
+    remainingSeconds: Math.max(0, dto.remainingSeconds),
+    receivedAt,
+    lockedPrice: mapMoney(dto.lockedPrice),
+  };
+}
+
+function toPassengerItem(p: BookingPassenger): PassengerItemDto {
+  return {
+    passengerId: p.id,
+    passengerType: p.type,
+    ...(p.associatedAdultId ? { associatedAdultId: p.associatedAdultId } : {}),
+    firstName: p.firstName,
+    lastName: p.lastName,
+    documentType: p.documentType,
+    documentNumber: p.documentNumber,
+    nationality: p.nationality,
+    ...(p.documentExpiryDate ? { documentExpiryDate: p.documentExpiryDate } : {}),
+    birthDate: p.birthDate,
+    gender: p.gender,
+    contact: { email: p.email, phone: p.phone },
+    ...(p.seats?.length ? { assignedSeats: p.seats } : {}),
+  };
+}
+
+export function toBookingRequest(request: CreateBookingRequest): BookingRequestDto {
+  return {
+    holdId: request.holdId,
+    passengers: request.passengers.map(toPassengerItem),
+    payment: { paymentReference: request.paymentReference },
+  };
+}
+
+function mapBookedFare(dto: CabinPricingDto): BookedFare {
+  return {
+    cabin: dto.cabinClass,
+    brand: dto.fareBrand,
+    refundable: dto.fareRules.isRefundable,
+    changeable: dto.fareRules.isChangeable,
+    baggage: {
+      personalItem: dto.baggageAllowance.personalItemIncluded ?? false,
+      carryOn: dto.baggageAllowance.carryOnIncluded ?? 0,
+      checked: dto.baggageAllowance.checkedBaggageIncluded ?? 0,
+    },
+    extraBagPrice: dto.extraCheckedBaggagePrice ? mapMoney(dto.extraCheckedBaggagePrice) : null,
+  };
+}
+
+/** Itinerario de una reserva: trae solo la familia vendida, sin precios por tipo (README, sección 6). */
+function mapBookedLeg(dto: ItineraryDto): BookedLeg {
+  const fare = dto.pricingOptions[0];
+  if (!fare) throw new Error(`El itinerario ${dto.itineraryId} de la reserva no trae su familia`);
+  return {
+    itinerary: { id: dto.itineraryId, segments: dto.segments.map(mapSegment), durationMinutes: dto.totalDurationMinutes, stops: dto.stopsCount },
+    fare: mapBookedFare(fare),
+  };
+}
+
+function mapBookedPassenger(dto: PassengerItemDto): BookedPassenger {
+  return {
+    id: dto.passengerId,
+    type: dto.passengerType,
+    ...(dto.associatedAdultId ? { associatedAdultId: dto.associatedAdultId } : {}),
+    firstName: dto.firstName,
+    lastName: dto.lastName,
+    documentType: dto.documentType,
+    documentNumber: dto.documentNumber,
+    nationality: dto.nationality,
+    ...(dto.documentExpiryDate ? { documentExpiryDate: dto.documentExpiryDate } : {}),
+    birthDate: dto.birthDate,
+    gender: dto.gender,
+    email: dto.contact.email,
+    phone: dto.contact.phone,
+    seats: dto.assignedSeats ?? [],
+  };
+}
+
+function mapTicket(dto: TicketDto): Booking['tickets'][number] {
+  return { id: dto.ticketId, passengerId: dto.passengerId, number: dto.eTicketNumber ?? null, status: dto.status, issuedAt: dto.issuedAt ?? null };
+}
+
+export function mapBooking(dto: BookingDetailDto): Booking {
+  const [outbound, inbound] = (dto.itineraries ?? []).map(mapBookedLeg);
+  if (!outbound) throw new Error(`La reserva ${dto.bookingId} no trae itinerarios`);
+  return {
+    id: dto.bookingId,
+    code: dto.pnr,
+    status: dto.status,
+    createdAt: dto.createdAt,
+    outbound,
+    ...(inbound ? { inbound } : {}),
+    passengers: (dto.passengers ?? []).map(mapBookedPassenger),
+    tickets: (dto.tickets ?? []).map(mapTicket),
+    total: mapMoney(dto.grandTotal),
+    changes: (dto.changes ?? []).map((c) => ({ at: c.changedAt ?? '', description: c.description ?? '' })),
+  };
 }

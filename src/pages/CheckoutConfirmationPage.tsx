@@ -1,24 +1,46 @@
-import { LogIn, Ticket } from 'lucide-react';
+import { LogIn, Search, Ticket } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
-import { CheckoutSteps } from '@/features/checkout';
+import { useAuth } from '@/features/auth';
+import { checkout, CheckoutSteps, purchaseNotice, useCheckout } from '@/features/checkout';
 import { flightsApi, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { useAsync } from '@/shared/lib/useAsync';
 import { Alert, Button, EmptyState, ErrorState, LoadingState } from '@/shared/ui';
 
 const p = es.purchase;
+const f = es.checkoutForms;
 
-/** Pantalla final de la compra (no es un paso): código de reserva y acceso a Mis viajes. */
+/**
+ * Final de la compra (no es un paso): confirmada, en proceso (se sigue hasta el estado final) o
+ * fallida. Al llegar de nuevo (recargar, enlace) se lee la reserva y se retoma el seguimiento.
+ */
 export function CheckoutConfirmationPage() {
   const { id = '' } = useParams();
-  const { user } = useAuth();
-  const booking = useAsync(() => (user ? flightsApi.getBooking(id) : Promise.resolve(null)), [id, user?.id]);
+  const { status, user, authorized } = useAuth();
+  const state = useCheckout();
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const authorizedRef = useRef(authorized);
+  authorizedRef.current = authorized;
+  const current = 'booking' in state && state.booking.id === id ? state : null;
+
+  const load = () => {
+    setLoadError(null);
+    const call = <T,>(fn: () => Promise<T>) => authorizedRef.current(fn);
+    call(() => flightsApi.getBooking(id))
+      .then((booking) => checkout.follow(booking, call))
+      .catch(setLoadError);
+  };
+  useEffect(() => {
+    if (status === 'authenticated' && !current) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- al cambiar de reserva o de sesión
+  }, [id, status]);
 
   let content;
-  if (!user) {
+  if (status === 'restoring') {
+    content = <LoadingState label={es.session.restoring} />;
+  } else if (!user) {
     content = (
       <EmptyState
         title={p.confirmationTitle}
@@ -31,11 +53,9 @@ export function CheckoutConfirmationPage() {
         }
       />
     );
-  } else if (booking.status === 'loading' || booking.status === 'idle') {
-    content = <LoadingState label={es.trip.loading} skeletons={1} />;
-  } else if (booking.status === 'error') {
+  } else if (loadError) {
     content =
-      isApiError(booking.error) && booking.error.status === 404 ? (
+      isApiError(loadError) && loadError.status === 404 ? (
         <EmptyState
           title={es.trip.notFoundTitle}
           text={es.trip.notFoundText}
@@ -47,22 +67,55 @@ export function CheckoutConfirmationPage() {
           }
         />
       ) : (
-        <ErrorState error={booking.error} onRetry={() => void booking.execute()} />
+        <ErrorState error={loadError} onRetry={load} />
       );
-  } else if (booking.data) {
-    const data = booking.data;
+  } else if (!current) {
+    content = <LoadingState label={es.trip.loading} skeletons={1} />;
+  } else {
+    const { booking } = current;
+    const notice = purchaseNotice(current);
+    const name = (passengerId: string) => {
+      const pax = booking.passengers.find((x) => x.id === passengerId);
+      return pax ? `${pax.firstName} ${pax.lastName}` : passengerId;
+    };
     content = (
       <>
-        <Alert variant="success" title={fmt(p.confirmationCode, { code: data.code })}>
-          <p>{fmt(p.confirmationText, { email: data.contact.email })}</p>
-        </Alert>
+        {current.step === 'confirmed' ? (
+          <Alert variant="success" live="polite" title={fmt(p.confirmationCode, { code: booking.code })}>
+            <p>{fmt(p.confirmationText, { email: booking.passengers[0]?.email ?? '' })}</p>
+          </Alert>
+        ) : notice ? (
+          <Alert variant={notice.tone} live="polite" title={notice.title}>
+            <p>{notice.text}</p>
+          </Alert>
+        ) : null}
+        {current.step === 'processing' && !current.gaveUp ? <LoadingState label={es.trip.status[booking.status]} /> : null}
+        {booking.tickets.length > 0 && current.step !== 'failed' ? (
+          <section className="flex flex-col gap-2">
+            <h2 className="text-xl">{f.ticketsTitle}</h2>
+            <ul className="flex flex-col gap-1 tabular-nums">
+              {booking.tickets.map((t) => (
+                <li key={t.id}>{t.number ? fmt(f.ticketLine, { name: name(t.passengerId), number: t.number }) : fmt(f.ticketPending, { name: name(t.passengerId) })}</li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <div className="flex flex-wrap gap-4">
-          <Button asChild>
-            <Link to={routes.trip(data.id)}>
-              <Ticket aria-hidden="true" />
-              {p.goToTrip}
-            </Link>
-          </Button>
+          {current.step === 'failed' ? (
+            <Button asChild>
+              <Link to={routes.search()}>
+                <Search aria-hidden="true" />
+                {p.searchAgain}
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild>
+              <Link to={routes.trip(booking.id)}>
+                <Ticket aria-hidden="true" />
+                {p.goToTrip}
+              </Link>
+            </Button>
+          )}
           <Button asChild variant="secondary">
             <Link to={routes.trips()}>{es.nav.trips}</Link>
           </Button>

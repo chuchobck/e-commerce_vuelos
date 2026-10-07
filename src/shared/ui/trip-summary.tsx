@@ -1,9 +1,15 @@
 import { PlaneTakeoff } from 'lucide-react';
-import type { SelectedLeg } from '@/shared/api';
+import type { Fare, Itinerary } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { fareName, formatDuration, formatLongDate, formatTime } from '@/shared/lib/format';
 
-function LegRow({ title, leg }: { title: string; leg: SelectedLeg }) {
+/** Un tramo elegido (paso 1) o reservado (BookingDetail): solo hacen falta los vuelos y la familia. */
+export interface TripLeg {
+  itinerary: Pick<Itinerary, 'segments' | 'durationMinutes'>;
+  fare: Pick<Fare, 'brand'>;
+}
+
+function LegRow({ title, leg }: { title: string; leg: TripLeg }) {
   const { segments } = leg.itinerary;
   const first = segments[0];
   const last = segments[segments.length - 1];
@@ -35,7 +41,7 @@ function LegRow({ title, leg }: { title: string; leg: SelectedLeg }) {
 }
 
 /** Resumen de ida y vuelta como lista de definiciones. */
-export function TripSummary({ outbound, inbound }: { outbound: SelectedLeg; inbound?: SelectedLeg }) {
+export function TripSummary({ outbound, inbound }: { outbound: TripLeg; inbound?: TripLeg }) {
   return (
     <dl className="flex flex-col gap-6">
       <LegRow title={es.purchase.outbound} leg={outbound} />

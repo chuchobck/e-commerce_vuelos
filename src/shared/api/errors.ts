@@ -2,11 +2,11 @@ import { es, fmt } from '@/shared/i18n';
 import type { ProblemCode } from './contract';
 
 /**
- * Códigos que no vienen del contrato: fallas de transporte y los del mock que aún no tienen
- * equivalente en la API (la compra se conecta en F4). Los errores de cuenta (/auth/*) no tienen
+ * Códigos que no vienen del contrato: fallas de transporte y el 409 genérico de los errores
+ * simulados del mock. Los errores de cuenta (/auth/*) no tienen
  * código propio: la API manda VALIDATION_FAILED y el status dice qué pasó (ver authErrorMessage).
  */
-export type LocalErrorCode = 'NETWORK' | 'TIMEOUT' | 'NOT_CONNECTED' | 'HOLD_EXPIRED' | 'CONFLICT' | 'SERVICE_UNAVAILABLE';
+export type LocalErrorCode = 'NETWORK' | 'TIMEOUT' | 'NOT_CONNECTED' | 'CONFLICT' | 'SERVICE_UNAVAILABLE';
 
 export type ApiErrorCode = ProblemCode | LocalErrorCode;
 
@@ -76,8 +76,6 @@ export function errorMessage(error: unknown): string {
       return e.timeout;
     case 'NETWORK':
       return e.network;
-    case 'HOLD_EXPIRED':
-      return es.purchase.holdExpiredText;
     case 'CHECK_IN_NOT_AVAILABLE':
       return e.checkInNotAvailable;
     case 'OFFER_NO_LONGER_AVAILABLE':
