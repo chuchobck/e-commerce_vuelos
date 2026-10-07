@@ -1,5 +1,32 @@
+# Dependencias y compilados
 node_modules
 dist
-*.local
-.env
 .vite
+coverage
+*.tsbuildinfo
+
+# Variables de entorno (solo se sube .env.example)
+.env
+.env.*
+!.env.example
+*.local
+
+# Registros
+*.log
+npm-debug.log*
+
+# Pruebas de extremo a extremo
+test-results
+playwright-report
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.swp
+*.suo
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini

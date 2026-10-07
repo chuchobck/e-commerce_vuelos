@@ -2,10 +2,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { RegisterSchema, type RegisterInput } from '@/features/forms/schemas';
+import { RETURN_TO_PARAM, routes, safeReturnTo } from '@/app/routes';
+import { RegisterSchema, type RegisterInput } from '@/features/auth';
 import { errorMessage, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { useErrorSummary } from '@/shared/lib/useErrorSummary';
@@ -39,6 +40,8 @@ const FIELDS = {
 export function RegisterPage() {
   const { register: registerAccount } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const returnTo = safeReturnTo(params.get(RETURN_TO_PARAM));
   const [submitError, setSubmitError] = useState<unknown>(null);
 
   const {
@@ -71,7 +74,7 @@ export function RegisterPage() {
     try {
       const s = await registerAccount(values);
       toast({ title: fmt(a.registered, { name: s.user.firstName.split(' ')[0] }), variant: 'success' });
-      navigate('/mis-reservas', { replace: true });
+      navigate(returnTo ?? routes.trips(), { replace: true });
     } catch (error) {
       if (isApiError(error) && error.code === 'EMAIL_TAKEN') {
         setError('email', { message: a.emailTaken }, { shouldFocus: true });
@@ -196,7 +199,7 @@ export function RegisterPage() {
         </form>
       </Card>
       <p className="text-center">
-        {a.haveAccount} <Link to="/ingresar">{a.goLogin}</Link>
+        {a.haveAccount} <Link to={routes.login(returnTo ?? undefined)}>{a.goLogin}</Link>
       </p>
     </Page>
   );

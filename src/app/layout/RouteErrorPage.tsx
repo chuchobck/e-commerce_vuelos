@@ -1,4 +1,5 @@
 import { Home, RefreshCw } from 'lucide-react';
+import { routes } from '@/app/routes';
 import { es } from '@/shared/i18n';
 import { usePageTitle } from '@/shared/lib/usePageTitle';
 
@@ -22,7 +23,7 @@ export function RouteErrorPage() {
           {es.common.retry}
         </button>
         <a
-          href="/"
+          href={routes.home()}
           className="inline-flex min-h-12 items-center gap-2 rounded border-2 border-primary px-6 font-bold no-underline"
         >
           <Home aria-hidden="true" className="size-6" />

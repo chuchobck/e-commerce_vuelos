@@ -2,14 +2,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { LogIn } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { LoginSchema, type LoginInput } from '@/features/forms/schemas';
+import { RETURN_TO_PARAM, routes, safeReturnTo } from '@/app/routes';
+import { LoginSchema, type LoginInput } from '@/features/auth';
 import { errorMessage } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { useErrorSummary } from '@/shared/lib/useErrorSummary';
-import { Alert, Button, Card, ErrorSummary, Field, Input, PasswordInput, toast } from '@/shared/ui';
+import { Alert, Button, Card, ErrorSummary, Field, Input, MockOnly, PasswordInput, toast } from '@/shared/ui';
 
 const a = es.auth;
 
@@ -21,8 +22,10 @@ const FIELDS = {
 export function LoginPage() {
   const { session, login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? '/mis-reservas';
+  const [params] = useSearchParams();
+  // A dónde volver (p. ej. la compra en curso); si no hay, a Mis viajes.
+  const returnTo = safeReturnTo(params.get(RETURN_TO_PARAM));
+  const next = returnTo ?? routes.trips();
   const [submitError, setSubmitError] = useState<unknown>(null);
 
   const {
@@ -42,7 +45,7 @@ export function LoginPage() {
     try {
       const s = await login(values);
       toast({ title: fmt(a.welcome, { name: s.user.firstName.split(' ')[0] }), variant: 'success' });
-      navigate(from, { replace: true });
+      navigate(next, { replace: true });
     } catch (error) {
       setSubmitError(error);
     }
@@ -52,7 +55,7 @@ export function LoginPage() {
     <Page title={a.loginTitle} heading={a.loginHeading} lead={a.loginLead} width="narrow">
       {session ? (
         <Alert variant="success" title={fmt(a.alreadyIn, { name: session.user.firstName })}>
-          <Link to="/mis-reservas">{a.goBookings}</Link>
+          <Link to={next}>{returnTo ? es.common.continue : a.goTrips}</Link>
         </Alert>
       ) : null}
       <Card>
@@ -73,11 +76,13 @@ export function LoginPage() {
             <LogIn aria-hidden="true" />
             {a.submitLogin}
           </Button>
-          <p className="text-sm text-muted">{a.demoHint}</p>
+          <MockOnly>
+            <p className="text-sm text-muted">{a.demoHint}</p>
+          </MockOnly>
         </form>
       </Card>
       <p className="text-center">
-        {a.noAccount} <Link to="/registrarse">{a.createAccount}</Link>
+        {a.noAccount} <Link to={routes.register(returnTo ?? undefined)}>{a.createAccount}</Link>
       </p>
     </Page>
   );

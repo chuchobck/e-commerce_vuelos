@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { maskDateInput } from './dates';
 import {
-  BOOKING_CODE_PATTERN,
   FLIGHT_NUMBER_PATTERN,
   NAME_PATTERN,
   PASSPORT_PATTERN,
@@ -93,9 +92,7 @@ describe('otros patrones', () => {
     expect(PASSPORT_PATTERN.test('A123')).toBe(false);
     expect(PASSPORT_PATTERN.test('A1234 567')).toBe(false);
   });
-  it('código de reserva y número de vuelo', () => {
-    expect(BOOKING_CODE_PATTERN.test('QD7K2M')).toBe(true);
-    expect(BOOKING_CODE_PATTERN.test('QD7K2')).toBe(false);
+  it('número de vuelo', () => {
     expect(FLIGHT_NUMBER_PATTERN.test('QD100')).toBe(true);
     expect(FLIGHT_NUMBER_PATTERN.test('qd1234')).toBe(true);
     expect(FLIGHT_NUMBER_PATTERN.test('LA100')).toBe(false);

@@ -2,11 +2,11 @@ import { addDays, differenceInYears, format, isValid, parse, startOfDay } from '
 import { es as esLocale } from 'date-fns/locale';
 
 /** Formato visible para el usuario. */
-export const DISPLAY_DATE = 'dd/MM/yyyy';
+const DISPLAY_DATE = 'dd/MM/yyyy';
 /** Formato de intercambio (URL y API). */
-export const ISO_DATE = 'yyyy-MM-dd';
+const ISO_DATE = 'yyyy-MM-dd';
 /** Máximo de días hacia adelante que se pueden comprar. */
-export const MAX_BOOKING_DAYS = 330;
+const MAX_BOOKING_DAYS = 330;
 
 export const dateLocale = esLocale;
 

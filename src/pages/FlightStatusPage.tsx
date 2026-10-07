@@ -3,15 +3,13 @@ import { PlaneTakeoff, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Page } from '@/app/layout/Page';
-import { FlightStatusSchema, type FlightStatusInput } from '@/features/forms/schemas';
-import { flightsApi, isApiError, type FlightStatus, type FlightStatusCode } from '@/shared/api';
+import { FlightStatusCard, FlightStatusSchema, type FlightStatusInput } from '@/features/flight-status';
+import { flightsApi, isApiError, type FlightStatus } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { displayToIso, toDisplayDate, today } from '@/shared/lib/dates';
-import { formatLongDate, formatTime } from '@/shared/lib/format';
 import { useErrorSummary } from '@/shared/lib/useErrorSummary';
 import {
   Alert,
-  Badge,
   Button,
   Card,
   DatePicker,
@@ -21,6 +19,7 @@ import {
   Field,
   Input,
   LoadingState,
+  MockOnly,
 } from '@/shared/ui';
 
 const t = es.status;
@@ -28,16 +27,6 @@ const t = es.status;
 const FIELDS = {
   flightNumber: { id: 'status-flight', label: t.flightNumber },
   date: { id: 'status-date', label: t.date },
-};
-
-const TONE: Record<FlightStatusCode, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
-  SCHEDULED: 'neutral',
-  ON_TIME: 'success',
-  DELAYED: 'warning',
-  BOARDING: 'info',
-  DEPARTED: 'info',
-  LANDED: 'success',
-  CANCELLED: 'error',
 };
 
 type State = { status: 'idle' } | { status: 'loading' } | { status: 'error'; error: unknown } | { status: 'success'; data: FlightStatus };
@@ -72,9 +61,11 @@ export function FlightStatusPage() {
       <Card>
         <form noValidate onSubmit={handleSubmit(onValid, onInvalid)} className="flex flex-col gap-6">
           <ErrorSummary ref={summaryRef} errors={summary} />
-          <Alert variant="info">
-            <p>{t.demoHint}</p>
-          </Alert>
+          <MockOnly>
+            <Alert variant="info">
+              <p>{t.demoHint}</p>
+            </Alert>
+          </MockOnly>
           <div className="grid items-start gap-4 sm:grid-cols-2">
             <Field
               id={FIELDS.flightNumber.id}
@@ -132,39 +123,7 @@ export function FlightStatusPage() {
             <ErrorState error={state.error} headingLevel="h3" />
           )
         ) : (
-          <article role="status" className="flex flex-col gap-6 rounded border-2 border-border bg-surface p-6 shadow-card">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <h3 className="text-xl">
-                {fmt(t.resultHeading, { flight: state.data.flightNumber, date: formatLongDate(state.data.date) })}
-              </h3>
-              <Badge tone={TONE[state.data.status]}>{t.states[state.data.status]}</Badge>
-            </div>
-            <p className="text-lg font-bold">
-              {fmt(es.results.route, { origin: state.data.origin, destination: state.data.destination })}
-            </p>
-            <dl className="grid gap-4 sm:grid-cols-2">
-              {[
-                { title: t.departure, scheduled: state.data.scheduledDeparture, estimated: state.data.estimatedDeparture },
-                { title: t.arrival, scheduled: state.data.scheduledArrival, estimated: state.data.estimatedArrival },
-              ].map((row) => (
-                <div key={row.title} className="flex flex-col gap-2 rounded border-2 border-border p-4">
-                  <dt className="font-bold">{row.title}</dt>
-                  <dd className="flex flex-col">
-                    <span>
-                      {t.scheduledTime}: <span className="font-bold tabular-nums">{formatTime(row.scheduled)}</span>
-                    </span>
-                    <span>
-                      {t.estimatedTime}: <span className="font-bold tabular-nums">{formatTime(row.estimated)}</span>
-                    </span>
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <p className="text-muted">
-              {state.data.gate ? `${fmt(t.gate, { gate: state.data.gate })} · ` : ''}
-              {fmt(t.updated, { time: new Date(state.data.updatedAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }) })}
-            </p>
-          </article>
+          <FlightStatusCard status={state.data} />
         )}
       </section>
     </Page>

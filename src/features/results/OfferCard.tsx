@@ -22,14 +22,11 @@ interface OfferCardProps {
   airports?: Airport[];
   /** Tarifa marcada como elegida (ida ya seleccionada). */
   selectedFareId?: string;
-  /** id de la tarifa que se está procesando. */
-  pendingFareId?: string | null;
-  disabled?: boolean;
   onChoose?: (offer: FlightOffer, fare: Fare) => void;
 }
 
 /** Tarjeta de un vuelo con sus 3 tarifas (Light, Classic, Flex) y el equipaje incluido. */
-export function OfferCard({ offer, airports, selectedFareId, pendingFareId, disabled, onChoose }: OfferCardProps) {
+export function OfferCard({ offer, airports, selectedFareId, onChoose }: OfferCardProps) {
   const first = offer.segments[0];
   const last = offer.segments[offer.segments.length - 1];
   const numbers = offer.segments.map((s) => s.flightNumber).join(' + ');
@@ -122,9 +119,6 @@ export function OfferCard({ offer, airports, selectedFareId, pendingFareId, disa
                     price: formatUSD(fare.pricePerAdult),
                   })}
                   aria-pressed={selectedFareId ? selected : undefined}
-                  loading={pendingFareId === fare.id}
-                  loadingText={r.holding}
-                  disabled={disabled && pendingFareId !== fare.id}
                   onClick={() => onChoose(offer, fare)}
                 >
                   {r.chooseFare} {family}

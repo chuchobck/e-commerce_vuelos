@@ -64,6 +64,8 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
           >
             <DayPicker
               mode="single"
+              // Al abrir el calendario el foco debe entrar en él (WCAG 2.4.3); no es un autofoco al cargar la página.
+              // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
               locale={dateLocale}
               selected={selected}

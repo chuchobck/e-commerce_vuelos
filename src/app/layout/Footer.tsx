@@ -1,22 +1,23 @@
 import { Accessibility } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { routes } from '@/app/routes';
 import { es, fmt } from '@/shared/i18n';
 
 const COLUMNS = [
   {
     title: es.footer.helpTitle,
     links: [
-      { to: '/ayuda', label: es.footer.helpCenter },
-      { to: '/ayuda#preguntas', label: es.footer.faq },
-      { to: '/ayuda#equipaje', label: es.footer.baggage },
+      { to: routes.help(), label: es.footer.helpCenter },
+      { to: routes.help('preguntas'), label: es.footer.faq },
+      { to: routes.help('equipaje'), label: es.footer.baggage },
     ],
   },
   {
     title: es.footer.legalTitle,
     links: [
-      { to: '/ayuda#terminos', label: es.footer.terms },
-      { to: '/ayuda#privacidad', label: es.footer.privacy },
-      { to: '/ayuda#accesibilidad', label: es.footer.accessibility },
+      { to: routes.help('terminos'), label: es.footer.terms },
+      { to: routes.help('privacidad'), label: es.footer.privacy },
+      { to: routes.help('accesibilidad'), label: es.footer.accessibility },
     ],
   },
 ];
@@ -77,7 +78,7 @@ export function Footer() {
           <Accessibility aria-hidden="true" className="size-8 text-footer-link" />
           <p className="text-sm">
             {es.footer.a11yStatement}{' '}
-            <Link to="/ayuda#accesibilidad" className="text-footer-link">
+            <Link to={routes.help('accesibilidad')} className="text-footer-link">
               {es.footer.accessibility}
             </Link>
           </p>

@@ -1,18 +1,19 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { ChevronDown, CircleHelp, LogIn, LogOut, Moon, Sun, Ticket, User } from 'lucide-react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { ChevronDown, CircleHelp, LogIn, LogOut, Moon, Sun, Ticket, User, UserRound } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useTheme } from '@/app/providers/ThemeProvider';
+import { routes, safeReturnTo } from '@/app/routes';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { Button, toast } from '@/shared/ui';
 import { MobileMenu } from './MobileMenu';
-import { NAV_ITEMS } from './nav-items';
+import { isNavItemActive, NAV_ITEMS } from './nav-items';
 
-export function Logo() {
+function Logo() {
   return (
     <Link
-      to="/"
+      to={routes.home()}
       aria-label={es.app.logoAlt}
       className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded text-xl font-bold text-primary no-underline sm:text-2xl"
     >
@@ -22,7 +23,7 @@ export function Logo() {
   );
 }
 
-export function ThemeToggle() {
+function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   return (
@@ -37,13 +38,18 @@ export function ThemeToggle() {
   );
 }
 
+const MENU_ITEM =
+  'flex min-h-12 cursor-pointer items-center gap-2 rounded px-4 text-foreground no-underline outline-none data-[highlighted]:bg-primary-tint data-[highlighted]:outline data-[highlighted]:outline-[3px] data-[highlighted]:outline-focus';
+
+/** Sin sesión: "Ingresar" (vuelve a esta página después). Con sesión: Mis viajes, Mi perfil y Cerrar sesión. */
 function UserMenu() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname, search } = useLocation();
   if (!session) {
     return (
       <Button asChild variant="secondary" className="hidden lg:inline-flex">
-        <Link to="/ingresar">
+        <Link to={routes.login(safeReturnTo(pathname + search) ?? undefined)}>
           <LogIn aria-hidden="true" />
           {es.nav.login}
         </Link>
@@ -66,21 +72,26 @@ function UserMenu() {
           sideOffset={8}
           className="z-50 min-w-64 rounded border-2 border-border bg-surface p-2 shadow-raised animate-fade-in"
         >
-          <DropdownMenu.Item
-            onSelect={() => navigate('/mis-reservas')}
-            className="flex min-h-12 cursor-pointer items-center gap-2 rounded px-4 outline-none data-[highlighted]:bg-primary-tint data-[highlighted]:outline data-[highlighted]:outline-[3px] data-[highlighted]:outline-focus"
-          >
-            <Ticket aria-hidden="true" className="size-6 text-primary" />
-            {es.nav.bookings}
+          <DropdownMenu.Item asChild className={MENU_ITEM}>
+            <Link to={routes.trips()}>
+              <Ticket aria-hidden="true" className="size-6 text-primary" />
+              {es.nav.trips}
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild className={MENU_ITEM}>
+            <Link to={routes.profile()}>
+              <UserRound aria-hidden="true" className="size-6 text-primary" />
+              {es.nav.profile}
+            </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-2 h-px bg-border" />
           <DropdownMenu.Item
             onSelect={() => {
               logout();
               toast({ title: es.nav.loggedOut, variant: 'success' });
-              navigate('/');
+              navigate(routes.home());
             }}
-            className="flex min-h-12 cursor-pointer items-center gap-2 rounded px-4 outline-none data-[highlighted]:bg-primary-tint data-[highlighted]:outline data-[highlighted]:outline-[3px] data-[highlighted]:outline-focus"
+            className={MENU_ITEM}
           >
             <LogOut aria-hidden="true" className="size-6 text-primary" />
             {es.nav.logout}
@@ -96,6 +107,7 @@ function UserMenu() {
  * El orden visual coincide con el orden del teclado.
  */
 export function Header() {
+  const { pathname } = useLocation();
   return (
     <header className="border-b-2 border-border bg-surface">
       <div className="container-page flex min-h-20 items-center justify-between gap-2 sm:gap-4">
@@ -103,29 +115,30 @@ export function Header() {
 
         <nav aria-label={es.a11y.mainNav} className="hidden lg:block">
           <ul className="flex items-center gap-2">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    cn(
+            {NAV_ITEMS.map((item) => {
+              const active = isNavItemActive(item, pathname);
+              return (
+                <li key={item.to}>
+                  <Link
+                    to={item.to}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
                       'inline-flex min-h-12 items-center rounded px-4 font-bold no-underline hover:bg-primary-tint',
-                      isActive ? 'text-primary underline decoration-4 underline-offset-8' : 'text-foreground',
-                    )
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
+                      active ? 'text-primary underline decoration-4 underline-offset-8' : 'text-foreground',
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 
         <div className="flex items-center gap-2">
           {/* Ayuda: mismo lugar en todas las páginas (WCAG 3.2.6). */}
           <Button asChild variant="ghost" className="min-w-12 px-2 sm:px-4">
-            <Link to="/ayuda">
+            <Link to={routes.help()}>
               <CircleHelp aria-hidden="true" />
               <span className="hidden sm:inline">{es.nav.help}</span>
               <span className="sr-only sm:hidden">{es.nav.help}</span>

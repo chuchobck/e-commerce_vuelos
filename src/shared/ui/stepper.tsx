@@ -13,11 +13,16 @@ interface StepperProps {
 /**
  * Indicador de progreso de la compra. Lista ordenada con aria-current="step" en el paso actual
  * y el estado de cada paso escrito en texto (no solo por color o icono).
+ * Con `current` igual al número de pasos, todos se muestran completados (pantalla final).
  */
 export function Stepper({ steps, current, label = es.purchase.stepperLabel, className }: StepperProps) {
   return (
     <nav aria-label={label} className={className}>
-      <p className="sr-only">{fmt(es.purchase.stepOf, { current: current + 1, total: steps.length })}</p>
+      <p className="sr-only">
+        {current >= steps.length
+          ? fmt(es.purchase.stepsDone, { total: steps.length })
+          : fmt(es.purchase.stepOf, { current: current + 1, total: steps.length })}
+      </p>
       <ol className="flex items-start">
         {steps.map((step, i) => {
           const state = i < current ? 'complete' : i === current ? 'current' : 'upcoming';

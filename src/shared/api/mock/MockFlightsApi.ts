@@ -1,3 +1,5 @@
+import { es } from '@/shared/i18n';
+import { checkInWindow } from '@/shared/lib/checkin';
 import type { FlightsApi } from '../FlightsApi';
 import { ApiError } from '../errors';
 import type {
@@ -205,14 +207,11 @@ export class MockFlightsApi implements FlightsApi {
     return structuredClone(found);
   }
 
-  private findByCodeAndLastName(code: string, lastName: string): Booking {
-    const normalize = (s: string) =>
-      s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-    const found = this.db.bookings.find(
-      (b) =>
-        b.code === code.toUpperCase() &&
-        b.passengers.some((p) => normalize(p.lastName).includes(normalize(lastName))),
-    );
+  /** Reserva del usuario de la sesi\u00f3n. Como la API: sin sesi\u00f3n 401; ajena o inexistente 404. */
+  private ownedBooking(bookingId: string, token: string | undefined): Booking {
+    const user = this.userFromToken(token);
+    if (!user) throw new ApiError(401, 'UNAUTHORIZED', 'Sesi\u00f3n inv\u00e1lida');
+    const found = this.db.bookings.find((b) => b.id === bookingId && b.userId === user.id);
     if (!found) throw new ApiError(404, 'NOT_FOUND', 'Reserva no encontrada');
     return found;
   }
@@ -242,18 +241,13 @@ export class MockFlightsApi implements FlightsApi {
       }));
   }
 
-  async checkIn(request: CheckInRequest): Promise<CheckInResult> {
+  async checkIn(request: CheckInRequest, token?: string): Promise<CheckInResult> {
     await simulate('checkIn', [409, 503]);
-    const booking = this.findByCodeAndLastName(request.bookingCode, request.lastName);
+    const booking = this.ownedBooking(request.bookingId, token);
     if (booking.status === 'CANCELLED') throw new ApiError(409, 'CONFLICT', 'La reserva está cancelada');
-    const dep = new Date(booking.outbound.offer.segments[0].departureTime).getTime();
-    const diff = dep - Date.now();
-    if (diff > 24 * 3_600_000) {
-      throw new ApiError(409, 'CHECKIN_WINDOW', 'El check-in abre 24 horas antes de la salida. Vuelve más cerca de la fecha de tu vuelo.');
-    }
-    if (diff < 3_600_000) {
-      throw new ApiError(409, 'CHECKIN_WINDOW', 'El check-in en línea cerró 1 hora antes de la salida. Acércate al mostrador del aeropuerto.');
-    }
+    const checkin = checkInWindow(booking.outbound.offer.segments[0].departureTime);
+    if (checkin.status === 'not-open') throw new ApiError(409, 'CHECKIN_WINDOW', es.checkin.notOpenError);
+    if (checkin.status === 'closed') throw new ApiError(409, 'CHECKIN_WINDOW', es.checkin.closed);
     this.commit(() => {
       booking.status = 'CHECKED_IN';
       booking.passengers.forEach((p, i) => {
@@ -263,9 +257,9 @@ export class MockFlightsApi implements FlightsApi {
     return { booking: structuredClone(booking), boardingPasses: this.buildBoardingPasses(booking) };
   }
 
-  async getBoardingPasses(bookingCode: string, lastName: string): Promise<BoardingPass[]> {
+  async getBoardingPasses(bookingId: string, token?: string): Promise<BoardingPass[]> {
     await simulate('getBoardingPasses', [503]);
-    const booking = this.findByCodeAndLastName(bookingCode, lastName);
+    const booking = this.ownedBooking(bookingId, token);
     if (booking.status !== 'CHECKED_IN') throw new ApiError(409, 'CONFLICT', 'Aún no has hecho el check-in');
     return this.buildBoardingPasses(booking);
   }

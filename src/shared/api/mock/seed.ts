@@ -1,4 +1,5 @@
 import { addDays, format } from 'date-fns';
+import { CHECKIN_CLOSES_MINUTES, CHECKIN_OPENS_HOURS } from '@/shared/lib/checkin';
 import type { Booking, FlightOffer, PassengerCount } from '../types';
 import { generateOffers } from './generators';
 import { DB_VERSION, type MockDb } from './store';
@@ -6,18 +7,18 @@ import { DB_VERSION, type MockDb } from './store';
 /** Hash de "quinde2026" (cuenta de prueba documentada en la pantalla de ingreso). */
 const DEMO_HASH = 'dc6515ef8bcbcf58716f4db57317cc72f1c5e0c95fdb6444455d887e648370f5';
 
-export const DEMO_USER_ID = 'usr_demo';
+const DEMO_USER_ID = 'usr_demo';
 
 const ONE_ADULT: PassengerCount = { adults: 1, children: 0, infants: 0 };
 
-/** Primer vuelo UIO→GYE que sale entre 2 y 24 horas desde ahora (para probar el check-in). */
+/** Primer vuelo UIO→GYE dentro de la ventana de check-in (con al menos 1 h de margen antes del cierre). */
 function offerInCheckInWindow(): FlightOffer | null {
   const now = Date.now();
-  for (let d = 0; d < 2; d++) {
+  for (let d = 0; d <= 2; d++) {
     const date = format(addDays(new Date(), d), 'yyyy-MM-dd');
     const found = generateOffers('UIO', 'GYE', date, 'ECONOMY', ONE_ADULT).find((o) => {
       const dep = new Date(o.segments[0].departureTime).getTime();
-      return dep - now > 2 * 3_600_000 && dep - now < 24 * 3_600_000;
+      return dep - now > CHECKIN_CLOSES_MINUTES * 60_000 + 3_600_000 && dep - now < CHECKIN_OPENS_HOURS * 3_600_000;
     });
     if (found) return found;
   }

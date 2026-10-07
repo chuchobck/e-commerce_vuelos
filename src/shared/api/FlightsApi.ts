@@ -47,8 +47,9 @@ export interface FlightsApi {
   getBooking(bookingIdOrCode: string): Promise<Booking>;
   cancelBooking(bookingId: string, token?: string): Promise<Booking>;
 
-  checkIn(request: CheckInRequest): Promise<CheckInResult>;
-  getBoardingPasses(bookingCode: string, lastName: string): Promise<BoardingPass[]>;
+  /** Check-in de todos los pasajeros. 401 sin sesión, 404 si la reserva no es del usuario, 409 fuera de la ventana. */
+  checkIn(request: CheckInRequest, token?: string): Promise<CheckInResult>;
+  getBoardingPasses(bookingId: string, token?: string): Promise<BoardingPass[]>;
 
   getFlightStatus(flightNumber: string, date: string): Promise<FlightStatus>;
 

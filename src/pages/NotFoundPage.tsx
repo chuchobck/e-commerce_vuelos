@@ -1,13 +1,13 @@
 import { CircleHelp, Compass, Search, Ticket } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { SEARCH_ANCHOR_ID } from '@/app/layout/RootLayout';
+import { routes } from '@/app/routes';
 import { es } from '@/shared/i18n';
 
 const LINKS = [
-  { to: `/#${SEARCH_ANCHOR_ID}`, label: es.nav.search, icon: Search },
-  { to: '/mis-reservas', label: es.nav.bookings, icon: Ticket },
-  { to: '/ayuda', label: es.nav.help, icon: CircleHelp },
+  { to: routes.search(), label: es.common.searchFlights, icon: Search },
+  { to: routes.trips(), label: es.nav.trips, icon: Ticket },
+  { to: routes.help(), label: es.nav.help, icon: CircleHelp },
 ];
 
 /** 404 amable: explica qué pasó y ofrece caminos claros. */

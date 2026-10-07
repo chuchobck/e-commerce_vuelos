@@ -3,7 +3,7 @@
  * Los pares sin ruta directa se ofrecen con 1 escala en UIO o GYE.
  * Galápagos solo se conecta con el continente desde UIO, GYE y LTX, como en la realidad.
  */
-export const DIRECT_ROUTES: [string, string][] = [
+const DIRECT_ROUTES: [string, string][] = [
   ['UIO', 'GYE'],
   ['UIO', 'CUE'],
   ['GYE', 'CUE'],

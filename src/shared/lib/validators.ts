@@ -6,7 +6,6 @@
 export const NAME_PATTERN = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]+$/;
 export const PASSPORT_PATTERN = /^[A-Za-z0-9]{6,12}$/;
 export const PHONE_EC_PATTERN = /^9\d{8}$/;
-export const BOOKING_CODE_PATTERN = /^[A-Za-z0-9]{6}$/;
 export const FLIGHT_NUMBER_PATTERN = /^QD\d{3,4}$/i;
 
 /** Elimina todo lo que no sea dígito (para teclear y pegar en campos numéricos). */

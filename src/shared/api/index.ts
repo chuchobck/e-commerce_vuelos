@@ -21,6 +21,7 @@ export const flightsApi: FlightsApi = createFlightsApi();
 
 export type { FlightsApi } from './FlightsApi';
 export * from './types';
+export { apiConfig } from './config';
 export { ApiError, errorMessage, isApiError } from './errors';
 export {
   MOCK_OPERATIONS,

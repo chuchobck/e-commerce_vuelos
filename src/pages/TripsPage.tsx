@@ -1,54 +1,35 @@
-import { ChevronRight, LogIn, Search, Ticket } from 'lucide-react';
+import { ChevronRight, Search, Ticket } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { SEARCH_ANCHOR_ID } from '@/app/layout/RootLayout';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { BookingStatusBadge } from '@/features/bookings/BookingStatusBadge';
+import { routes } from '@/app/routes';
+import { BookingStatusBadge } from '@/features/trips';
 import { flightsApi, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { formatLongDate, formatTime, formatUSD } from '@/shared/lib/format';
 import { useAsync } from '@/shared/lib/useAsync';
 import { Button, EmptyState, ErrorState, LoadingState } from '@/shared/ui';
 
-const t = es.bookings;
+const t = es.trips;
 
-export function MyBookingsPage() {
+/** Lista de viajes del usuario. La ruta exige sesión (RequireAuth). */
+export function TripsPage() {
   const { session, logout } = useAuth();
   const token = session?.token;
-  const bookings = useAsync(() => (token ? flightsApi.listBookings(token) : Promise.resolve([])), [token]);
+  const trips = useAsync(() => (token ? flightsApi.listBookings(token) : Promise.resolve([])), [token]);
 
-  // Sesión vencida en el servidor: se cierra localmente y se pide ingresar de nuevo.
+  // Sesión vencida en el servidor: se cierra localmente y RequireAuth pide ingresar de nuevo.
   useEffect(() => {
-    if (bookings.status === 'error' && isApiError(bookings.error) && bookings.error.status === 401) logout();
-  }, [bookings.status, bookings.error, logout]);
+    if (trips.status === 'error' && isApiError(trips.error) && trips.error.status === 401) logout();
+  }, [trips.status, trips.error, logout]);
 
   let content;
-  if (!session) {
-    content = (
-      <EmptyState
-        title={t.loginTitle}
-        text={t.loginText}
-        icon={<LogIn className="size-8" />}
-        action={
-          <>
-            <Button asChild>
-              <Link to="/ingresar" state={{ from: '/mis-reservas' }}>
-                {es.nav.login}
-              </Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link to="/check-in">{es.nav.checkIn}</Link>
-            </Button>
-          </>
-        }
-      />
-    );
-  } else if (bookings.status === 'loading' || bookings.status === 'idle') {
+  if (trips.status === 'loading' || trips.status === 'idle') {
     content = <LoadingState label={t.loading} skeletons={2} />;
-  } else if (bookings.status === 'error') {
-    content = <ErrorState error={bookings.error} onRetry={() => void bookings.execute()} />;
-  } else if (bookings.data.length === 0) {
+  } else if (trips.status === 'error') {
+    content = <ErrorState error={trips.error} onRetry={() => void trips.execute()} />;
+  } else if (trips.data.length === 0) {
     content = (
       <EmptyState
         title={t.emptyTitle}
@@ -56,7 +37,7 @@ export function MyBookingsPage() {
         icon={<Ticket className="size-8" />}
         action={
           <Button asChild>
-            <Link to={`/#${SEARCH_ANCHOR_ID}`}>
+            <Link to={routes.search()}>
               <Search aria-hidden="true" />
               {es.common.searchFlights}
             </Link>
@@ -67,7 +48,7 @@ export function MyBookingsPage() {
   } else {
     content = (
       <ul aria-label={t.listLabel} className="flex flex-col gap-4">
-        {bookings.data.map((bk) => {
+        {trips.data.map((bk) => {
           const first = bk.outbound.offer.segments[0];
           const last = bk.outbound.offer.segments[bk.outbound.offer.segments.length - 1];
           return (
@@ -87,7 +68,7 @@ export function MyBookingsPage() {
                   </div>
                 </div>
                 <Button asChild variant="secondary">
-                  <Link to={`/reserva/${bk.code}`}>
+                  <Link to={routes.trip(bk.id)}>
                     {fmt(t.view, { code: bk.code })}
                     <ChevronRight aria-hidden="true" />
                   </Link>
