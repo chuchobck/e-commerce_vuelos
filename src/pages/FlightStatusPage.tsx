@@ -3,7 +3,7 @@ import { PlaneTakeoff, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Page } from '@/app/layout/Page';
-import { FlightStatusSchema, type FlightStatusInput } from '@/features/forms';
+import { FlightStatusSchema, type FlightStatusInput } from '@/features/flight-status';
 import { flightsApi, isApiError, type FlightStatus, type FlightStatusCode } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { displayToIso, toDisplayDate, today } from '@/shared/lib/dates';

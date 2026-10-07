@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { LoginSchema, type LoginInput } from '@/features/forms';
+import { LoginSchema, type LoginInput } from '@/features/auth';
 import { errorMessage } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { useErrorSummary } from '@/shared/lib/useErrorSummary';

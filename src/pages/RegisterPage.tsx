@@ -5,7 +5,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { RegisterSchema, type RegisterInput } from '@/features/forms';
+import { RegisterSchema, type RegisterInput } from '@/features/auth';
 import { errorMessage, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { useErrorSummary } from '@/shared/lib/useErrorSummary';

@@ -3,7 +3,7 @@ import { CalendarCheck, QrCode } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Page } from '@/app/layout/Page';
-import { CheckInSchema, type CheckInInput } from '@/features/forms';
+import { CheckInSchema, type CheckInInput } from '@/features/checkin';
 import { flightsApi, type CheckInResult } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { formatLongDate, formatTime } from '@/shared/lib/format';
