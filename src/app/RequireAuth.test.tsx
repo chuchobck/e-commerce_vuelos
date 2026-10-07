@@ -100,7 +100,7 @@ describe('RequireAuth', () => {
     expect(screen.getByText(es.errors.network)).toBeTruthy();
     expect(screen.queryByTestId('login')).toBeNull();
     offline = false;
-    fireEvent.click(screen.getByRole('button', { name: es.states.retry }));
+    fireEvent.click(screen.getByRole('button', { name: es.common.retry }));
     expect(await screen.findByText('Privado')).toBeTruthy();
   });
 

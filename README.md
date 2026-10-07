@@ -17,7 +17,7 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 ## 1. Estado actual (2026-10-07, cierre de F3)
 
 - Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 3. 171 archivos en `src`, unas 13.300 líneas de TypeScript (sin contar los tipos generados).
-- 260 pruebas en verde con `npm run test` y 17 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta, solo contra el backend local). Lint, typecheck y build sin errores.
+- 262 pruebas en verde con `npm run test` y 17 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta, solo contra el backend local). Lint, typecheck y build sin errores.
 - **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, "Escápate", estado de vuelo y la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
 - Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para `/auth/*`, `contracts/backend-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
 - **Sesión** (sección 6, "Modelo de seguridad de la sesión"): access token solo en memoria, renovación única entre pestañas, cierre de sesión que se propaga a las demás pestañas, restauración al recargar sin parpadeo.
@@ -334,7 +334,7 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 
 ## 8. Pruebas
 
-- **Hoy:** 260 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429).
+- **Hoy:** 262 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429).
 - **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 por minuto).
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
 - Al cerrar cada fase: lint, typecheck, build, pruebas, recorrido solo con teclado, 320 px, zoom al 200 % y modo oscuro.
