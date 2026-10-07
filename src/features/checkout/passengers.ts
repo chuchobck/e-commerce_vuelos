@@ -196,7 +196,8 @@ export function initialPassengerValues(types: PassengerType[], draft: BookingPas
       phone: d?.phone.replace(/^\+593/, '') ?? '',
     };
   });
-  const sameContact = passengers.every((p) => p.email === passengers[0].email && p.phone === passengers[0].phone);
+  // Sin borrador, un solo contacto para todos (lo normal); con borrador, solo si los guardados coinciden.
+  const sameContact = !usable || passengers.every((p) => p.email === passengers[0].email && p.phone === passengers[0].phone);
   return { passengers, sameContact, seats: usable ? seatsFromDraft(draft, segmentIds) : {} };
 }
 

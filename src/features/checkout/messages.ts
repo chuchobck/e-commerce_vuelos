@@ -40,8 +40,9 @@ export function purchaseNotice(state: CheckoutState): PurchaseNotice | null {
           };
     case 'held':
       if (state.bookingError) {
-        const cabin = state.bookingError.code === 'SEAT_CABIN_MISMATCH';
-        return { tone: 'warning', title: es.checkoutForms.seatsTakenTitle, text: cabin ? es.checkoutForms.seatsCabinText : es.checkoutForms.seatsTakenText };
+        const code = state.bookingError.code;
+        const text = code === 'SEAT_CABIN_MISMATCH' ? es.checkoutForms.seatsCabinText : code === 'SEAT_TAKEN' ? es.checkoutForms.seatsTakenText : es.checkoutForms.seatsInvalidText;
+        return { tone: 'warning', title: es.checkoutForms.seatsTakenTitle, text };
       }
       return state.passengerErrors.length > 0 ? { tone: 'warning', title: m.passengersTitle, text: m.passengersText } : null;
     case 'processing':

@@ -41,7 +41,8 @@ export function CheckoutPaymentPage() {
 
   // Al recargar en este paso, los pasajeros guardados siguen valiendo si están completos.
   useEffect(() => {
-    if (state.step === 'held' && !state.passengersReady && selection && isDraftComplete(selection, checkout.passengersDraft())) {
+    // (No con un error de asiento pendiente: ese se corrige primero en el paso 2.)
+    if (state.step === 'held' && !state.passengersReady && !state.bookingError && selection && isDraftComplete(selection, checkout.passengersDraft())) {
       checkout.setPassengers(checkout.passengersDraft(), true);
     }
   }, [state, selection]);

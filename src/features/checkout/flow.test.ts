@@ -344,6 +344,24 @@ describe('máquina de la compra: pago y resultado', () => {
     expect(s.flow.getState().step).toBe('confirmed');
   });
 
+  it('SEAT_TAKEN al pagar: vuelve a los datos con el hold vivo; con los asientos corregidos el pedido y la clave son nuevos', async () => {
+    const s = await ready();
+    s.api.setOutcome(() => new ApiError({ status: 409, code: 'SEAT_TAKEN' }));
+    const withSeat = [{ ...PAX[0], seats: [{ segmentId: 's1', seatNumber: '12A' }] }];
+    s.flow.setPassengers(withSeat, true);
+    await s.flow.pay('PAY-OK-AAAA1111');
+    expect(s.flow.getState()).toMatchObject({ step: 'held', passengersReady: false, bookingError: { code: 'SEAT_TAKEN' }, hold: { id: 'hold-1' } });
+    s.api.setOutcome(() => booking('CONFIRMED'));
+    // El usuario elige otro asiento y continúa: el error de asientos queda atendido.
+    s.flow.setPassengers([{ ...PAX[0], seats: [{ segmentId: 's1', seatNumber: '14C' }] }], true);
+    expect((s.flow.getState() as { bookingError?: unknown }).bookingError).toBeUndefined();
+    await s.flow.pay('PAY-OK-BBBB2222');
+    const [first, second] = vi.mocked(s.api.api.createBooking).mock.calls;
+    expect(second[1]).not.toBe(first[1]);
+    expect(second[0].passengers[0].seats).toEqual([{ segmentId: 's1', seatNumber: '14C' }]);
+    expect(s.flow.getState().step).toBe('confirmed');
+  });
+
   it('202: en proceso; se consulta con esperas crecientes hasta el estado final', async () => {
     const s = await ready();
     s.api.setOutcome(() => booking('PENDING_PAYMENT'));

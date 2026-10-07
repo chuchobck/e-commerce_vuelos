@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flightsApi, seatConflictError, type SeatMap } from '@/shared/api';
 import { mockSeatMap } from '@/shared/api/mock/generators';
+import { markSeatsTaken } from '@/shared/api/mock/seatSimulation';
 import { es } from '@/shared/i18n';
 import { clearSeatMapStore } from '../seatMapStore';
 import { FAMILY, segmentsFor } from '../testSupport';
@@ -14,12 +15,15 @@ const t = es.seats;
 const { offerId, segments } = segmentsFor('UIO', 'GYE');
 const SEGMENT = segments[0];
 
+// El mapa del mock nace con todo libre (como la API real); aquí se ocupan algunos, como lo haría una reserva.
+const withTakenSeats = (map: SeatMap) => markSeatsTaken(map, new Set(['20A', '20B', '20C', '21D']));
+
 let maps: Map<string, SeatMap>;
 
 beforeEach(() => {
   clearSeatMapStore();
   maps = new Map();
-  vi.spyOn(flightsApi, 'getSeatMap').mockImplementation(async (offer, segment) => maps.get(segment) ?? mockSeatMap(offer, segment));
+  vi.spyOn(flightsApi, 'getSeatMap').mockImplementation(async (offer, segment) => maps.get(segment) ?? withTakenSeats(mockSeatMap(offer, segment)));
 });
 
 afterEach(() => {

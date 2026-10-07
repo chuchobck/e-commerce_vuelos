@@ -40,11 +40,10 @@ import {
   unauthorized,
   userIdFromAccessToken,
 } from './auth';
-import { mockFlightStatus, mockSearch, mockSeatMap } from './generators';
+import { mockFlightStatus, mockSearch } from './generators';
 import * as purchase from './purchase';
 import { simulate } from './network';
 import { seeded } from './random';
-import { applySimulatedSeats } from './seatSimulation';
 import { refreshSeed, seedDb } from './seed';
 import { hashPassword, loadDb, saveDb, type MockDb, type StoredBooking, type StoredUser } from './store';
 
@@ -94,7 +93,7 @@ export class MockFlightsApi implements FlightsApi {
 
   async getSeatMap(offerId: string, segmentId: string): Promise<SeatMap> {
     await simulate('getSeatMap', [503]);
-    return applySimulatedSeats(mockSeatMap(offerId, segmentId));
+    return purchase.seatMapOf(this.db, offerId, segmentId);
   }
 
   async getFlightStatus(flightNumber: string, date: string): Promise<FlightStatus> {

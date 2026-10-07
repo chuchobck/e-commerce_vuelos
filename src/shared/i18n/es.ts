@@ -422,6 +422,7 @@ export const es = {
     seatsHide: 'Ocultar asientos',
     seatsTakenTitle: 'Revisa tus asientos',
     seatsTakenText: 'Alguien eligió antes un asiento de tu compra. Mantuvimos los demás: elige otro y vuelve a continuar. Tu precio sigue apartado.',
+    seatsInvalidText: 'La aerolínea no aceptó uno de los asientos elegidos. Elige otro o deja la asignación automática. Tu precio sigue apartado.',
     seatsCabinText: 'Un asiento elegido no corresponde a tu tarifa. Mantuvimos los demás: elige otro y vuelve a continuar. Tu precio sigue apartado.',
     birthRule: {
       ADULT: 'Desde 18 años.',

@@ -105,8 +105,11 @@ describe('formulario de pasajeros', () => {
 
   it('"mismo contacto para todos": los demás no piden correo ni celular, y el pedido los copia', async () => {
     const { onDone } = setup({ adults: 2, children: 0, infants: 0 });
-    expect(screen.getAllByLabelText(/^Correo electrónico/)).toHaveLength(2);
+    // Nace marcado: solo se pide un contacto; al desmarcar, cada pasajero tiene el suyo.
     const same = screen.getByRole('checkbox', { name: f.sameContact });
+    expect(screen.getAllByLabelText(/^Correo electrónico/)).toHaveLength(1);
+    fireEvent.click(same);
+    await waitFor(() => expect(screen.getAllByLabelText(/^Correo electrónico/)).toHaveLength(2));
     fireEvent.click(same);
     await waitFor(() => expect(screen.getAllByLabelText(/^Correo electrónico/)).toHaveLength(1));
     fill(0);
@@ -159,8 +162,6 @@ describe('formulario de pasajeros', () => {
     fill(0);
     fill(1, { first: 'Luz', last: 'Pérez Gómez', doc: '0926687856', birth: '01082025' });
     change(field(/^Celular/, 0), '991234567');
-    change(field(/^Correo electrónico/, 1), 'luz@example.test');
-    change(field(/^Celular/, 1), '991234567');
     fireEvent.submit(screen.getByRole('form', { name: es.purchase.passengersTitle }));
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
     const sent = onDone.mock.calls[0][0] as BookingPassenger[];

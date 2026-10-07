@@ -113,6 +113,10 @@ export function classifyPaymentError(error: unknown, hold: Hold): CheckoutState 
     if (error.code === 'INFANT_SEAT_NOT_ALLOWED') {
       return { step: 'held', hold, passengersReady: false, passengerErrors: error.fieldErrors };
     }
+    // Un asiento que la API no acepta por otra razón (no existe en el avión, tramo ajeno, repetido): también se revisa en el paso 2.
+    if ((error.status === 400 || error.status === 422) && error.fieldErrors.some((e) => /assignedSeats/.test(e.field))) {
+      return { step: 'held', hold, passengersReady: false, passengerErrors: [], bookingError: error };
+    }
     if ((error.status === 400 || error.status === 422) && error.fieldErrors.some(isPassengerField)) {
       return { step: 'held', hold, passengersReady: false, passengerErrors: error.fieldErrors.filter(isPassengerField) };
     }

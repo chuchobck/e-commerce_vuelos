@@ -122,8 +122,11 @@ describe('pasajeros del paso 2', () => {
     const values = initialPassengerValues(['ADULT', 'ADULT', 'INFANT'], [], 'cuenta@example.test');
     expect(values.passengers.map((p) => p.email)).toEqual(['cuenta@example.test', '', '']);
     expect(values.passengers[2]).toMatchObject({ type: 'INFANT', adultIndex: '0' });
-    expect(values.sameContact).toBe(false);
-    expect(initialPassengerValues(['ADULT'], [], 'cuenta@example.test').sameContact).toBe(true);
+    // Un solo contacto para todos es lo normal: nace marcado.
+    expect(values.sameContact).toBe(true);
+    // Con un borrador de contactos distintos, se respeta.
+    const draft = toBookingPassengers(form([person(), person({ email: 'otro@example.test' })]));
+    expect(initialPassengerValues(['ADULT', 'ADULT'], draft).sameContact).toBe(false);
   });
 
   it('el borrador se recupera solo si coincide con los pasajeros de la selección', () => {

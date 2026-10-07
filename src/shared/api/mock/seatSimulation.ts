@@ -21,10 +21,19 @@ export function clearSeatSimulation(): void {
   taken.clear();
 }
 
+/** Asientos ocupados por la simulación en un tramo. */
+export function simulatedSeats(segmentId: string | undefined): ReadonlySet<string> {
+  return (segmentId ? taken.get(segmentId) : undefined) ?? new Set();
+}
+
 /** Aplica al mapa los asientos ocupados por la simulación. Sin simulación activa devuelve el mismo mapa. */
 export function applySimulatedSeats(map: SeatMapDto): SeatMapDto {
-  const seats = map.segmentId ? taken.get(map.segmentId) : undefined;
-  if (!seats || seats.size === 0) return map;
+  return markSeatsTaken(map, simulatedSeats(map.segmentId));
+}
+
+/** Devuelve el mapa con esos asientos en `isAvailable: false` (el mismo mapa si no hay ninguno). */
+export function markSeatsTaken(map: SeatMapDto, seats: ReadonlySet<string>): SeatMapDto {
+  if (seats.size === 0) return map;
   return {
     ...map,
     cabins: map.cabins?.map((cabin) => ({
