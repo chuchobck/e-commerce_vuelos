@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Cabin } from '@/shared/api';
+import { hasFlights, type SearchCabin } from '@/shared/api';
 import { es } from '@/shared/i18n';
 import { parseDisplayDate } from '@/shared/lib/dates';
 import { futureDateField, optionalFutureDateField } from '@/shared/lib/schemas';
@@ -8,13 +8,13 @@ const v = es.validation;
 
 export const MAX_PASSENGERS = 9;
 
-export const CABINS = ['ECONOMY', 'BUSINESS'] as const satisfies readonly Cabin[];
+export const CABINS = ['ECONOMY', 'BUSINESS'] as const satisfies readonly SearchCabin[];
 export const TRIP_TYPES = ['ROUND', 'ONE_WAY'] as const;
 export type TripType = (typeof TRIP_TYPES)[number];
 
 /**
  * Buscador de vuelos. Las fechas llegan en formato visible "dd/mm/aaaa".
- * Reglas: origen ≠ destino, fechas no pasadas, regreso obligatorio y ≥ salida en "Ida y vuelta",
+ * Reglas: origen ≠ destino y con vuelos entre ambos, fechas no pasadas, regreso obligatorio y ≥ salida en "Ida y vuelta",
  * 1–9 pasajeros, al menos 1 adulto e infantes ≤ adultos (cada infante viaja en brazos de un adulto).
  */
 export const SearchFormSchema = z
@@ -32,6 +32,8 @@ export const SearchFormSchema = z
   .superRefine((data, ctx) => {
     if (data.origin && data.destination && data.origin === data.destination) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['destination'], message: v.sameAirport });
+    } else if (data.origin && data.destination && !hasFlights(data.origin, data.destination)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['destination'], message: v.noRoute });
     }
     if (data.tripType === 'ROUND') {
       if (!data.returnDate) {

@@ -2,18 +2,19 @@ import { apiConfig } from '../config';
 import { ApiError, type ApiErrorCode } from '../errors';
 
 /** Estados de error que el mock puede simular para diseñar los estados de la interfaz. */
-export type SimulatedStatus = 409 | 422 | 503;
+export type SimulatedStatus = 409 | 422 | 429 | 503;
 
 const FORCE_KEY = 'quinde.mock.forceError';
 
 const CODES: Record<SimulatedStatus, ApiErrorCode> = {
   409: 'CONFLICT',
-  422: 'VALIDATION',
+  422: 'VALIDATION_FAILED',
+  429: 'RATE_LIMIT_EXCEEDED',
   503: 'SERVICE_UNAVAILABLE',
 };
 
 /** Espera entre 300 y 800 ms para simular la red. */
-export function latency(min = 300, max = 800): Promise<void> {
+function latency(min = 300, max = 800): Promise<void> {
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -36,13 +37,19 @@ function forcedStatus(operation: string): SimulatedStatus | null {
   }
 }
 
+function simulated(status: SimulatedStatus, operation: string) {
+  // 429 y 503 llegan con Retry-After, como en la API.
+  const retryAfter = status === 429 ? 10 : status === 503 ? 5 : undefined;
+  return new ApiError({ status, code: CODES[status], detail: `Error simulado (${operation})`, retryAfter });
+}
+
 /** Lanza ocasionalmente uno de los errores permitidos para la operación. */
 function maybeFail(operation: string, allowed: SimulatedStatus[]): void {
   const forced = forcedStatus(operation);
-  if (forced) throw new ApiError(forced, CODES[forced], `Error simulado (${operation})`);
+  if (forced) throw simulated(forced, operation);
   if (allowed.length === 0 || Math.random() >= apiConfig.mockErrorRate) return;
   const status = allowed[Math.floor(Math.random() * allowed.length)];
-  throw new ApiError(status, CODES[status], `Error simulado (${operation})`);
+  throw simulated(status, operation);
 }
 
 /** Simula red: latencia + error ocasional. */
@@ -69,7 +76,7 @@ export const MOCK_OPERATIONS = [
   'register',
 ] as const;
 
-export const SIMULATED_STATUSES: SimulatedStatus[] = [409, 422, 503];
+export const SIMULATED_STATUSES: SimulatedStatus[] = [409, 422, 429, 503];
 
 /** Error forzado actual, p. ej. "search:503" o "*:409"; null si no hay. */
 export function getForcedError(): string | null {

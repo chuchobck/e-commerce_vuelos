@@ -1,12 +1,12 @@
-import type { Fare, FlightOffer, PassengerCount } from '@/shared/api';
+import type { Money, PassengerCount, SelectedLeg } from '@/shared/api';
+import { addMoney } from '@/shared/lib/money';
 
-export interface SelectedLeg {
-  offer: FlightOffer;
-  fare: Fare;
-}
+export type { SelectedLeg } from '@/shared/api';
 
 /** Lo elegido en el paso 1. Sobrevive a ir a ingresar/registrarse y a refrescar la página. */
 export interface CheckoutSelection {
+  /** Oferta de la API que contiene los dos tramos (el hold la pide en F4). */
+  offerId: string;
   outbound: SelectedLeg;
   inbound?: SelectedLeg;
   passengers: PassengerCount;
@@ -35,13 +35,20 @@ function storage(): Storage | null {
 
 function isLeg(value: unknown): value is SelectedLeg {
   const leg = value as SelectedLeg | undefined;
-  return !!leg && typeof leg.offer?.id === 'string' && Array.isArray(leg.offer.segments) && typeof leg.fare?.id === 'string';
+  return (
+    !!leg &&
+    typeof leg.itinerary?.id === 'string' &&
+    Array.isArray(leg.itinerary.segments) &&
+    typeof leg.fare?.brand === 'string' &&
+    typeof leg.fare.total?.cents === 'number'
+  );
 }
 
 function isSelection(value: unknown): value is CheckoutSelection {
   const sel = value as CheckoutSelection | null;
   return (
     !!sel &&
+    typeof sel.offerId === 'string' &&
     isLeg(sel.outbound) &&
     (sel.inbound === undefined || isLeg(sel.inbound)) &&
     typeof sel.passengers?.adults === 'number' &&
@@ -86,6 +93,8 @@ export function clearSelection(): void {
   }
 }
 
-export function selectionTotal(selection: CheckoutSelection): number {
-  return Math.round((selection.outbound.fare.totalPrice + (selection.inbound?.fare.totalPrice ?? 0)) * 100) / 100;
+/** Total de la selección para todos los pasajeros (suma en centavos). */
+export function selectionTotal(selection: CheckoutSelection): Money {
+  const out = selection.outbound.fare.total;
+  return selection.inbound ? addMoney(out, selection.inbound.fare.total) : out;
 }

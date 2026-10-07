@@ -1,0 +1,564 @@
+{
+  "totalOffers": 1,
+  "offers": [
+    {
+      "offerId": "8f1135a0-2320-42b9-8c1c-91d2614e2228",
+      "airline": {
+        "code": "LA",
+        "name": "LATAM Airlines"
+      },
+      "itineraries": [
+        {
+          "itineraryId": "ec4aa274-1ccc-4704-9385-df9183ba25ca",
+          "totalDurationMinutes": 235,
+          "stopsCount": 1,
+          "segments": [
+            {
+              "segmentId": "dfba95d2-7a0c-4857-aa36-10781acd5d96",
+              "flightNumber": "LA1400",
+              "departure": {
+                "iataCode": "UIO",
+                "at": "2026-10-09T11:00:00.000Z",
+                "terminal": null
+              },
+              "arrival": {
+                "iataCode": "GYE",
+                "at": "2026-10-09T11:55:00.000Z",
+                "terminal": null
+              },
+              "marketingCarrier": "LA",
+              "operatingCarrier": "LA",
+              "aircraft": "320",
+              "durationMinutes": 55,
+              "status": "SCHEDULED"
+            },
+            {
+              "segmentId": "bb1ee117-ce03-4dae-ba1b-f13fa10b8060",
+              "flightNumber": "LA2410",
+              "departure": {
+                "iataCode": "GYE",
+                "at": "2026-10-09T13:00:00.000Z",
+                "terminal": null
+              },
+              "arrival": {
+                "iataCode": "GPS",
+                "at": "2026-10-09T14:55:00.000Z",
+                "terminal": null
+              },
+              "layoverMinutes": 65,
+              "marketingCarrier": "LA",
+              "operatingCarrier": "LA",
+              "aircraft": "320",
+              "durationMinutes": 115,
+              "status": "SCHEDULED"
+            }
+          ],
+          "pricingOptions": [
+            {
+              "cabinClass": "ECONOMY",
+              "fareBrand": "BASIC",
+              "availableSeats": 126,
+              "fareRules": {
+                "isRefundable": false,
+                "isChangeable": false
+              },
+              "baggageAllowance": {
+                "personalItemIncluded": true,
+                "carryOnIncluded": 0,
+                "checkedBaggageIncluded": 0
+              },
+              "extraCheckedBaggagePrice": {
+                "currency": "USD",
+                "total": "40.00"
+              },
+              "pricePerPassengerType": [
+                {
+                  "passengerType": "ADULT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "350.35",
+                    "taxes": "70.07",
+                    "total": "420.42"
+                  }
+                },
+                {
+                  "passengerType": "YOUTH",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "315.32",
+                    "taxes": "63.07",
+                    "total": "378.39"
+                  }
+                },
+                {
+                  "passengerType": "CHILD",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "262.77",
+                    "taxes": "52.56",
+                    "total": "315.33"
+                  }
+                },
+                {
+                  "passengerType": "INFANT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "35.04",
+                    "taxes": "7.00",
+                    "total": "42.04"
+                  }
+                }
+              ]
+            },
+            {
+              "cabinClass": "ECONOMY",
+              "fareBrand": "CLASSIC",
+              "availableSeats": 126,
+              "fareRules": {
+                "isRefundable": true,
+                "isChangeable": true
+              },
+              "baggageAllowance": {
+                "personalItemIncluded": true,
+                "carryOnIncluded": 1,
+                "checkedBaggageIncluded": 1
+              },
+              "extraCheckedBaggagePrice": {
+                "currency": "USD",
+                "total": "40.00"
+              },
+              "pricePerPassengerType": [
+                {
+                  "passengerType": "ADULT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "420.42",
+                    "taxes": "84.09",
+                    "total": "504.51"
+                  }
+                },
+                {
+                  "passengerType": "YOUTH",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "378.38",
+                    "taxes": "75.68",
+                    "total": "454.06"
+                  }
+                },
+                {
+                  "passengerType": "CHILD",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "315.32",
+                    "taxes": "63.07",
+                    "total": "378.39"
+                  }
+                },
+                {
+                  "passengerType": "INFANT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "42.04",
+                    "taxes": "8.41",
+                    "total": "50.45"
+                  }
+                }
+              ]
+            },
+            {
+              "cabinClass": "ECONOMY",
+              "fareBrand": "FLEX",
+              "availableSeats": 126,
+              "fareRules": {
+                "isRefundable": true,
+                "isChangeable": true
+              },
+              "baggageAllowance": {
+                "personalItemIncluded": true,
+                "carryOnIncluded": 1,
+                "checkedBaggageIncluded": 2
+              },
+              "extraCheckedBaggagePrice": {
+                "currency": "USD",
+                "total": "40.00"
+              },
+              "pricePerPassengerType": [
+                {
+                  "passengerType": "ADULT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "543.05",
+                    "taxes": "108.61",
+                    "total": "651.66"
+                  }
+                },
+                {
+                  "passengerType": "YOUTH",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "488.74",
+                    "taxes": "97.74",
+                    "total": "586.48"
+                  }
+                },
+                {
+                  "passengerType": "CHILD",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "407.28",
+                    "taxes": "81.46",
+                    "total": "488.74"
+                  }
+                },
+                {
+                  "passengerType": "INFANT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "54.30",
+                    "taxes": "10.86",
+                    "total": "65.16"
+                  }
+                }
+              ]
+            },
+            {
+              "cabinClass": "BUSINESS",
+              "fareBrand": "BUSINESS_FLEX",
+              "availableSeats": 12,
+              "fareRules": {
+                "isRefundable": true,
+                "isChangeable": true
+              },
+              "baggageAllowance": {
+                "personalItemIncluded": true,
+                "carryOnIncluded": 2,
+                "checkedBaggageIncluded": 2
+              },
+              "extraCheckedBaggagePrice": {
+                "currency": "USD",
+                "total": "40.00"
+              },
+              "pricePerPassengerType": [
+                {
+                  "passengerType": "ADULT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "910.91",
+                    "taxes": "182.18",
+                    "total": "1093.09"
+                  }
+                },
+                {
+                  "passengerType": "YOUTH",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "819.82",
+                    "taxes": "163.97",
+                    "total": "983.79"
+                  }
+                },
+                {
+                  "passengerType": "CHILD",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "683.19",
+                    "taxes": "136.63",
+                    "total": "819.82"
+                  }
+                },
+                {
+                  "passengerType": "INFANT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "91.09",
+                    "taxes": "18.22",
+                    "total": "109.31"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "itineraryId": "39f7233c-44a3-474f-b178-d2fff719ec88",
+          "totalDurationMinutes": 415,
+          "stopsCount": 1,
+          "segments": [
+            {
+              "segmentId": "e455730e-a268-4192-b329-9e7db541b46f",
+              "flightNumber": "LA2411",
+              "departure": {
+                "iataCode": "GPS",
+                "at": "2026-10-12T16:30:00.000Z",
+                "terminal": null
+              },
+              "arrival": {
+                "iataCode": "GYE",
+                "at": "2026-10-12T18:25:00.000Z",
+                "terminal": null
+              },
+              "marketingCarrier": "LA",
+              "operatingCarrier": "LA",
+              "aircraft": "320",
+              "durationMinutes": 115,
+              "status": "SCHEDULED"
+            },
+            {
+              "segmentId": "37783768-e5f0-4f1a-a3ab-12d7ac062543",
+              "flightNumber": "LA1405",
+              "departure": {
+                "iataCode": "GYE",
+                "at": "2026-10-12T22:30:00.000Z",
+                "terminal": null
+              },
+              "arrival": {
+                "iataCode": "UIO",
+                "at": "2026-10-12T23:25:00.000Z",
+                "terminal": null
+              },
+              "layoverMinutes": 245,
+              "marketingCarrier": "LA",
+              "operatingCarrier": "LA",
+              "aircraft": "320",
+              "durationMinutes": 55,
+              "status": "SCHEDULED"
+            }
+          ],
+          "pricingOptions": [
+            {
+              "cabinClass": "ECONOMY",
+              "fareBrand": "BASIC",
+              "availableSeats": 126,
+              "fareRules": {
+                "isRefundable": false,
+                "isChangeable": false
+              },
+              "baggageAllowance": {
+                "personalItemIncluded": true,
+                "carryOnIncluded": 0,
+                "checkedBaggageIncluded": 0
+              },
+              "extraCheckedBaggagePrice": {
+                "currency": "USD",
+                "total": "40.00"
+              },
+              "pricePerPassengerType": [
+                {
+                  "passengerType": "ADULT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "318.50",
+                    "taxes": "63.70",
+                    "total": "382.20"
+                  }
+                },
+                {
+                  "passengerType": "YOUTH",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "286.65",
+                    "taxes": "57.33",
+                    "total": "343.98"
+                  }
+                },
+                {
+                  "passengerType": "CHILD",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "238.88",
+                    "taxes": "47.78",
+                    "total": "286.66"
+                  }
+                },
+                {
+                  "passengerType": "INFANT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "31.85",
+                    "taxes": "6.37",
+                    "total": "38.22"
+                  }
+                }
+              ]
+            },
+            {
+              "cabinClass": "ECONOMY",
+              "fareBrand": "CLASSIC",
+              "availableSeats": 126,
+              "fareRules": {
+                "isRefundable": true,
+                "isChangeable": true
+              },
+              "baggageAllowance": {
+                "personalItemIncluded": true,
+                "carryOnIncluded": 1,
+                "checkedBaggageIncluded": 1
+              },
+              "extraCheckedBaggagePrice": {
+                "currency": "USD",
+                "total": "40.00"
+              },
+              "pricePerPassengerType": [
+                {
+                  "passengerType": "ADULT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "382.20",
+                    "taxes": "76.44",
+                    "total": "458.64"
+                  }
+                },
+                {
+                  "passengerType": "YOUTH",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "343.98",
+                    "taxes": "68.79",
+                    "total": "412.77"
+                  }
+                },
+                {
+                  "passengerType": "CHILD",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "286.65",
+                    "taxes": "57.33",
+                    "total": "343.98"
+                  }
+                },
+                {
+                  "passengerType": "INFANT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "38.22",
+                    "taxes": "7.65",
+                    "total": "45.87"
+                  }
+                }
+              ]
+            },
+            {
+              "cabinClass": "ECONOMY",
+              "fareBrand": "FLEX",
+              "availableSeats": 126,
+              "fareRules": {
+                "isRefundable": true,
+                "isChangeable": true
+              },
+              "baggageAllowance": {
+                "personalItemIncluded": true,
+                "carryOnIncluded": 1,
+                "checkedBaggageIncluded": 2
+              },
+              "extraCheckedBaggagePrice": {
+                "currency": "USD",
+                "total": "40.00"
+              },
+              "pricePerPassengerType": [
+                {
+                  "passengerType": "ADULT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "493.68",
+                    "taxes": "98.74",
+                    "total": "592.42"
+                  }
+                },
+                {
+                  "passengerType": "YOUTH",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "444.31",
+                    "taxes": "88.86",
+                    "total": "533.17"
+                  }
+                },
+                {
+                  "passengerType": "CHILD",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "370.26",
+                    "taxes": "74.05",
+                    "total": "444.31"
+                  }
+                },
+                {
+                  "passengerType": "INFANT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "49.37",
+                    "taxes": "9.88",
+                    "total": "59.25"
+                  }
+                }
+              ]
+            },
+            {
+              "cabinClass": "BUSINESS",
+              "fareBrand": "BUSINESS_FLEX",
+              "availableSeats": 12,
+              "fareRules": {
+                "isRefundable": true,
+                "isChangeable": true
+              },
+              "baggageAllowance": {
+                "personalItemIncluded": true,
+                "carryOnIncluded": 2,
+                "checkedBaggageIncluded": 2
+              },
+              "extraCheckedBaggagePrice": {
+                "currency": "USD",
+                "total": "40.00"
+              },
+              "pricePerPassengerType": [
+                {
+                  "passengerType": "ADULT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "828.10",
+                    "taxes": "165.62",
+                    "total": "993.72"
+                  }
+                },
+                {
+                  "passengerType": "YOUTH",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "745.29",
+                    "taxes": "149.06",
+                    "total": "894.35"
+                  }
+                },
+                {
+                  "passengerType": "CHILD",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "621.08",
+                    "taxes": "124.22",
+                    "total": "745.30"
+                  }
+                },
+                {
+                  "passengerType": "INFANT",
+                  "price": {
+                    "currency": "USD",
+                    "baseFare": "82.81",
+                    "taxes": "16.56",
+                    "total": "99.37"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "grandTotal": {
+        "currency": "USD",
+        "baseFare": "2508.21",
+        "taxes": "501.65",
+        "total": "3009.86"
+      }
+    }
+  ]
+}

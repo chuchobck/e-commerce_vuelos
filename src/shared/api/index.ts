@@ -22,7 +22,9 @@ export const flightsApi: FlightsApi = createFlightsApi();
 export type { FlightsApi } from './FlightsApi';
 export * from './types';
 export { apiConfig } from './config';
-export { ApiError, errorMessage, isApiError } from './errors';
+export { AIRPORTS, cityOf, destinationsFrom, findAirport, hasFlights, type Airport, type RegionId } from './airports';
+export { ApiError, errorMessage, fieldErrorMessage, isApiError, NotYetConnectedError, type FieldError } from './errors';
+export { faresForCabin, itinerarySignature } from './mapping';
 export {
   MOCK_OPERATIONS,
   SIMULATED_STATUSES,

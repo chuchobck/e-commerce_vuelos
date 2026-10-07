@@ -1,16 +1,12 @@
 import { PlaneTakeoff } from 'lucide-react';
-import type { Fare, FlightOffer } from '@/shared/api';
+import type { SelectedLeg } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { formatDuration, formatLongDate, formatTime } from '@/shared/lib/format';
+import { fareName, formatDuration, formatLongDate, formatTime } from '@/shared/lib/format';
 
-interface Leg {
-  offer: FlightOffer;
-  fare: Fare;
-}
-
-function LegRow({ title, leg }: { title: string; leg: Leg }) {
-  const first = leg.offer.segments[0];
-  const last = leg.offer.segments[leg.offer.segments.length - 1];
+function LegRow({ title, leg }: { title: string; leg: SelectedLeg }) {
+  const { segments } = leg.itinerary;
+  const first = segments[0];
+  const last = segments[segments.length - 1];
   return (
     <div className="flex flex-col gap-2">
       <dt className="flex items-center gap-2 font-bold">
@@ -29,9 +25,9 @@ function LegRow({ title, leg }: { title: string; leg: Leg }) {
           {last.destination}
         </span>
         <span className="text-sm text-muted">
-          {fmt(es.results.flightLabel, { flight: leg.offer.segments.map((s) => s.flightNumber).join(' + ') })} ·{' '}
-          {fmt(es.results.duration, { duration: formatDuration(leg.offer.durationMinutes) })} ·{' '}
-          {fmt(es.purchase.fareLabel, { fare: es.fares[leg.fare.family] })}
+          {fmt(es.results.flightLabel, { flight: segments.map((s) => s.flightNumber).join(' + ') })} ·{' '}
+          {fmt(es.results.duration, { duration: formatDuration(leg.itinerary.durationMinutes) })} ·{' '}
+          {fmt(es.purchase.fareLabel, { fare: fareName(leg.fare.brand) })}
         </span>
       </dd>
     </div>
@@ -39,7 +35,7 @@ function LegRow({ title, leg }: { title: string; leg: Leg }) {
 }
 
 /** Resumen de ida y vuelta como lista de definiciones. */
-export function TripSummary({ outbound, inbound }: { outbound: Leg; inbound?: Leg }) {
+export function TripSummary({ outbound, inbound }: { outbound: SelectedLeg; inbound?: SelectedLeg }) {
   return (
     <dl className="flex flex-col gap-6">
       <LegRow title={es.purchase.outbound} leg={outbound} />
@@ -47,4 +43,3 @@ export function TripSummary({ outbound, inbound }: { outbound: Leg; inbound?: Le
     </dl>
   );
 }
-

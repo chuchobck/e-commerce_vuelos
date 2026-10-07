@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Fare, FlightOffer } from '@/shared/api';
+import type { Fare, Itinerary } from '@/shared/api';
 import type { CheckoutSelection } from './selection';
 
 /** sessionStorage mínima en memoria: sobrevive a "refrescar" (recargar el módulo). */
@@ -17,13 +17,15 @@ function fakeStorage(): Storage {
   };
 }
 
-const offer = { id: 'off_1', segments: [{ flightNumber: 'QD100' }], fares: [] } as unknown as FlightOffer;
-const fare = { id: 'fare_classic', totalPrice: 120.1 } as unknown as Fare;
-const back = { id: 'fare_light', totalPrice: 80.25 } as unknown as Fare;
+const usd = (cents: number) => ({ cents, currency: 'USD' });
+const itinerary = { id: 'it_1', segments: [{ flightNumber: 'LA1400' }], fares: [] } as unknown as Itinerary;
+const fare = { brand: 'CLASSIC', cabin: 'ECONOMY', total: usd(12010) } as unknown as Fare;
+const back = { brand: 'BASIC', cabin: 'ECONOMY', total: usd(8025) } as unknown as Fare;
 
 const SELECTION: CheckoutSelection = {
-  outbound: { offer, fare },
-  inbound: { offer: { ...offer, id: 'off_2' }, fare: back },
+  offerId: 'off_1',
+  outbound: { itinerary, fare },
+  inbound: { itinerary: { ...itinerary, id: 'it_2' }, fare: back },
   passengers: { adults: 1, children: 0, infants: 0 },
   searchQuery: 'origen=UIO&destino=GYE&ida=2026-10-12',
 };
@@ -77,6 +79,7 @@ describe('selección de compra', () => {
   });
 
   it('suma ida y vuelta', async () => {
-    expect((await freshModule()).selectionTotal(SELECTION)).toBe(200.35);
+    // 120,10 + 80,25 en centavos: sin errores de coma flotante.
+    expect((await freshModule()).selectionTotal(SELECTION)).toEqual(usd(20035));
   });
 });

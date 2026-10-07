@@ -4,33 +4,18 @@ import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { routes } from '@/app/routes';
-import { flightsApi, type FlightOffer } from '@/shared/api';
+import { faresForCabin, flightsApi } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
-import { toIsoDate, today } from '@/shared/lib/dates';
-import { formatDuration, formatShortDate, formatUSD } from '@/shared/lib/format';
+import { lastFlightDate, parseIsoDate, toIsoDate, today } from '@/shared/lib/dates';
+import { formatDuration, formatMoney, formatShortDate } from '@/shared/lib/format';
 import { useAsync } from '@/shared/lib/useAsync';
 import { LoadingState, Skeleton } from '@/shared/ui';
-import { ESCAPES, REGION_BG, regionOf, type EscapeOrigin } from './regions';
+import { escapeFromOffers, escapesCache, type Escape } from './escapePrice';
+import { cityLabel, ESCAPES, REGION_BG, regionOf, type EscapeOrigin } from './regions';
 
 const h = es.home;
 const ORIGINS = Object.keys(ESCAPES) as EscapeOrigin[];
-
-interface Escape {
-  code: string;
-  /** Precio mínimo ida y vuelta por persona, o null si no se pudo consultar. */
-  price: number | null;
-  durationMinutes: number | null;
-  direct: boolean;
-  noFlights: boolean;
-}
-
-function cheapest(offers: FlightOffer[]) {
-  return offers.reduce<number | null>((min, o) => {
-    const p = Math.min(...o.fares.map((f) => f.pricePerAdult));
-    return min === null || p < min ? p : min;
-  }, null);
-}
 
 /** Próximo fin de semana (viernes a domingo), siempre a futuro. */
 function weekend() {
@@ -38,46 +23,33 @@ function weekend() {
   return { friday: toIsoDate(friday), sunday: toIsoDate(addDays(friday, 2)) };
 }
 
-/** Un reintento ante fallos pasajeros (503) antes de mostrar la tarjeta sin precio. */
-async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn();
-  } catch {
-    return fn();
-  }
-}
-
+/**
+ * Una búsqueda real por destino (4 por ciudad de salida, con la API limitada a 20 por minuto),
+ * guardada 10 minutos. Un destino que falla o no tiene vuelos simplemente no se muestra:
+ * nunca se inventa un precio.
+ */
 async function loadEscapes(origin: EscapeOrigin): Promise<Escape[]> {
   const { friday, sunday } = weekend();
-  // Cada destino se consulta por separado: si uno falla, los demás se muestran igual.
-  return Promise.all(
-    ESCAPES[origin].map(async (code): Promise<Escape> => {
-      try {
-        const r = await withRetry(() =>
-          flightsApi.search({
-          origin,
-          destination: code,
-          departDate: friday,
-          returnDate: sunday,
-          passengers: { adults: 1, children: 0, infants: 0 },
-          cabin: 'ECONOMY',
-          }),
-        );
-        const out = cheapest(r.outbound);
-        const back = cheapest(r.inbound);
-        const fastest = [...r.outbound].sort((a, b) => a.durationMinutes - b.durationMinutes)[0];
-        return {
-          code,
-          price: out !== null && back !== null ? out + back : null,
-          durationMinutes: fastest?.durationMinutes ?? null,
-          direct: fastest?.stops === 0,
-          noFlights: r.outbound.length === 0 || r.inbound.length === 0,
-        };
-      } catch {
-        return { code, price: null, durationMinutes: null, direct: false, noFlights: false };
-      }
-    }),
+  // Fuera de la ventana de salidas de la API no hay nada que mostrar.
+  if ((parseIsoDate(sunday) ?? today()) > lastFlightDate()) return [];
+  const results = await Promise.all(
+    ESCAPES[origin].map((code) =>
+      escapesCache
+        .getOrLoad(`${origin}-${code}-${friday}`, async () => {
+          const r = await flightsApi.search({
+            origin,
+            destination: code,
+            departDate: friday,
+            returnDate: sunday,
+            passengers: { adults: 1, children: 0, infants: 0 },
+            cabin: 'ECONOMY',
+          });
+          return escapeFromOffers(code, r.offers, (it) => faresForCabin(it, 'ECONOMY'));
+        })
+        .catch(() => null),
+    ),
   );
+  return results.filter((e): e is Escape => e !== null && e.price !== null);
 }
 
 function resultsHref(origin: string, destination: string) {
@@ -100,7 +72,8 @@ export function Escapes() {
   const [origin, setOrigin] = useState<EscapeOrigin>('UIO');
   const escapes = useAsync(() => loadEscapes(origin), [origin]);
   const { friday, sunday } = weekend();
-  const city = (code: string) => h.cities[code as keyof typeof h.cities] ?? code;
+  // Si ninguna escapada tiene precio real (error, límite o sin vuelos), la sección no se muestra.
+  if (escapes.status === 'error' || (escapes.status === 'success' && escapes.data.length === 0)) return null;
 
   return (
     <section aria-labelledby="escapes-title" className="bg-surface">
@@ -131,7 +104,7 @@ export function Escapes() {
                   'hover:border-foreground data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
                 )}
               >
-                {city(code)}
+                {cityLabel(code)}
               </RadioGroupPrimitive.Item>
             ))}
           </RadioGroupPrimitive.Root>
@@ -153,7 +126,7 @@ export function Escapes() {
                         {region ? (
                           <p className="text-sm font-bold uppercase tracking-wide text-muted">{h.worlds[region].name}</p>
                         ) : null}
-                        <h3 className="font-display text-2xl font-semibold">{city(e.code)}</h3>
+                        <h3 className="font-display text-2xl font-semibold">{cityLabel(e.code)}</h3>
                         {e.durationMinutes !== null ? (
                           <p className="text-sm text-muted">
                             {fmt(e.direct ? h.escapesDirect : h.escapesStops, {
@@ -161,27 +134,18 @@ export function Escapes() {
                             })}
                           </p>
                         ) : null}
-                        <div className="mt-auto pt-4">
-                          {e.price !== null ? (
-                            <p className="flex flex-col">
-                              <span className="text-2xl font-extrabold tabular-nums text-foreground">
-                                {fmt(h.escapesPrice, { price: formatUSD(e.price) })}
-                              </span>
-                              <span className="text-sm text-muted">{h.escapesPriceNote}</span>
-                            </p>
-                          ) : (
-                            <p className="text-sm text-muted">{e.noFlights ? h.escapesNoFlights : h.escapesUnavailable}</p>
-                          )}
-                        </div>
-                        {e.noFlights ? null : (
-                          <Link
-                            to={resultsHref(origin, e.code)}
-                            className="mt-2 inline-flex min-h-12 items-center gap-2 font-bold"
-                          >
-                            {fmt(h.escapesCta, { city: city(e.code) })}
-                            <ArrowRight aria-hidden="true" className="size-6" />
-                          </Link>
-                        )}
+                        {e.price ? (
+                          <p className="mt-auto flex flex-col pt-4">
+                            <span className="text-2xl font-extrabold tabular-nums text-foreground">
+                              {fmt(h.escapesPrice, { price: formatMoney(e.price) })}
+                            </span>
+                            <span className="text-sm text-muted">{h.escapesPriceNote}</span>
+                          </p>
+                        ) : null}
+                        <Link to={resultsHref(origin, e.code)} className="mt-2 inline-flex min-h-12 items-center gap-2 font-bold">
+                          {fmt(h.escapesCta, { city: cityLabel(e.code) })}
+                          <ArrowRight aria-hidden="true" className="size-6" />
+                        </Link>
                       </div>
                     </article>
                   </li>

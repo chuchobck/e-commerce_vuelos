@@ -6,16 +6,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useForm, type FieldErrors } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { routes } from '@/app/routes';
-import { flightsApi } from '@/shared/api';
+import { AIRPORTS, destinationsFrom, findAirport } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
-import { maxBookingDate, parseDisplayDate, today } from '@/shared/lib/dates';
-import { useAsync } from '@/shared/lib/useAsync';
+import { lastFlightDate, parseDisplayDate, today } from '@/shared/lib/dates';
 import {
   Button,
   CompactField,
   DatePicker,
-  ErrorState,
   ErrorSummary,
   QuantityInput,
   RadioGroup,
@@ -61,7 +59,6 @@ const groupClasses =
 export function SearchForm() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const airports = useAsync(() => flightsApi.listAirports(), []);
   const [summary, setSummary] = useState<SummaryError[]>([]);
   const [attempt, setAttempt] = useState(0);
   const [announcement, setAnnouncement] = useState('');
@@ -96,7 +93,7 @@ export function SearchForm() {
       const { destination } = queryToForm(q);
       if (!destination) return;
       setValue('destination', destination, { shouldValidate: isSubmitted });
-      const city = es.home.cities[destination as keyof typeof es.home.cities] ?? destination;
+      const city = findAirport(destination)?.city ?? destination;
       setAnnouncement(fmt(s.destinationPrefilled, { city }));
     } else {
       reset(queryToForm(q));
@@ -114,19 +111,22 @@ export function SearchForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, isSubmitted]);
 
-  const options = useMemo(
-    () => (airports.data ?? []).map((a) => ({ value: a.code, label: `${shortCity(a.city)} (${a.code})` })),
-    [airports.data],
-  );
-
-  const [tripType, adults, children, infants, cabin, departDate] = watch([
+  const [tripType, adults, children, infants, cabin, departDate, origin] = watch([
     'tripType',
     'adults',
     'children',
     'infants',
     'cabin',
     'departDate',
+    'origin',
   ]);
+
+  // Catálogo estático (la API no lista aeropuertos). El destino solo ofrece lo que tiene vuelos desde el origen.
+  const originOptions = useMemo(() => AIRPORTS.map((a) => ({ value: a.code, label: `${a.city} (${a.code})` })), []);
+  const destinationOptions = useMemo(() => {
+    const reachable = origin ? destinationsFrom(origin) : null;
+    return originOptions.filter((o) => o.value !== origin && (!reachable || reachable.includes(o.value)));
+  }, [origin, originOptions]);
   const total = adults + children + infants;
   const canAddMore = total < MAX_PASSENGERS;
   const minReturn = parseDisplayDate(departDate) ?? today();
@@ -164,11 +164,6 @@ export function SearchForm() {
     }
   };
 
-  if (airports.status === 'error') {
-    return <ErrorState error={airports.error} onRetry={() => void airports.execute()} headingLevel="h3" />;
-  }
-
-  const loadingAirports = airports.status === 'loading';
 
   return (
     <form noValidate aria-label={s.formLabel} onSubmit={handleSubmit(onValid, onInvalid)} className="flex flex-col gap-6">
@@ -219,9 +214,8 @@ export function SearchForm() {
             <Select
               {...register('origin')}
               variant="bare"
-              options={options}
-              placeholder={loadingAirports ? es.a11y.loading : s.chooseOrigin}
-              disabled={loadingAirports}
+              options={originOptions}
+              placeholder={s.chooseOrigin}
             />
           </CompactField>
           <CompactField
@@ -237,9 +231,8 @@ export function SearchForm() {
             <Select
               {...register('destination')}
               variant="bare"
-              options={options}
-              placeholder={loadingAirports ? es.a11y.loading : s.chooseDestination}
-              disabled={loadingAirports}
+              options={destinationOptions}
+              placeholder={s.chooseDestination}
             />
           </CompactField>
           <button
@@ -278,7 +271,7 @@ export function SearchForm() {
                   variant="bare"
                   calendarLabel={s.departCalendar}
                   minDate={today()}
-                  maxDate={maxBookingDate()}
+                  maxDate={lastFlightDate()}
                 />
               )}
             />
@@ -305,7 +298,7 @@ export function SearchForm() {
                     variant="bare"
                     calendarLabel={s.returnCalendar}
                     minDate={minReturn}
-                    maxDate={maxBookingDate()}
+                    maxDate={lastFlightDate()}
                   />
                 )}
               />
@@ -419,7 +412,6 @@ export function SearchForm() {
         <Button
           type="submit"
           size="lg"
-          disabled={loadingAirports}
           className="h-[4.25rem] md:col-span-2 xl:col-span-1 xl:px-6"
         >
           <Search aria-hidden="true" />
@@ -432,11 +424,6 @@ export function SearchForm() {
       <ErrorSummary ref={summaryRef} errors={summary} inline />
     </form>
   );
-}
-
-/** "San Cristóbal (Galápagos)" → "San Cristóbal": el código IATA ya identifica el aeropuerto. */
-function shortCity(city: string) {
-  return city.replace(/\s*\(.*\)$/, '');
 }
 
 function toSummary(errors: FieldErrors<SearchFormInput>): SummaryError[] {

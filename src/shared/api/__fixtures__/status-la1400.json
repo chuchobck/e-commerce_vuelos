@@ -1,0 +1,22 @@
+{
+  "flightNumber": "LA1400",
+  "date": "2026-10-09",
+  "marketingCarrier": "LA",
+  "operatingCarrier": "LA",
+  "departure": {
+    "iataCode": "UIO",
+    "terminal": null,
+    "scheduledAt": "2026-10-09T11:00:00.000Z",
+    "estimatedAt": null,
+    "actualAt": null
+  },
+  "arrival": {
+    "iataCode": "GYE",
+    "terminal": null,
+    "scheduledAt": "2026-10-09T11:55:00.000Z",
+    "estimatedAt": null,
+    "actualAt": null
+  },
+  "aircraft": "320",
+  "status": "SCHEDULED"
+}

@@ -12,7 +12,7 @@ import tseslint from 'typescript-eslint';
  * Las rutas se comparan ya resueltas, así que valen igual para `@/…` que para `../…`.
  */
 const FEATURES = fs
-  .readdirSync('src/features', { withFileTypes: true })
+  .readdirSync(new URL('./src/features', import.meta.url), { withFileTypes: true })
   .filter((d) => d.isDirectory())
   .map((d) => d.name);
 

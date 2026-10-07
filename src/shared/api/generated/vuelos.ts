@@ -915,13 +915,13 @@ export interface components {
         };
         PassengerBreakdown: {
             /** @default 1 */
-            adults: number;
+            adults?: number;
             /** @default 0 */
-            youths: number;
+            youths?: number;
             /** @default 0 */
-            children: number;
+            children?: number;
             /** @default 0 */
-            infants: number;
+            infants?: number;
         };
         SearchResponse: {
             totalOffers: number;

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
+import type { Money } from '@/shared/api';
 import { es } from '@/shared/i18n';
-import { formatUSD } from '@/shared/lib/format';
+import { formatMoney } from '@/shared/lib/format';
 import { Card, CardTitle, TripSummary } from '@/shared/ui';
 import type { SelectedLeg } from './selection';
 
@@ -9,7 +10,7 @@ const p = es.purchase;
 interface CheckoutSummaryProps {
   outbound: SelectedLeg;
   inbound?: SelectedLeg;
-  total: number;
+  total: Money;
   /** El precio ya está apartado con un hold activo. */
   held: boolean;
   /** Acciones bajo el total (p. ej. cancelar el hold). */
@@ -33,7 +34,7 @@ export function CheckoutSummary({ outbound, inbound, total, held, children }: Ch
         ) : null}
         <p className="flex flex-col">
           <span className="text-sm text-muted">{p.totalLabel}</span>
-          <span className="text-3xl font-bold tabular-nums">{formatUSD(total)}</span>
+          <span className="text-3xl font-bold tabular-nums">{formatMoney(total)}</span>
         </p>
         {children}
       </Card>

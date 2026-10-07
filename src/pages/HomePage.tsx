@@ -1,7 +1,7 @@
 import { CreditCard, Ticket, UserRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { routes, SEARCH_ANCHOR_ID } from '@/app/routes';
-import { Escapes, Panorama, REGION_BG, REGIONS, RegionArt } from '@/features/home';
+import { cityLabel, Escapes, Panorama, REGION_BG, REGIONS, RegionArt } from '@/features/home';
 import { SearchForm } from '@/features/search';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
@@ -74,7 +74,7 @@ export function HomePage() {
                     <p className="flex-1 text-muted">{world.hook}</p>
                     <ul aria-label={fmt(h.worldsDestinations, { region: world.name })} className="flex flex-wrap gap-2">
                       {region.airports.map((code) => {
-                        const city = h.cities[code];
+                        const city = cityLabel(code);
                         return (
                           <li key={code}>
                             <Link

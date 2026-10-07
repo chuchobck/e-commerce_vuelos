@@ -6,7 +6,8 @@
 export const NAME_PATTERN = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]+$/;
 export const PASSPORT_PATTERN = /^[A-Za-z0-9]{6,12}$/;
 export const PHONE_EC_PATTERN = /^9\d{8}$/;
-export const FLIGHT_NUMBER_PATTERN = /^QD\d{3,4}$/i;
+/** Como la API: aerolínea IATA (2 caracteres) y número sin ceros a la izquierda, p. ej. LA1400 o AV45. */
+export const FLIGHT_NUMBER_PATTERN = /^[A-Z0-9]{2}[1-9][0-9]{0,3}$/i;
 
 /** Elimina todo lo que no sea dígito (para teclear y pegar en campos numéricos). */
 export function onlyDigits(value: string): string {

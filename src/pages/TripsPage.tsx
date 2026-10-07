@@ -7,7 +7,7 @@ import { routes } from '@/app/routes';
 import { BookingStatusBadge } from '@/features/trips';
 import { flightsApi, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { formatLongDate, formatTime, formatUSD } from '@/shared/lib/format';
+import { formatLongDate, formatTime, formatMoney } from '@/shared/lib/format';
 import { useAsync } from '@/shared/lib/useAsync';
 import { Button, EmptyState, ErrorState, LoadingState } from '@/shared/ui';
 
@@ -49,8 +49,8 @@ export function TripsPage() {
     content = (
       <ul aria-label={t.listLabel} className="flex flex-col gap-4">
         {trips.data.map((bk) => {
-          const first = bk.outbound.offer.segments[0];
-          const last = bk.outbound.offer.segments[bk.outbound.offer.segments.length - 1];
+          const first = bk.outbound.itinerary.segments[0];
+          const last = bk.outbound.itinerary.segments[bk.outbound.itinerary.segments.length - 1];
           return (
             <li key={bk.id}>
               <article className="flex flex-wrap items-center justify-between gap-4 rounded border-2 border-border bg-surface p-6 shadow-card">
@@ -61,7 +61,7 @@ export function TripsPage() {
                   </h2>
                   <p className="text-muted">
                     {formatLongDate(first.departureTime)} · {formatTime(first.departureTime)} ·{' '}
-                    {fmt(t.passengersCount, { count: bk.passengers.length })} · {formatUSD(bk.totalPaid)}
+                    {fmt(t.passengersCount, { count: bk.passengers.length })} · {formatMoney(bk.totalPaid)}
                   </p>
                   <div>
                     <BookingStatusBadge status={bk.status} />

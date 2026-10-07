@@ -45,12 +45,11 @@ describe('check-in del mock (alineado con la API)', () => {
     expect((await failure(api.checkIn({ bookingId: LATER_BOOKING }, other.token))).status).toBe(404);
   });
 
-  it('fuera de la ventana responde 409 y explica cuándo abre', async () => {
+  it('fuera de la ventana responde 409 CHECK_IN_NOT_AVAILABLE (código del contrato)', async () => {
     const api = await freshApi();
     const demo = await api.login({ email: 'demo@quinde.ec', password: 'quinde2026' });
     const error = await failure(api.checkIn({ bookingId: LATER_BOOKING }, demo.token));
     expect(error.status).toBe(409);
-    expect(error.code).toBe('CHECKIN_WINDOW');
-    expect(error.message).toContain('48 horas');
+    expect(error.code).toBe('CHECK_IN_NOT_AVAILABLE');
   });
 }, 20_000);

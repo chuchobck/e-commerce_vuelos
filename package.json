@@ -10,7 +10,7 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "lint": "eslint . --max-warnings 0",
-    "api:types": "openapi-typescript contracts/vuelos-openapi.yaml -o src/shared/api/generated/vuelos.ts"
+    "api:types": "openapi-typescript contracts/vuelos-openapi.yaml --default-non-nullable false -o src/shared/api/generated/vuelos.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -1,15 +1,21 @@
 import { format } from 'date-fns';
 import { dateLocale, parseIsoDate } from './dates';
+import type { Money } from './money';
+import { es } from '@/shared/i18n';
 
-const usd = new Intl.NumberFormat('es-EC', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-});
+const formatters = new Map<string, Intl.NumberFormat>();
 
-/** Precio en dólares con formato de Ecuador, p. ej. "$ 89,90" → "US$ 89,90" según el navegador. */
-export function formatUSD(amount: number): string {
-  return usd.format(amount);
+/**
+ * Único formato de dinero de la interfaz (es-EC), p. ej. "$94,38". Recibe centavos enteros:
+ * la división se hace solo para mostrar, nunca para calcular.
+ */
+export function formatMoney(m: Money): string {
+  let f = formatters.get(m.currency);
+  if (!f) {
+    f = new Intl.NumberFormat('es-EC', { style: 'currency', currency: m.currency, minimumFractionDigits: 2 });
+    formatters.set(m.currency, f);
+  }
+  return f.format(m.cents / 100);
 }
 
 /** "lun., 12 de octubre de 2026" */
@@ -44,4 +50,9 @@ export function formatCountdown(totalSeconds: number): string {
   const m = Math.floor(safe / 60);
   const s = safe % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/** Nombre visible de una familia tarifaria. Código desconocido: "PREMIUM_PLUS" → "Premium Plus". */
+export function fareName(brand: string): string {
+  return es.fares[brand] ?? brand.toLowerCase().split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }

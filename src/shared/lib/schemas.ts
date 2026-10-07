@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { es } from '@/shared/i18n';
-import { ageOn, maxBookingDate, parseDisplayDate, today } from './dates';
+import { es, fmt } from '@/shared/i18n';
+import { ageOn, lastFlightDate, parseDisplayDate, toDisplayDate, today } from './dates';
 import {
   FLIGHT_NUMBER_PATTERN,
   NAME_PATTERN,
@@ -60,10 +60,13 @@ export const futureDateField = z
     const d = parseDisplayDate(s);
     return !d || d >= today();
   }, v.datePast)
-  .refine((s) => {
-    const d = parseDisplayDate(s);
-    return !d || d <= maxBookingDate();
-  }, v.dateTooFar);
+  .refine(
+    (s) => {
+      const d = parseDisplayDate(s);
+      return !d || d <= lastFlightDate();
+    },
+    () => ({ message: fmt(v.dateTooFar, { date: toDisplayDate(lastFlightDate()) }) }),
+  );
 
 /** Fecha opcional con las mismas reglas cuando tiene valor. */
 export const optionalFutureDateField = z.union([z.literal(''), futureDateField]);

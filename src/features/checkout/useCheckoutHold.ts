@@ -1,13 +1,26 @@
 import { useState } from 'react';
-import { errorMessage, flightsApi, type Hold } from '@/shared/api';
+import { errorMessage, flightsApi, type CreateHoldRequest, type Hold, type PassengerCount, type SelectedLeg } from '@/shared/api';
 import { es } from '@/shared/i18n';
 import { useAsync } from '@/shared/lib/useAsync';
 import { toast } from '@/shared/ui';
 import { setSelectionHold, type CheckoutSelection } from './selection';
 
+/** Pedido de hold con la forma del contrato: un itinerario y su familia por tramo. */
+function holdRequest(offerId: string, outbound: SelectedLeg, inbound: SelectedLeg | undefined, passengers: PassengerCount): CreateHoldRequest {
+  return {
+    offerId,
+    itinerarySelections: [outbound, ...(inbound ? [inbound] : [])].map((leg) => ({
+      itineraryId: leg.itinerary.id,
+      cabinClass: leg.fare.cabin,
+      fareBrand: leg.fare.brand,
+    })),
+    passengers,
+  };
+}
+
 function selectionKey(selection: CheckoutSelection) {
-  const { outbound, inbound, passengers } = selection;
-  return [outbound.fare.id, inbound?.fare.id ?? '', passengers.adults, passengers.children, passengers.infants].join('|');
+  const { offerId, outbound, inbound, passengers } = selection;
+  return [offerId, outbound.fare.brand, inbound?.fare.brand ?? '', passengers.adults, passengers.children, passengers.infants].join('|');
 }
 
 /**
@@ -20,11 +33,7 @@ function createHoldOnce(selection: CheckoutSelection): Promise<Hold> {
   const key = selectionKey(selection);
   if (creating?.key !== key) {
     const promise = flightsApi
-      .createHold({
-        outbound: { offerId: selection.outbound.offer.id, fareId: selection.outbound.fare.id },
-        inbound: selection.inbound ? { offerId: selection.inbound.offer.id, fareId: selection.inbound.fare.id } : undefined,
-        passengers: selection.passengers,
-      })
+      .createHold(holdRequest(selection.offerId, selection.outbound, selection.inbound, selection.passengers))
       .then((hold) => {
         setSelectionHold(hold.id);
         return hold;
@@ -58,11 +67,7 @@ export function useCheckoutHold(selection: CheckoutSelection | null, { create }:
   const extend = async (previous: Hold) => {
     setExtending(true);
     try {
-      const next = await flightsApi.createHold({
-        outbound: { offerId: previous.outbound.offer.id, fareId: previous.outbound.fare.id },
-        inbound: previous.inbound ? { offerId: previous.inbound.offer.id, fareId: previous.inbound.fare.id } : undefined,
-        passengers: previous.passengers,
-      });
+      const next = await flightsApi.createHold(holdRequest(previous.offerId, previous.outbound, previous.inbound, previous.passengers));
       await flightsApi.cancelHold(previous.id).catch(() => undefined);
       setSelectionHold(next.id);
       state.setState({ status: 'success', data: next, error: undefined });

@@ -183,7 +183,7 @@ export function UiKitPage() {
       <Block title={k.statesTitle}>
         <LoadingState />
         <EmptyState title={es.trips.emptyTitle} text={es.trips.emptyText} headingLevel="h3" />
-        <ErrorState error={new ApiError(503, 'SERVICE_UNAVAILABLE')} onRetry={() => undefined} headingLevel="h3" />
+        <ErrorState error={new ApiError({ status: 503, code: 'SERVICE_UNAVAILABLE' })} onRetry={() => undefined} headingLevel="h3" />
         <p className="font-bold">{k.skeletonTitle}</p>
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-24 w-full" />
