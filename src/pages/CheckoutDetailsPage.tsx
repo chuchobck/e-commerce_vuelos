@@ -1,41 +1,47 @@
-import { ArrowLeft, ArrowRight, Search, ShoppingCart } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Search, ShoppingCart } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
+import { LoginForm, RegisterForm, useAuth } from '@/features/auth';
 import {
   AccountBlock,
+  checkout,
+  CheckoutAside,
+  CheckoutLayout,
   CheckoutSteps,
-  CheckoutSummary,
-  clearSelection,
-  HoldStatus,
+  HoldNotice,
   loadSelection,
-  selectionTotal,
-  useCheckoutHold,
+  PassengersForm,
+  useCheckout,
 } from '@/features/checkout';
-import { apiConfig, errorMessage, flightsApi, type Hold } from '@/shared/api';
-import { es } from '@/shared/i18n';
-import { Alert, Button, Card, CardTitle, ConfirmDialog, EmptyState, toast } from '@/shared/ui';
+import { es, fmt } from '@/shared/i18n';
+import { Button, EmptyState, toast } from '@/shared/ui';
 
 const p = es.purchase;
+const title = fmt(p.stepTitle, { current: 2, name: p.detailsTitle });
 
 /**
- * Paso 2: cuenta y pasajeros. Sin sesión se pide ingresar aquí mismo (no se redirige);
- * con sesión se crea el hold y arranca el temporizador. El formulario de pasajeros llega en F4.
+ * Paso 2: cuenta y pasajeros. Sin sesión, ingresar o crear la cuenta ocurre aquí mismo (la
+ * selección se conserva); con sesión se aparta el precio una sola vez y se piden los datos.
  */
 export function CheckoutDetailsPage() {
-  const { status, user } = useAuth();
+  const { status, user, authorized } = useAuth();
   const navigate = useNavigate();
+  const state = useCheckout();
   const [selection] = useState(loadSelection);
-  // Con la API real el hold aún no existe (F4): no se intenta.
-  const { hold, active, statusProps } = useCheckoutHold(apiConfig.usingMock ? selection : null, { create: !!user });
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
+  const authorizedRef = useRef(authorized);
+  authorizedRef.current = authorized;
+
+  const start = () => void checkout.start({ authenticated: status === 'authenticated', authorized: (call) => authorizedRef.current(call) });
+  useEffect(() => {
+    if (status !== 'restoring') start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia la sesión
+  }, [status]);
 
   if (!selection) {
     return (
-      <Page title={p.detailsTitle} heading={p.detailsHeading}>
+      <Page title={title} heading={p.detailsHeading}>
         <EmptyState
           title={p.emptyTitle}
           text={p.emptyText}
@@ -53,97 +59,64 @@ export function CheckoutDetailsPage() {
     );
   }
 
-  const resultsHref = routes.results(selection.searchQuery);
-  const here = routes.checkoutDetails();
-  const searchAgain = (
-    <Button asChild>
-      <Link to={resultsHref}>
-        <Search aria-hidden="true" />
-        {p.searchAgain}
-      </Link>
-    </Button>
-  );
-
-  const cancel = async (h: Hold) => {
-    setCancelling(true);
-    try {
-      await flightsApi.cancelHold(h.id);
-      clearSelection();
-      setConfirmOpen(false);
-      toast({ title: p.cancelled, variant: 'success' });
-      navigate(resultsHref);
-    } catch (error) {
-      toast({ title: errorMessage(error), variant: 'error' });
-    } finally {
-      setCancelling(false);
-    }
+  const editing = state.step === 'held' || state.step === 'rejected';
+  const searchAgain = () => navigate(routes.results(checkout.searchAgain() ?? selection.searchQuery));
+  const cancel = async () => {
+    const query = await checkout.cancel();
+    toast({ title: p.cancelled, variant: 'success' });
+    navigate(routes.results(query ?? selection.searchQuery));
   };
 
   return (
-    <Page title={p.detailsTitle} heading={p.detailsHeading}>
+    <Page
+      title={title}
+      heading={
+        <>
+          <span className="sr-only">{fmt(p.stepOf, { current: 2, total: 3 })}. </span>
+          {p.detailsHeading}
+        </>
+      }
+    >
       <CheckoutSteps current={1} />
-      {apiConfig.usingMock && user ? <HoldStatus {...statusProps} searchAgain={searchAgain} /> : null}
-      {/* Mientras se restaura la sesión no se muestra nada: ni "Ingresa" ni "Compras como" parpadean. */}
-      {status === 'restoring' ? null : (
-        <AccountBlock email={user?.email} loginHref={routes.login(here)} registerHref={routes.register(here)} />
-      )}
-      {!apiConfig.usingMock ? (
-        // Con la API real, apartar el precio y pagar se conectan en F4: se explica en vez de fallar.
-        <Alert variant="info" title={p.notConnectedTitle}>
-          <p>{p.notConnectedText}</p>
-        </Alert>
-      ) : null}
+      <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} onCancel={cancel} />}>
+        {/* Mientras se restaura la sesión no se muestra nada: ni las opciones ni "Compras como" parpadean. */}
+        {status === 'restoring' ? null : (
+          <AccountBlock
+            email={user?.email}
+            loginForm={<LoginForm idPrefix="checkout-login" onSuccess={(u) => toast({ title: fmt(es.auth.welcome, { email: u.email }), variant: 'success' })} />}
+            registerForm={<RegisterForm idPrefix="checkout-register" onSuccess={(u) => toast({ title: fmt(es.auth.registered, { email: u.email }), variant: 'success' })} />}
+          />
+        )}
+        {status === 'authenticated' ? <HoldNotice state={state} onSearchAgain={searchAgain} onRetryHold={start} /> : null}
 
-      <CheckoutSummary
-        outbound={hold?.outbound ?? selection.outbound}
-        inbound={hold?.inbound ?? selection.inbound}
-        total={hold?.totalPrice ?? selectionTotal(selection)}
-        held={active}
-      >
-        {active ? (
-          <Button variant="secondary" onClick={() => setConfirmOpen(true)}>
-            {p.cancelHold}
-          </Button>
+        {editing && status === 'authenticated' ? (
+          <section aria-labelledby="passengers-heading" className="flex flex-col gap-4">
+            <h2 id="passengers-heading" className="text-2xl">
+              {p.passengersTitle}
+            </h2>
+            <PassengersForm
+              selection={selection}
+              draft={checkout.passengersDraft()}
+              accountEmail={user?.email}
+              rejected={state.step === 'held' ? state.passengerErrors : []}
+              onDraft={(passengers) => checkout.setPassengers(passengers, false)}
+              onDone={(passengers) => {
+                checkout.setPassengers(passengers, true);
+                navigate(routes.checkoutPayment());
+              }}
+            />
+          </section>
         ) : null}
-      </CheckoutSummary>
 
-      <Card className="flex flex-col gap-4">
-        <CardTitle>{p.passengersTitle}</CardTitle>
-        <Alert variant="info">
-          <p>{p.passengersPending}</p>
-        </Alert>
-      </Card>
-
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <Button asChild variant="ghost">
-          <Link to={resultsHref}>
-            <ArrowLeft aria-hidden="true" />
-            {p.backToResults}
-          </Link>
-        </Button>
-        {active ? (
-          <Button asChild size="lg">
-            <Link to={routes.checkoutPayment()}>
-              {p.continueToPayment}
-              <ArrowRight aria-hidden="true" />
+        <div>
+          <Button asChild variant="ghost">
+            <Link to={routes.results(selection.searchQuery)}>
+              <ArrowLeft aria-hidden="true" />
+              {p.backToResults}
             </Link>
           </Button>
-        ) : null}
-      </div>
-
-      {hold ? (
-        <ConfirmDialog
-          open={confirmOpen}
-          onOpenChange={setConfirmOpen}
-          title={p.cancelHoldConfirmTitle}
-          description={p.cancelHoldConfirmText}
-          confirmLabel={p.cancelHoldConfirm}
-          cancelLabel={p.cancelHoldKeep}
-          loading={cancelling}
-          destructive
-          onConfirm={() => void cancel(hold)}
-        />
-      ) : null}
+        </div>
+      </CheckoutLayout>
     </Page>
   );
 }

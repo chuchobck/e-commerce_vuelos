@@ -57,7 +57,7 @@ export function TripCancelPage() {
             <TripSummary outbound={booking.outbound} inbound={booking.inbound} />
             <p className="flex flex-col">
               <span className="text-sm text-muted">{t.total}</span>
-              <span className="text-2xl font-bold tabular-nums">{formatMoney(booking.totalPaid)}</span>
+              <span className="text-2xl font-bold tabular-nums">{formatMoney(booking.total)}</span>
             </p>
           </Card>
           {booking.status === 'CANCELLED' ? (

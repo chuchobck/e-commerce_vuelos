@@ -58,7 +58,7 @@ describe('RealFlightsApi', () => {
   it('lo que aún no está conectado rechaza con NotYetConnectedError, sin llamar a la red', async () => {
     const { http, request } = fakeHttp();
     const api: FlightsApi = new RealFlightsApi(http);
-    for (const op of [() => api.getHold('h'), () => api.listBookings(), () => api.checkIn({ bookingId: 'b' })]) {
+    for (const op of [() => api.cancelBooking('b'), () => api.listBookings(), () => api.checkIn({ bookingId: 'b' })]) {
       await expect(op()).rejects.toBeInstanceOf(NotYetConnectedError);
     }
     expect(request).not.toHaveBeenCalled();

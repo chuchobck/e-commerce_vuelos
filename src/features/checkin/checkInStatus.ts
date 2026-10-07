@@ -11,7 +11,7 @@ const c = es.checkin;
  */
 export function checkInStatus(booking: Booking, now: Date = new Date()): { available: boolean; reason?: string } {
   if (booking.status === 'CANCELLED') return { available: false, reason: c.tripCancelled };
-  if (booking.status === 'CHECKED_IN') return { available: false, reason: c.done };
+  if (booking.status !== 'CONFIRMED') return { available: false, reason: c.notConfirmed };
   const checkin = checkInWindow(booking.outbound.itinerary.segments[0].departureTime, now);
   if (checkin.status === 'not-open') {
     return {

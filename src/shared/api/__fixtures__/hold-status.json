@@ -1,0 +1,11 @@
+{
+  "status": "HELD",
+  "expiresAt": "2026-10-07T10:12:28.812Z",
+  "remainingSeconds": 899,
+  "lockedPrice": {
+    "currency": "USD",
+    "baseFare": "135.52",
+    "taxes": "27.10",
+    "total": "162.62"
+  }
+}

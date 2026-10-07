@@ -1,0 +1,210 @@
+{
+  "bookingId": "bdf72ddf-a411-4f8a-8808-f4d1b68bcf50",
+  "pnr": "UNU3G6",
+  "status": "PENDING_PAYMENT",
+  "grandTotal": {
+    "currency": "USD",
+    "baseFare": "135.52",
+    "taxes": "27.10",
+    "total": "162.62"
+  },
+  "createdAt": "2026-10-07T09:57:28.875Z",
+  "updatedAt": "2026-10-07T09:57:28.903Z",
+  "itineraries": [
+    {
+      "itineraryId": "334803ba-6513-4e3e-88d2-2717baaa934f",
+      "totalDurationMinutes": 55,
+      "stopsCount": 0,
+      "segments": [
+        {
+          "segmentId": "d49be402-f010-40e6-b1df-006b722599e2",
+          "flightNumber": "LA1400",
+          "departure": {
+            "iataCode": "UIO",
+            "at": "2026-10-19T11:00:00.000Z",
+            "terminal": null
+          },
+          "arrival": {
+            "iataCode": "GYE",
+            "at": "2026-10-19T11:55:00.000Z",
+            "terminal": null
+          },
+          "marketingCarrier": "LA",
+          "operatingCarrier": "LA",
+          "aircraft": "320",
+          "durationMinutes": 55,
+          "status": "SCHEDULED"
+        }
+      ],
+      "pricingOptions": [
+        {
+          "cabinClass": "ECONOMY",
+          "fareBrand": "BASIC",
+          "availableSeats": 125,
+          "fareRules": {
+            "isRefundable": false,
+            "isChangeable": false
+          },
+          "baggageAllowance": {
+            "personalItemIncluded": true,
+            "carryOnIncluded": 0,
+            "checkedBaggageIncluded": 0
+          },
+          "extraCheckedBaggagePrice": {
+            "currency": "USD",
+            "total": "15.00"
+          },
+          "pricePerPassengerType": []
+        }
+      ]
+    },
+    {
+      "itineraryId": "5bae15b8-e889-4de0-9208-96f3501a5ef7",
+      "totalDurationMinutes": 55,
+      "stopsCount": 0,
+      "segments": [
+        {
+          "segmentId": "4f5e60fe-215c-45b7-a851-f2b1ef5a48b5",
+          "flightNumber": "LA1401",
+          "departure": {
+            "iataCode": "GYE",
+            "at": "2026-10-22T12:30:00.000Z",
+            "terminal": null
+          },
+          "arrival": {
+            "iataCode": "UIO",
+            "at": "2026-10-22T13:25:00.000Z",
+            "terminal": null
+          },
+          "marketingCarrier": "LA",
+          "operatingCarrier": "LA",
+          "aircraft": "320",
+          "durationMinutes": 55,
+          "status": "SCHEDULED"
+        }
+      ],
+      "pricingOptions": [
+        {
+          "cabinClass": "ECONOMY",
+          "fareBrand": "BASIC",
+          "availableSeats": 125,
+          "fareRules": {
+            "isRefundable": false,
+            "isChangeable": false
+          },
+          "baggageAllowance": {
+            "personalItemIncluded": true,
+            "carryOnIncluded": 0,
+            "checkedBaggageIncluded": 0
+          },
+          "extraCheckedBaggagePrice": {
+            "currency": "USD",
+            "total": "15.00"
+          },
+          "pricePerPassengerType": []
+        }
+      ]
+    }
+  ],
+  "passengers": [
+    {
+      "passengerId": "PAX1",
+      "passengerType": "ADULT",
+      "firstName": "Ana",
+      "lastName": "Pérez",
+      "documentType": "NATIONAL_ID",
+      "documentNumber": "1710034065",
+      "nationality": "EC",
+      "birthDate": "1990-04-15",
+      "gender": "F",
+      "contact": {
+        "email": "ana.perez@example.test",
+        "phone": "+593991234567"
+      },
+      "assignedSeats": [
+        {
+          "segmentId": "d49be402-f010-40e6-b1df-006b722599e2",
+          "seatNumber": "10B"
+        },
+        {
+          "segmentId": "4f5e60fe-215c-45b7-a851-f2b1ef5a48b5",
+          "seatNumber": "10A"
+        }
+      ],
+      "extraBaggage": []
+    },
+    {
+      "passengerId": "PAX2",
+      "passengerType": "INFANT",
+      "associatedAdultId": "PAX1",
+      "firstName": "Luz",
+      "lastName": "Pérez",
+      "documentType": "PASSPORT",
+      "documentNumber": "AB123456",
+      "nationality": "EC",
+      "documentExpiryDate": "2031-01-01",
+      "birthDate": "2025-08-01",
+      "gender": "F",
+      "contact": {
+        "email": "ana.perez@example.test",
+        "phone": "+593991234567"
+      },
+      "assignedSeats": [],
+      "extraBaggage": []
+    }
+  ],
+  "tickets": [
+    {
+      "ticketId": "9af465ad-f762-4d16-b1db-c92d334dccb9",
+      "bookingId": "bdf72ddf-a411-4f8a-8808-f4d1b68bcf50",
+      "passengerId": "PAX1",
+      "eTicketNumber": null,
+      "status": "PENDING",
+      "issuedAt": null,
+      "segments": [
+        {
+          "segmentId": "d49be402-f010-40e6-b1df-006b722599e2",
+          "status": "PENDING",
+          "couponNumber": null
+        },
+        {
+          "segmentId": "4f5e60fe-215c-45b7-a851-f2b1ef5a48b5",
+          "status": "PENDING",
+          "couponNumber": null
+        }
+      ],
+      "failureReason": null
+    },
+    {
+      "ticketId": "19f9f293-bf16-44a9-b75d-ace4a66d6e34",
+      "bookingId": "bdf72ddf-a411-4f8a-8808-f4d1b68bcf50",
+      "passengerId": "PAX2",
+      "eTicketNumber": null,
+      "status": "PENDING",
+      "issuedAt": null,
+      "segments": [
+        {
+          "segmentId": "d49be402-f010-40e6-b1df-006b722599e2",
+          "status": "PENDING",
+          "couponNumber": null
+        },
+        {
+          "segmentId": "4f5e60fe-215c-45b7-a851-f2b1ef5a48b5",
+          "status": "PENDING",
+          "couponNumber": null
+        }
+      ],
+      "failureReason": null
+    }
+  ],
+  "changes": [
+    {
+      "changedAt": "2026-10-07T09:57:28.875Z",
+      "description": "Booking created from hold"
+    },
+    {
+      "changedAt": "2026-10-07T09:57:28.875Z",
+      "description": "Payment pending confirmation; tickets will be issued once it is approved"
+    }
+  ]
+}

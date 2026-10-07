@@ -70,6 +70,24 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
   Render ni con la cuenta de administrador sembrada. Esperar un minuto entre corridas (ingreso 5/min).
 - Modelo de seguridad y contrapartida XSS: sección 6 del README. F8 debe agregar una CSP estricta.
 
+## Compra (desde F4a)
+
+- La lógica es una máquina de estados pura (`features/checkout/machine.ts`) que ejecuta `flow.ts`;
+  las páginas solo llaman a `checkout.*` y leen `useCheckout()`. Nada de lógica de compra en páginas.
+- Hold una sola vez por selección; refrescar lo verifica con `GET`. El tiempo restante sale del
+  servidor (`remainingSeconds` desde `receivedAt`); nunca comparar `expiresAt` con la hora local.
+- Toda escritura de compra lleva `Idempotency-Key` de `idempotency.ts` (una por intención). Un
+  reintento reenvía el mismo cuerpo con la misma clave; nunca una clave con otro cuerpo.
+- Tarjetas: solo en `shared/payments` y en el formulario; nunca en almacenamiento, logs ni hacia la
+  API de vuelos (solo viaja `paymentReference`). Las tarjetas de prueba solo con el mock o en desarrollo.
+- Pantallas de la compra (F4b): `CheckoutLayout` (dos columnas) + `CheckoutAside` (temporizador, resumen,
+  cancelar). El panel nunca es una barra fija sobre los campos. La cuenta incrustada recibe `LoginForm` y
+  `RegisterForm` desde la página (un módulo de `features` no importa de otro). Las reglas de pasajero viven en
+  `passengers.ts` y siguen el DTO del backend; la nacionalidad reservable es `BOOKABLE_COUNTRIES` (hoy, Ecuador).
+- Mensajes de compra: catálogo único `es.purchaseErrors`, elegido por `features/checkout/messages.ts`.
+- `npm run test:api` crea holds y reservas **solo contra el backend local**; nunca contra Render.
+  Límites: 30 holds y 10 reservas por minuto por IP.
+
 ## Accesibilidad: WCAG 2.2 AA
 
 HTML semántico, un solo `h1` por página, "Saltar al contenido", foco siempre visible y nunca tapado,

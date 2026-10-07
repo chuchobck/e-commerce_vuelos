@@ -49,18 +49,27 @@ export interface FlightsApi {
   /** GET /auth/me (con sesión). */
   me(): Promise<User>;
 
-  /* Desde aquí: solo en el mock hasta F4 (hold y reserva) y F6 (postventa). */
+  /* Compra (F4a). Las dos escrituras llevan Idempotency-Key (una por intención; ver features/checkout). */
 
-  /** Bloquea temporalmente precio y cupo. 409 si la tarifa ya no está disponible. */
-  createHold(request: CreateHoldRequest): Promise<Hold>;
+  /** POST /offers/hold. 409 sin cupo o con la oferta vencida; 422 si la selección no es de la oferta. */
+  createHold(request: CreateHoldRequest, idempotencyKey: string): Promise<Hold>;
+  /** GET /offers/hold/{id}: estado y segundos restantes según el servidor. 404 si no es del usuario. */
   getHold(holdId: string): Promise<Hold>;
+  /** DELETE /offers/hold/{id}. Liberar uno vencido o liberado es 204; uno ya usado en una reserva, 409. */
   cancelHold(holdId: string): Promise<void>;
 
-  /** Convierte un hold en reserva pagada. 422 si los datos no son válidos, 409 si el hold expiró. */
-  createBooking(request: CreateBookingRequest): Promise<Booking>;
+  /**
+   * POST /bookings. Pago aprobado: CONFIRMED con boletos (201). Pendiente: PENDING_PAYMENT (202).
+   * Rechazado: 422 PAYMENT_NOT_AUTHORIZED y el hold sigue. Hold vencido o liberado: 410; ya usado: 409.
+   */
+  createBooking(request: CreateBookingRequest, idempotencyKey: string): Promise<Booking>;
+  /** GET /bookings/{id}. 404 si no es del usuario. */
+  getBooking(bookingId: string): Promise<Booking>;
+
+  /* Desde aquí: solo en el mock hasta F6 (postventa). */
+
   /** Reservas del usuario autenticado. 401 sin sesión. */
   listBookings(): Promise<Booking[]>;
-  getBooking(bookingIdOrCode: string): Promise<Booking>;
   cancelBooking(bookingId: string): Promise<Booking>;
 
   /** Check-in de todos los pasajeros. 401 sin sesión, 404 si la reserva no es del usuario, 409 fuera de la ventana. */

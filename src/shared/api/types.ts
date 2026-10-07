@@ -8,10 +8,10 @@
  *    ("2026-10-09T06:00:00-05:00") para mostrar la hora local sin cálculos en los componentes.
  *  - Fechas sin hora: "yyyy-MM-dd" (fecha local del aeropuerto de salida).
  *
- * Hold, reserva, check-in y sesión siguen siendo del mock: se conectan en F3, F4 y F6.
+ * Hold y reserva derivan del contrato (F4a). Check-in y pases siguen siendo del mock hasta F6.
  */
 import type { Money } from '@/shared/lib/money';
-import type { CabinClass, FlightStatusCode, SeatMapDto } from './contract';
+import type { BookingDetailDto, CabinClass, FlightStatusCode, HoldStatusDto, PassengerItemDto, SeatMapDto, TicketDto } from './contract';
 
 export type { CabinClass, FlightStatusCode } from './contract';
 export type { Money } from '@/shared/lib/money';
@@ -123,7 +123,7 @@ export interface FlightStatus {
 }
 
 /* -------------------------------------------------------------------------------------------- */
-/* Hold, reserva, check-in y sesión: formas del mock hasta F3, F4 y F6.                          */
+/* Hold y reserva (F4a): derivan del contrato (HoldResponse, HoldStatusResponse, BookingDetail).  */
 /* -------------------------------------------------------------------------------------------- */
 
 /** Como HoldRequest del contrato, con los pasajeros del buscador. */
@@ -133,72 +133,100 @@ export interface CreateHoldRequest {
   passengers: PassengerCount;
 }
 
-export type HoldStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'CONVERTED';
+export type HoldStatus = HoldStatusDto['status'];
 
+/**
+ * Hold del contrato. El tiempo restante sale del SERVIDOR (`remainingSeconds`) y se mide desde
+ * `receivedAt`, el momento en que llegó la respuesta según el reloj de este equipo: así un reloj
+ * desfasado no adelanta ni atrasa el vencimiento (ver features/checkout/holdClock.ts).
+ */
 export interface Hold {
   id: string;
   status: HoldStatus;
-  createdAt: string;
-  expiresAt: string;
-  offerId: string;
-  outbound: SelectedLeg;
-  inbound?: SelectedLeg;
-  passengers: PassengerCount;
-  totalPrice: Money;
+  /** Hora de vencimiento según el servidor (UTC). Solo informativa: no se compara con el reloj local. */
+  expiresAt: string | null;
+  remainingSeconds: number;
+  /** Date.now() local al recibir la respuesta. */
+  receivedAt: number;
+  lockedPrice: Money;
+  /** Tarifa base e impuestos del precio congelado, si la API los da. */
+  fareBreakdown?: { base: Money; taxes: Money };
 }
 
-export type PassengerType = 'ADT' | 'CHD' | 'INF';
-export type DocumentType = 'CEDULA' | 'PASSPORT';
+export type PassengerTypeCode = PassengerItemDto['passengerType'];
+export type DocumentType = PassengerItemDto['documentType'];
+export type Gender = PassengerItemDto['gender'];
 
-export interface PassengerData {
-  type: PassengerType;
+/** Pasajero de la reserva (PassengerItem del contrato, sin equipaje: se compra después). */
+export interface BookingPassenger {
+  /** Lo elige el cliente (PAX1, PAX2…); único dentro de la reserva. */
+  id: string;
+  type: PassengerTypeCode;
+  /** Solo infantes: el id del adulto que lo lleva. */
+  associatedAdultId?: string;
   firstName: string;
   lastName: string;
-  birthDate: string;
   documentType: DocumentType;
   documentNumber: string;
-  /** Asiento elegido; si falta se asigna automáticamente. */
-  seatId?: string;
-}
-
-export interface ContactData {
+  /** País ISO 3166-1 alfa-2. */
+  nationality: string;
+  /** yyyy-MM-dd; obligatoria con pasaporte. */
+  documentExpiryDate?: string;
+  /** yyyy-MM-dd. */
+  birthDate: string;
+  gender: Gender;
   email: string;
   phone: string;
+  /** Asientos elegidos; sin ellos la API asigna el primero libre de la cabina. */
+  seats?: { segmentId: string; seatNumber: string }[];
 }
 
-export interface PaymentData {
-  cardNumber: string;
-  cardHolder: string;
-  expiry: string;
-  cvv: string;
-}
-
+/** BookingRequest del contrato: el dueño sale del token, nunca del cuerpo. */
 export interface CreateBookingRequest {
   holdId: string;
-  passengers: PassengerData[];
-  contact: ContactData;
-  payment: PaymentData;
+  passengers: BookingPassenger[];
+  /** Referencia de la Payment API (shared/payments). Nunca datos de tarjeta. */
+  paymentReference: string;
 }
 
-export type BookingStatus = 'CONFIRMED' | 'CANCELLED' | 'CHECKED_IN';
+export type BookingStatus = BookingDetailDto['status'];
+export type TicketStatus = TicketDto['status'];
 
-export interface BookedPassenger extends Omit<PassengerData, 'seatId'> {
+/** Familia vendida: la API la devuelve sin precios por tipo (README, sección 6). */
+export type BookedFare = Omit<Fare, 'seatsLeft' | 'pricePerAdult' | 'total'>;
+
+/** Lo reservado en un tramo: el itinerario y la familia vendida. */
+export interface BookedLeg {
+  itinerary: Omit<Itinerary, 'fares'>;
+  fare: BookedFare;
+}
+
+export interface BookedPassenger extends Omit<BookingPassenger, 'seats'> {
+  seats: { segmentId: string; seatNumber: string }[];
+}
+
+export interface BookedTicket {
   id: string;
-  seat: string | null;
-  seatAutoAssigned: boolean;
+  passengerId: string;
+  /** Número de boleto electrónico (cuando ya se emitió). */
+  number: string | null;
+  status: TicketStatus;
+  issuedAt: string | null;
 }
 
+/** Reserva (BookingDetail del contrato). */
 export interface Booking {
   id: string;
+  /** PNR. */
   code: string;
   status: BookingStatus;
   createdAt: string;
-  outbound: SelectedLeg;
-  inbound?: SelectedLeg;
+  outbound: BookedLeg;
+  inbound?: BookedLeg;
   passengers: BookedPassenger[];
-  contact: ContactData;
-  totalPaid: Money;
-  userId?: string;
+  tickets: BookedTicket[];
+  total: Money;
+  changes: { at: string; description: string }[];
 }
 
 /** El check-in se hace por bookingId y solo lo puede hacer el dueño de la reserva (con sesión). */

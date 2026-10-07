@@ -1,15 +1,47 @@
-import type { FlightStatusDto, SearchResponseDto, SeatMapDto, TokenResponseDto, UserResponseDto } from './contract';
+import type {
+  BookingDetailDto,
+  FlightStatusDto,
+  HoldResponseDto,
+  HoldStatusDto,
+  SearchResponseDto,
+  SeatMapDto,
+  TokenResponseDto,
+  UserResponseDto,
+} from './contract';
 import { NotYetConnectedError } from './errors';
 import type { FlightsApi } from './FlightsApi';
 import type { HttpClient } from './http/client';
 import { deviceFingerprint } from './http/deviceFingerprint';
-import { mapFlightStatus, mapSearchResponse, mapTokens, mapUser, toSearchRequest } from './mapping';
-import type { AuthTokens, Credentials, FlightStatus, SearchParams, SearchResult, SeatMap, User } from './types';
+import {
+  mapBooking,
+  mapFlightStatus,
+  mapHoldCreated,
+  mapHoldStatus,
+  mapSearchResponse,
+  mapTokens,
+  mapUser,
+  toBookingRequest,
+  toHoldRequest,
+  toSearchRequest,
+} from './mapping';
+import type {
+  AuthTokens,
+  Booking,
+  CreateBookingRequest,
+  CreateHoldRequest,
+  Credentials,
+  FlightStatus,
+  Hold,
+  SearchParams,
+  SearchResult,
+  SeatMap,
+  User,
+} from './types';
 
 /**
  * Implementación contra la API real: las operaciones públicas (búsqueda, mapa de asientos y
- * estado de vuelo, F2) y la cuenta (F3). Hold, reservas y postventa lanzan NotYetConnectedError,
- * que la interfaz explica sin romper la pantalla; se conectan en F4 y F6.
+ * estado de vuelo, F2), la cuenta (F3) y la compra (hold y reserva, F4a). Mis viajes y la
+ * postventa lanzan NotYetConnectedError, que la interfaz explica sin romper la pantalla (F6).
  */
 export class RealFlightsApi implements FlightsApi {
   constructor(private readonly http: HttpClient) {}
@@ -66,23 +98,41 @@ export class RealFlightsApi implements FlightsApi {
     await this.http.request('GET', '/health', { silent: true });
   }
 
-  async createHold(): Promise<never> {
-    throw new NotYetConnectedError('createHold');
+  /* Compra. Las escrituras nunca se reintentan solas: el reintento lo decide la compra con la misma clave. */
+
+  async createHold(request: CreateHoldRequest, idempotencyKey: string): Promise<Hold> {
+    const dto = await this.http.request<HoldResponseDto>('POST', '/offers/hold', {
+      body: toHoldRequest(request),
+      headers: { 'Idempotency-Key': idempotencyKey },
+      auth: true,
+    });
+    return mapHoldCreated(dto, Date.now());
   }
-  async getHold(): Promise<never> {
-    throw new NotYetConnectedError('getHold');
+
+  async getHold(holdId: string): Promise<Hold> {
+    const dto = await this.http.request<HoldStatusDto>('GET', `/offers/hold/${encodeURIComponent(holdId)}`, { auth: true, retry: true });
+    return mapHoldStatus(dto, holdId, Date.now());
   }
-  async cancelHold(): Promise<never> {
-    throw new NotYetConnectedError('cancelHold');
+
+  async cancelHold(holdId: string): Promise<void> {
+    await this.http.request('DELETE', `/offers/hold/${encodeURIComponent(holdId)}`, { auth: true });
   }
-  async createBooking(): Promise<never> {
-    throw new NotYetConnectedError('createBooking');
+
+  async createBooking(request: CreateBookingRequest, idempotencyKey: string): Promise<Booking> {
+    const dto = await this.http.request<BookingDetailDto>('POST', '/bookings', {
+      body: toBookingRequest(request),
+      headers: { 'Idempotency-Key': idempotencyKey },
+      auth: true,
+    });
+    return mapBooking(dto);
   }
+
+  async getBooking(bookingId: string): Promise<Booking> {
+    return mapBooking(await this.http.request<BookingDetailDto>('GET', `/bookings/${encodeURIComponent(bookingId)}`, { auth: true, retry: true }));
+  }
+
   async listBookings(): Promise<never> {
     throw new NotYetConnectedError('listBookings');
-  }
-  async getBooking(): Promise<never> {
-    throw new NotYetConnectedError('getBooking');
   }
   async cancelBooking(): Promise<never> {
     throw new NotYetConnectedError('cancelBooking');

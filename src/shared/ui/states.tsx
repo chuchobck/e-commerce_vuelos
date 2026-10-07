@@ -115,7 +115,7 @@ export function ErrorState({
 }
 
 /** Reintentar; si la API pidió esperar (Retry-After), se habilita al terminar la cuenta. */
-function RetryButton({ onRetry, waitSeconds }: { onRetry: () => void; waitSeconds: number }) {
+export function RetryButton({ onRetry, waitSeconds, label = es.common.retry }: { onRetry: () => void; waitSeconds: number; label?: string }) {
   const [left, setLeft] = useState(waitSeconds);
   useEffect(() => {
     setLeft(waitSeconds);
@@ -127,7 +127,7 @@ function RetryButton({ onRetry, waitSeconds }: { onRetry: () => void; waitSecond
     <div className="flex flex-col items-center gap-2">
       <Button variant="primary" onClick={onRetry} disabled={left > 0} aria-describedby={left > 0 ? 'retry-wait' : undefined}>
         <RefreshCw aria-hidden="true" />
-        {es.common.retry}
+        {label}
       </Button>
       {left > 0 ? (
         <p id="retry-wait" className="text-sm tabular-nums">

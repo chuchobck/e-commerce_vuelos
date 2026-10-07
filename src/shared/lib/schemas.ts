@@ -4,8 +4,10 @@ import { EMAIL_MAX_LENGTH, isValidEmail, normalizeEmail, passwordLengthIssue } f
 import { ageOn, lastFlightDate, parseDisplayDate, toDisplayDate, today } from './dates';
 import {
   FLIGHT_NUMBER_PATTERN,
+  NAME_MAX_LENGTH,
   NAME_PATTERN,
   PASSPORT_PATTERN,
+  compactDocument,
   PHONE_EC_PATTERN,
   isFutureExpiry,
   isValidCedula,
@@ -23,8 +25,7 @@ export const nameField = z
   .string()
   .trim()
   .min(1, v.required)
-  .min(2, v.nameLength)
-  .max(40, v.nameLength)
+  .max(NAME_MAX_LENGTH, v.nameLength)
   .regex(NAME_PATTERN, v.nameInvalid);
 
 export const cedulaField = z
@@ -34,7 +35,7 @@ export const cedulaField = z
   .length(10, v.cedulaLength)
   .refine(isValidCedula, v.cedulaInvalid);
 
-export const passportField = z.string().trim().min(1, v.required).regex(PASSPORT_PATTERN, v.passportInvalid);
+export const passportField = z.string().trim().min(1, v.required).transform(compactDocument).pipe(z.string().regex(PASSPORT_PATTERN, v.passportInvalid));
 
 /** Correo: misma normalización y validación que el backend (shared/lib/credentials.ts). */
 export const emailField = z
@@ -89,20 +90,23 @@ export const futureDateField = z
 /** Fecha opcional con las mismas reglas cuando tiene valor. */
 export const optionalFutureDateField = z.union([z.literal(''), futureDateField]);
 
-export type PassengerType = 'ADT' | 'CHD' | 'INF';
+/** Tipos de pasajero del contrato (PassengerItem.passengerType). */
+export type PassengerType = 'ADULT' | 'YOUTH' | 'CHILD' | 'INFANT';
 
 /**
- * Valida la fecha de nacimiento según el tipo de pasajero, en la fecha del vuelo:
- * adulto ≥ 12 años, niño 2–11, infante < 2.
+ * Valida la fecha de nacimiento (dd/mm/aaaa) según el tipo de pasajero, como el backend: la edad
+ * cuenta el día del PRIMER vuelo (adulto ≥ 18, joven 12–17, niño 2–11, infante < 2) y un infante
+ * además debe seguir siendo menor de 2 el día del ÚLTIMO vuelo.
  */
-export function birthDateMessage(birth: string, type: PassengerType, flightDate: Date): string | null {
+export function birthDateMessage(birth: string, type: PassengerType, flightDate: Date, lastFlightDate: Date = flightDate): string | null {
   const d = parseDisplayDate(birth);
   if (!d) return v.dateInvalid;
   if (d > today()) return v.birthFuture;
   const age = ageOn(d, flightDate);
-  if (type === 'ADT' && age < 12) return v.birthAdult;
-  if (type === 'CHD' && (age < 2 || age > 11)) return v.birthChild;
-  if (type === 'INF' && age >= 2) return v.birthInfant;
+  if (type === 'ADULT' && age < 18) return v.birthAdult;
+  if (type === 'YOUTH' && (age < 12 || age > 17)) return v.birthYouth;
+  if (type === 'CHILD' && (age < 2 || age > 11)) return v.birthChild;
+  if (type === 'INFANT' && (age >= 2 || ageOn(d, lastFlightDate) >= 2)) return v.birthInfant;
   return null;
 }
 
@@ -119,7 +123,7 @@ export function birthDateField(type: PassengerType, flightDate: Date) {
 
 /** Documento: cédula (módulo 10) o pasaporte alfanumérico. */
 export const documentSchema = z.discriminatedUnion('documentType', [
-  z.object({ documentType: z.literal('CEDULA'), documentNumber: cedulaField }),
+  z.object({ documentType: z.literal('NATIONAL_ID'), documentNumber: cedulaField }),
   z.object({ documentType: z.literal('PASSPORT'), documentNumber: passportField }),
 ]);
 
