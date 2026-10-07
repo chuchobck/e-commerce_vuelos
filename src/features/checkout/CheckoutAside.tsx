@@ -1,12 +1,13 @@
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { es, fmt } from '@/shared/i18n';
-import type { Money, PassengerCount } from '@/shared/api';
+import type { BookingPassenger, Money, PassengerCount } from '@/shared/api';
 import { formatMoney } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/useMediaQuery';
 import { Button, Card, CardTitle, ConfirmDialog, TripSummary } from '@/shared/ui';
 import { HoldTimer } from './HoldTimer';
 import { holdOf, type CheckoutState } from './machine';
+import { anySeatChosen, seatLines } from './seatLines';
 import { selectionTotal, type CheckoutSelection } from './selection';
 
 const p = es.purchase;
@@ -30,6 +31,8 @@ function PriceRow({ label, money, strong }: { label: string; money: Money; stron
 interface CheckoutAsideProps {
   selection: CheckoutSelection;
   state: CheckoutState;
+  /** Pasajeros escritos hasta ahora (el borrador): de ahí salen los asientos elegidos. */
+  passengers?: BookingPassenger[];
   /** "Cancelar compra": libera el hold y vuelve a los resultados. */
   onCancel: () => Promise<void>;
 }
@@ -39,13 +42,14 @@ interface CheckoutAsideProps {
  * con su desglose si la API lo da) y "Cancelar compra". En móvil va arriba y el resumen se pliega;
  * el temporizador siempre está a la vista.
  */
-export function CheckoutAside({ selection, state, onCancel }: CheckoutAsideProps) {
+export function CheckoutAside({ selection, state, passengers = [], onCancel }: CheckoutAsideProps) {
   const desktop = useMediaQuery('(min-width: 1024px)');
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const hold = holdOf(state);
   const total = hold?.lockedPrice ?? selectionTotal(selection);
+  const lines = seatLines(passengers, selection.outbound, selection.inbound);
 
   return (
     <aside aria-label={p.summaryTitle} className="flex flex-col gap-4">
@@ -66,9 +70,22 @@ export function CheckoutAside({ selection, state, onCancel }: CheckoutAsideProps
               <span className="font-bold">{f.passengersLabel}: </span>
               {passengersLine(selection.passengers)}
             </p>
-            <p className="text-sm text-muted">
-              <span className="font-bold text-foreground">{f.seat}:</span> {f.seatAuto}
-            </p>
+            {anySeatChosen(lines) ? (
+              <div className="flex flex-col gap-1 text-sm">
+                <p className="font-bold">{f.seatsTitle}</p>
+                <ul className="flex flex-col gap-1 text-muted">
+                  {lines.map((l) => (
+                    <li key={l.passengerId}>
+                      <span className="font-bold text-foreground">{l.name}:</span> {l.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm text-muted">
+                <span className="font-bold text-foreground">{f.seat}:</span> {f.seatAuto}
+              </p>
+            )}
             <dl className="flex flex-col gap-2 border-t-2 border-border pt-4">
               {hold?.fareBreakdown ? (
                 <>

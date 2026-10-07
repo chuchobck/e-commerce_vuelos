@@ -3,7 +3,11 @@
  * Regla: ningún texto visible se escribe directamente en un componente.
  * Para interpolar valores usa `fmt(es.x.y, { clave: valor })` desde src/shared/i18n/fmt.ts.
  */
+import { seatsEs } from './seats';
+
 export const es = {
+  seats: seatsEs,
+
   app: {
     name: 'Quinde',
     titleSuffix: 'Quinde',
@@ -407,7 +411,19 @@ export const es = {
     taxes: 'Impuestos y tasas',
     seat: 'Asiento',
     seatAuto: 'Asignación automática.',
-    seatSoon: 'Pronto podrás elegir tu asiento aquí mismo.',
+    seatAutoShort: 'Asignación automática',
+    seatInfant: 'En brazos (sin asiento)',
+    seatInSegment: '{origin} → {destination}: {seat}',
+    seatsTitle: 'Asientos',
+    seatsAutoText: 'Asignaremos tus asientos automáticamente.',
+    seatsChosenIntro: 'Elegiste estos asientos:',
+    seatsChoose: 'Elegir asientos (opcional)',
+    seatsChange: 'Cambiar asientos',
+    seatsHide: 'Ocultar asientos',
+    seatsTakenTitle: 'Revisa tus asientos',
+    seatsTakenText: 'Alguien eligió antes uno de los asientos de tu compra. Revisamos el mapa: quitamos el que ya no está disponible y conservamos los demás. Elige otro y vuelve a continuar. Tu precio sigue apartado.',
+    seatsInvalidText: 'La aerolínea no aceptó uno de los asientos elegidos. Revisa tus asientos o deja la asignación automática, y vuelve a continuar. Tu precio sigue apartado.',
+    seatsCabinText: 'La aerolínea dice que un asiento no corresponde a la cabina de tu tarifa. Revisamos el mapa y conservamos lo que sí sirve: revisa tus asientos y vuelve a continuar. Tu precio sigue apartado.',
     birthRule: {
       ADULT: 'Desde 18 años.',
       YOUTH: 'De 12 a 17 años.',

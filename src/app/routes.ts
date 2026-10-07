@@ -36,6 +36,7 @@ export const paths = {
   profile: '/perfil',
   help: '/ayuda',
   uiKit: '/componentes',
+  uiKitSeats: '/componentes/asientos',
 } as const;
 
 /** Secciones de la página de ayuda enlazables con #ancla. */

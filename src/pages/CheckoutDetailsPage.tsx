@@ -1,5 +1,5 @@
 import { ArrowLeft, Search, ShoppingCart } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
@@ -15,6 +15,7 @@ import {
   PassengersForm,
   useCheckout,
 } from '@/features/checkout';
+import { SeatSelector, seatSegmentsFromLegs, toAssignedSeats } from '@/features/seats';
 import { es, fmt } from '@/shared/i18n';
 import { Button, EmptyState, toast } from '@/shared/ui';
 
@@ -30,6 +31,7 @@ export function CheckoutDetailsPage() {
   const navigate = useNavigate();
   const state = useCheckout();
   const [selection] = useState(loadSelection);
+  const segments = useMemo(() => (selection ? seatSegmentsFromLegs(selection.outbound, selection.inbound) : []), [selection]);
   const authorizedRef = useRef(authorized);
   authorizedRef.current = authorized;
 
@@ -60,6 +62,8 @@ export function CheckoutDetailsPage() {
   }
 
   const editing = state.step === 'held' || state.step === 'rejected';
+  // Error de asiento al reservar (409/422): se abre el selector para que revise contra un mapa nuevo.
+  const seatError = state.step === 'held' ? state.bookingError : undefined;
   const searchAgain = () => navigate(routes.results(checkout.searchAgain() ?? selection.searchQuery));
   const cancel = async () => {
     const query = await checkout.cancel();
@@ -78,7 +82,7 @@ export function CheckoutDetailsPage() {
       }
     >
       <CheckoutSteps current={1} />
-      <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} onCancel={cancel} />}>
+      <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} passengers={checkout.passengersDraft()} onCancel={cancel} />}>
         {/* Mientras se restaura la sesión no se muestra nada: ni las opciones ni "Compras como" parpadean. */}
         {status === 'restoring' ? null : (
           <AccountBlock
@@ -96,6 +100,14 @@ export function CheckoutDetailsPage() {
             </h2>
             <PassengersForm
               selection={selection}
+              seats={{
+                segmentIds: segments.map((s) => s.id),
+                toAssigned: (value, passengerId) => toAssignedSeats(value, passengerId, segments),
+                forceOpen: !!seatError,
+                render: ({ passengers, value, onChange }) => (
+                  <SeatSelector offerId={selection.offerId} segments={segments} passengers={passengers} value={value} onChange={onChange} serverError={seatError} />
+                ),
+              }}
               draft={checkout.passengersDraft()}
               accountEmail={user?.email}
               rejected={state.step === 'held' ? state.passengerErrors : []}

@@ -39,6 +39,11 @@ export function purchaseNotice(state: CheckoutState): PurchaseNotice | null {
             text: isApiError(state.error) && (state.error.status === 429 || state.error.status === 503) ? errorMessage(state.error) : m.paymentErrorText,
           };
     case 'held':
+      if (state.bookingError) {
+        const code = state.bookingError.code;
+        const text = code === 'SEAT_CABIN_MISMATCH' ? es.checkoutForms.seatsCabinText : code === 'SEAT_TAKEN' ? es.checkoutForms.seatsTakenText : es.checkoutForms.seatsInvalidText;
+        return { tone: 'warning', title: es.checkoutForms.seatsTakenTitle, text };
+      }
       return state.passengerErrors.length > 0 ? { tone: 'warning', title: m.passengersTitle, text: m.passengersText } : null;
     case 'processing':
       return state.gaveUp ? { tone: 'warning', title: m.gaveUpTitle, text: m.gaveUpText } : { tone: 'info', title: m.processingTitle, text: m.processingText };

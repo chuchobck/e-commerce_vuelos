@@ -307,7 +307,7 @@ export function mockSeatMap(offerId: string, segmentId: string): SeatMapDto {
   const segment = offer?.itineraries.flatMap((it) => it.segments).find((s) => s.segmentId === segmentId);
   if (!segment) throw new ApiError({ status: 404, code: 'VALIDATION_FAILED', detail: 'Seat map not found' });
   const aircraft = (segment.aircraft ?? '320') as MockRoute['aircraft'];
-  const rand = seeded(`${segment.flightNumber}-${segment.departure.at}-seats`);
+  // Como la API real: todos libres; solo se ocupan los asientos de reservas hechas (mock/purchase.ts).
   return {
     segmentId,
     cabins: CABIN_LAYOUT[aircraft].map((layout, layoutIndex) => ({
@@ -322,7 +322,7 @@ export function mockSeatMap(offerId: string, segmentId: string): SeatMapDto {
             if (c === layout.letters.length / 2 - 1 || c === layout.letters.length / 2) characteristics.push('AISLE');
             if (layout.cabin === 'ECONOMY' && i === 0 && layoutIndex > 0) characteristics.push('EXTRA_LEGROOM');
             if (layout.exitRows.includes(rowNumber)) characteristics.push('EMERGENCY_EXIT');
-            return { seatNumber: `${rowNumber}${letter}`, isAvailable: rand() > 0.35, characteristics };
+            return { seatNumber: `${rowNumber}${letter}`, isAvailable: true, characteristics };
           }),
         };
       }),

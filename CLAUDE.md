@@ -84,6 +84,12 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
   cancelar). El panel nunca es una barra fija sobre los campos. La cuenta incrustada recibe `LoginForm` y
   `RegisterForm` desde la página (un módulo de `features` no importa de otro). Las reglas de pasajero viven en
   `passengers.ts` y siguen el DTO del backend; la nacionalidad reservable es `BOOKABLE_COUNTRIES` (hoy, Ecuador).
+- Asientos (F5): el selector es opcional y va plegado en el paso 2 (no suma clics). La página lo compone
+  con `PassengersForm` (`seats`); la elección es `passengerId → segmentId → asiento` y viaja como
+  `assignedSeats` por tramo (`toAssignedSeats`), omitido si no hay elección; los infantes nunca llevan.
+  Un error de asiento (`bookingError` en la máquina) vuelve al paso 2: nunca borrarlo antes de que el
+  usuario lo revise (el paso 3 no debe marcar los datos como listos mientras exista).
+  El 409 no dice qué asiento falló y el `detail` no se interpreta: se compara contra un mapa nuevo.
 - Mensajes de compra: catálogo único `es.purchaseErrors`, elegido por `features/checkout/messages.ts`.
 - `npm run test:api` crea holds y reservas **solo contra el backend local**; nunca contra Render.
   Límites: 30 holds y 10 reservas por minuto por IP.

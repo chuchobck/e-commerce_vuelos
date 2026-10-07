@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
 import { useAuth } from '@/features/auth';
-import { BookingCode, checkout, CheckoutSteps, purchaseNotice, useCheckout } from '@/features/checkout';
+import { BookingCode, checkout, CheckoutSteps, purchaseNotice, seatLines, useCheckout } from '@/features/checkout';
 import { flightsApi, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { Alert, Button, Card, CardTitle, EmptyState, ErrorState, LoadingState, TripSummary } from '@/shared/ui';
@@ -108,6 +108,18 @@ export function CheckoutConfirmationPage() {
           <Card className="flex flex-col gap-6">
             <CardTitle>{p.summaryTitle}</CardTitle>
             <TripSummary outbound={booking.outbound} inbound={booking.inbound} />
+            <section aria-labelledby="seats-heading" className="flex flex-col gap-2">
+              <h3 id="seats-heading" className="text-lg font-bold">
+                {f.seatsTitle}
+              </h3>
+              <ul className="flex flex-col gap-1">
+                {seatLines(booking.passengers, booking.outbound, booking.inbound).map((l) => (
+                  <li key={l.passengerId}>
+                    <span className="font-bold">{l.name}:</span> {l.text}
+                  </li>
+                ))}
+              </ul>
+            </section>
             {booking.tickets.length > 0 ? (
               <section aria-labelledby="tickets-heading" className="flex flex-col gap-2">
                 <h3 id="tickets-heading" className="text-lg font-bold">

@@ -33,10 +33,37 @@ export interface PassengerFormValue {
   phone: string;
 }
 
+/**
+ * Asientos elegidos: `passengerId → segmentId → seatNumber` (el mismo formato del selector de
+ * asientos; vacío = asignación automática). Los infantes nunca tienen entrada.
+ */
+export type SeatChoice = Record<string, Record<string, string>>;
+
 export interface PassengersFormValues {
   passengers: PassengerFormValue[];
   /** Un solo contacto (el del primer pasajero) para todos. */
   sameContact: boolean;
+  seats: SeatChoice;
+}
+
+/** `passengerId` que va en PassengerItem: PAX1, PAX2… (el selector de asientos usa los mismos). */
+export const passengerIdAt = (index: number) => `PAX${index + 1}`;
+
+/** Asientos de un pasajero en el formato por tramo de PassengerItem.assignedSeats. */
+export type ToAssignedSeats = (value: SeatChoice, passengerId: string) => { segmentId: string; seatNumber: string }[];
+
+/** Conversión por defecto: los tramos en el orden en que se eligieron. El selector aporta la suya (en el orden del viaje). */
+const assignedInOrder: ToAssignedSeats = (value, passengerId) => Object.entries(value[passengerId] ?? {}).map(([segmentId, seatNumber]) => ({ segmentId, seatNumber }));
+
+/** Los asientos que trae un borrador, solo de los tramos del viaje actual (otro vuelo = otros tramos). */
+export function seatsFromDraft(draft: BookingPassenger[], segmentIds: readonly string[]): SeatChoice {
+  const out: SeatChoice = {};
+  for (const p of draft) {
+    if (p.type === 'INFANT') continue;
+    const chosen = (p.seats ?? []).filter((s) => segmentIds.includes(s.segmentId));
+    if (chosen.length > 0) out[p.id] = Object.fromEntries(chosen.map((s) => [s.segmentId, s.seatNumber]));
+  }
+  return out;
 }
 
 /** Tipos en el orden de la búsqueda: adultos, niños e infantes (el buscador no pide jóvenes). */
@@ -99,7 +126,7 @@ export function passengersSchema({ first, last }: { first: Date; last: Date }) {
       if (p.type === 'INFANT' && p.adultIndex === '') issue('adultIndex', v.requiredSelect);
     });
   return z
-    .object({ passengers: z.array(passenger), sameContact: z.boolean() })
+    .object({ passengers: z.array(passenger), sameContact: z.boolean(), seats: z.record(z.record(z.string())) })
     .superRefine((value, ctx) => {
       // Cada adulto lleva a lo sumo un infante (lo exige la API).
       const seen = new Map<string, number>();
@@ -119,30 +146,35 @@ export function withSharedContact(values: PassengersFormValues): PassengersFormV
 }
 
 /** Del formulario al pedido de la API: ids PAX1…, cada infante con el adulto elegido, fechas ISO. */
-export function toBookingPassengers(input: PassengersFormValues): BookingPassenger[] {
+export function toBookingPassengers(input: PassengersFormValues, toAssigned: ToAssignedSeats = assignedInOrder): BookingPassenger[] {
   const values = withSharedContact(input);
-  return values.passengers.map((p, i) => ({
-    id: `PAX${i + 1}`,
-    type: p.type,
-    ...(p.type === 'INFANT' && p.adultIndex !== '' ? { associatedAdultId: `PAX${Number(p.adultIndex) + 1}` } : {}),
-    firstName: p.firstName.trim(),
-    lastName: p.lastName.trim(),
-    documentType: p.documentType,
-    documentNumber: compactDocument(p.documentNumber),
-    nationality: p.nationality.trim().toUpperCase(),
-    ...(p.documentType === 'PASSPORT' ? { documentExpiryDate: displayToIso(p.documentExpiryDate) } : {}),
-    birthDate: displayToIso(p.birthDate),
-    gender: p.gender as BookingPassenger['gender'],
-    email: p.email.trim().toLowerCase(),
-    phone: `+593${p.phone.trim()}`,
-  }));
+  return values.passengers.map((p, i) => {
+    const seats = p.type === 'INFANT' ? [] : toAssigned(values.seats ?? {}, passengerIdAt(i));
+    return {
+      id: passengerIdAt(i),
+      type: p.type,
+      ...(p.type === 'INFANT' && p.adultIndex !== '' ? { associatedAdultId: `PAX${Number(p.adultIndex) + 1}` } : {}),
+      firstName: p.firstName.trim(),
+      lastName: p.lastName.trim(),
+      documentType: p.documentType,
+      documentNumber: compactDocument(p.documentNumber),
+      nationality: p.nationality.trim().toUpperCase(),
+      ...(p.documentType === 'PASSPORT' ? { documentExpiryDate: displayToIso(p.documentExpiryDate) } : {}),
+      birthDate: displayToIso(p.birthDate),
+      gender: p.gender as BookingPassenger['gender'],
+      email: p.email.trim().toLowerCase(),
+      phone: `+593${p.phone.trim()}`,
+      // Sin asientos elegidos se omite el campo: la reserva asigna automáticamente.
+      ...(seats.length > 0 ? { seats } : {}),
+    };
+  });
 }
 
 /**
  * Valores iniciales: el borrador guardado si coincide con los pasajeros de la selección; si no,
  * vacíos, con el correo de la cuenta en el contacto del primer pasajero (no se pide dos veces).
  */
-export function initialPassengerValues(types: PassengerType[], draft: BookingPassenger[], accountEmail = ''): PassengersFormValues {
+export function initialPassengerValues(types: PassengerType[], draft: BookingPassenger[], accountEmail = '', segmentIds: readonly string[] = []): PassengersFormValues {
   const usable = draft.length === types.length && draft.every((d, i) => d.type === types[i]);
   let infants = 0;
   const passengers = types.map((type, i): PassengerFormValue => {
@@ -164,8 +196,9 @@ export function initialPassengerValues(types: PassengerType[], draft: BookingPas
       phone: d?.phone.replace(/^\+593/, '') ?? '',
     };
   });
-  const sameContact = passengers.every((p) => p.email === passengers[0].email && p.phone === passengers[0].phone);
-  return { passengers, sameContact };
+  // Sin borrador, un solo contacto para todos (lo normal); con borrador, solo si los guardados coinciden.
+  const sameContact = !usable || passengers.every((p) => p.email === passengers[0].email && p.phone === passengers[0].phone);
+  return { passengers, sameContact, seats: usable ? seatsFromDraft(draft, segmentIds) : {} };
 }
 
 /** ¿El borrador guardado ya está completo y válido para esta selección? (al recargar en el paso 3). */

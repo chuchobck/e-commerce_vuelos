@@ -276,6 +276,10 @@ export class CheckoutFlow {
           await this.resync();
         } else if (this.state.step === 'expired') {
           this.endHold();
+        } else if (this.state.step === 'held') {
+          // Asientos u otros datos: se corrigen y se paga con un pedido nuevo (otra clave, otra referencia).
+          this.pending = null;
+          this.deps.attempt.clear();
         }
       } finally {
         this.paying = null;

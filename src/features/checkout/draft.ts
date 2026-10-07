@@ -64,6 +64,26 @@ export function createAttemptStore(storage: StorageLike | null): AttemptStore {
   };
 }
 
+const isText = (v: unknown): v is string => typeof v === 'string';
+
+/**
+ * Un borrador viejo o dañado no debe romper la pantalla: se descartan los asientos que no tengan el
+ * formato por tramo (`seats: { segmentId, seatNumber }[]`, p. ej. el `seatId` suelto del formato
+ * antiguo) y, si un pasajero no se reconoce, se ignora todo el borrador.
+ */
+export function sanitizeDraft(raw: unknown): BookingPassenger[] {
+  if (!Array.isArray(raw)) return [];
+  const out: BookingPassenger[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return [];
+    const { seatId: _legacy, seats, ...rest } = item as BookingPassenger & { seatId?: unknown };
+    if (!isText(rest.id) || !isText(rest.type) || !isText(rest.firstName) || !isText(rest.birthDate)) return [];
+    const valid = Array.isArray(seats) ? seats.filter((s) => s && isText(s.segmentId) && isText(s.seatNumber)) : [];
+    out.push(valid.length > 0 ? { ...rest, seats: valid } : rest);
+  }
+  return out;
+}
+
 export function createDraftStore(storage: StorageLike | null): PassengerDraftStore {
   let memory: BookingPassenger[] = [];
   return {
@@ -71,8 +91,7 @@ export function createDraftStore(storage: StorageLike | null): PassengerDraftSto
       try {
         const raw = storage?.getItem(KEY);
         if (!raw) return memory;
-        const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? (parsed as BookingPassenger[]) : memory;
+        return sanitizeDraft(JSON.parse(raw));
       } catch {
         return memory;
       }

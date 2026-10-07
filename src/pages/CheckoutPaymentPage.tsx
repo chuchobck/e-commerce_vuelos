@@ -41,10 +41,16 @@ export function CheckoutPaymentPage() {
 
   // Al recargar en este paso, los pasajeros guardados siguen valiendo si están completos.
   useEffect(() => {
-    if (state.step === 'held' && !state.passengersReady && selection && isDraftComplete(selection, checkout.passengersDraft())) {
+    // (No con un error de asiento pendiente: ese se corrige primero en el paso 2.)
+    if (state.step === 'held' && !state.passengersReady && !state.bookingError && selection && isDraftComplete(selection, checkout.passengersDraft())) {
       checkout.setPassengers(checkout.passengersDraft(), true);
     }
   }, [state, selection]);
+
+  // Asiento ocupado o de otra cabina: se corrige en el paso 2 (el hold sigue vivo).
+  useEffect(() => {
+    if (state.step === 'held' && state.bookingError) navigate(routes.checkoutDetails(), { replace: true });
+  }, [state, navigate]);
 
   // Hay reserva (confirmada, en proceso o fallida): la confirmación la muestra.
   useEffect(() => {
@@ -102,7 +108,7 @@ export function CheckoutPaymentPage() {
       }
     >
       <CheckoutSteps current={2} />
-      <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} onCancel={cancel} />}>
+      <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} passengers={checkout.passengersDraft()} onCancel={cancel} />}>
         <HoldNotice
           state={state}
           onSearchAgain={() => navigate(routes.results(checkout.searchAgain() ?? selection.searchQuery))}

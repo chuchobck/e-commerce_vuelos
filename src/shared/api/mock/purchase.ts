@@ -13,6 +13,7 @@ import { ApiError } from '../errors';
 import { mapOffer } from '../mapping';
 import { HOLD_MINUTES } from './data/fares';
 import { mockOfferFromId, mockSeatMap } from './generators';
+import { markSeatsTaken, simulatedSeats } from './seatSimulation';
 import { randomCode } from './random';
 import type { MockDb, StoredBooking, StoredHold } from './store';
 
@@ -144,6 +145,64 @@ function checkPassengers(passengers: PassengerItemDto[], hold: StoredHold, first
   });
 }
 
+const SEAT_FORMAT = /^[1-9][0-9]{0,2}[A-Z]$/;
+
+/** Asientos de un tramo ocupados por reservas (la API real ocupa solo esos) y por la simulación de la demo. */
+export function takenSeats(db: MockDb, segmentId: string): Set<string> {
+  const taken = new Set(simulatedSeats(segmentId));
+  for (const b of db.bookings) {
+    if (b.dto.status === 'CANCELLED' || b.dto.status === 'FAILED') continue;
+    for (const p of b.dto.passengers ?? []) for (const s of p.assignedSeats ?? []) if (s.segmentId === segmentId) taken.add(s.seatNumber);
+  }
+  return taken;
+}
+
+/** El mapa de un tramo como lo daría la API: todo libre salvo lo reservado. */
+export function seatMapOf(db: MockDb, offerId: string, segmentId: string) {
+  return markSeatsTaken(mockSeatMap(offerId, segmentId), takenSeats(db, segmentId));
+}
+
+type Cabin = NonNullable<ReturnType<typeof mockSeatMap>['cabins']>[number];
+
+/**
+ * Los asientos elegidos, con los errores reales de la API (verificados contra el backend local):
+ * formato 400, repetido entre pasajeros 400, infante 422 INFANT_SEAT_NOT_ALLOWED, tramo ajeno 422,
+ * asiento que no existe 422, otra cabina 422 SEAT_CABIN_MISMATCH y ocupado 409 SEAT_TAKEN (sin
+ * decir cuál en `invalidParams`: solo el detalle).
+ */
+function checkSeats(db: MockDb, offerId: string, passengers: PassengerItemDto[], cabinOf: Map<string, string>) {
+  const chosen = new Map<string, number>();
+  passengers.forEach((p, i) => {
+    const field = `passengers[${i}].assignedSeats`;
+    (p.assignedSeats ?? []).forEach((a, j) => {
+      if (!SEAT_FORMAT.test(a.seatNumber)) throw problem(400, 'VALIDATION_FAILED', `${field}[${j}].seatNumber: seatNumber must be a row and a letter (12A)`, `${field}[${j}].seatNumber`, 'seatNumber must be a row and a letter (12A)');
+      if (p.passengerType === 'INFANT') throw problem(422, 'INFANT_SEAT_NOT_ALLOWED', `${field}: an infant travels on an adult's lap and has no seat`, field, 'infant');
+      if (!cabinOf.has(a.segmentId)) throw problem(422, 'VALIDATION_FAILED', `${field}[${j}].segmentId: is not a segment of the hold`, `${field}[${j}].segmentId`, 'is not a segment of the hold');
+      const key = `${a.segmentId}#${a.seatNumber}`;
+      if (chosen.has(key)) throw problem(400, 'VALIDATION_FAILED', `passengers[${i}].assignedSeats[${j}].seatNumber: is chosen by another passenger`, `passengers[${i}].assignedSeats[${j}].seatNumber`, 'is chosen by another passenger');
+      chosen.set(key, i);
+    });
+  });
+  for (const key of chosen.keys()) {
+    const [segmentId, seatNumber] = key.split('#');
+    const cabins: Cabin[] = mockSeatMap(offerId, segmentId).cabins ?? [];
+    const cabin = cabins.find((c) => c.rows?.some((r) => r.seats?.some((s) => s.seatNumber === seatNumber)));
+    const field = `passengers[${chosen.get(key)}].assignedSeats`;
+    if (!cabin) throw problem(422, 'VALIDATION_FAILED', `${field}: seat ${seatNumber} does not exist on this aircraft`, field, 'seat does not exist on this aircraft');
+    if (cabin.cabinClass !== cabinOf.get(segmentId)) {
+      throw problem(422, 'SEAT_CABIN_MISMATCH', `${field}: seat ${seatNumber} is in ${cabin.cabinClass}, but the hold is for ${cabinOf.get(segmentId)}`, field, 'seat is in another cabin');
+    }
+    if (takenSeats(db, segmentId).has(seatNumber)) throw problem(409, 'SEAT_TAKEN', `Seat ${seatNumber} is already taken on this flight`);
+  }
+}
+
+/** El primer asiento libre de la cabina (por fila y letra), sin contar los ya elegidos en esta reserva. */
+function firstFreeSeat(db: MockDb, offerId: string, segmentId: string, cabin: string, exclude: Set<string>): string {
+  const taken = takenSeats(db, segmentId);
+  const seats = (mockSeatMap(offerId, segmentId).cabins ?? []).filter((c) => c.cabinClass === cabin).flatMap((c) => c.rows ?? []).flatMap((r) => r.seats ?? []);
+  return seats.find((s) => s.seatNumber && !taken.has(s.seatNumber) && !exclude.has(s.seatNumber))?.seatNumber ?? '';
+}
+
 function issueTickets(booking: BookingDetailDto, now: number) {
   booking.tickets = (booking.tickets ?? []).map((t, i) => ({
     ...t,
@@ -206,16 +265,19 @@ export function createBooking(db: MockDb, ownerId: string, body: BookingRequestD
 
   const bookingId = crypto.randomUUID();
   const segments = itineraries.flatMap((it) => it.segments);
-  const passengers: PassengerItemDto[] = body.passengers.map((p, i) => {
+  // La cabina de cada tramo es la de la tarifa elegida en su itinerario.
+  const cabinOf = new Map(hold.request.itinerarySelections.flatMap((sel, i) => itineraries[i].segments.map((s) => [s.segmentId, sel.cabinClass] as const)));
+  checkSeats(db, hold.request.offerId, body.passengers, cabinOf);
+  // Asignación automática: el primer libre de la cabina, sin pisar lo que eligieron otros en esta reserva.
+  const reserved = new Map<string, Set<string>>(segments.map((s) => [s.segmentId, new Set(body.passengers.flatMap((p) => (p.assignedSeats ?? []).filter((a) => a.segmentId === s.segmentId).map((a) => a.seatNumber)))]));
+  const passengers: PassengerItemDto[] = body.passengers.map((p) => {
     if (p.passengerType === 'INFANT') return { ...p, assignedSeats: [], extraBaggage: [] };
     const seats = segments.map((s) => {
       const chosen = p.assignedSeats?.find((a) => a.segmentId === s.segmentId);
       if (chosen) return chosen;
-      const free = (mockSeatMap(hold.request.offerId, s.segmentId).cabins ?? [])
-        .flatMap((c) => c.rows ?? [])
-        .flatMap((r) => r.seats ?? [])
-        .filter((seat) => seat.isAvailable);
-      return { segmentId: s.segmentId, seatNumber: free[i]?.seatNumber ?? `${14 + i}C` };
+      const seatNumber = firstFreeSeat(db, hold.request.offerId, s.segmentId, cabinOf.get(s.segmentId)!, reserved.get(s.segmentId)!);
+      reserved.get(s.segmentId)!.add(seatNumber);
+      return { segmentId: s.segmentId, seatNumber };
     });
     return { ...p, assignedSeats: seats, extraBaggage: [] };
   });

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { paths, routes } from '@/app/routes';
 import { AuthProvider, createLocalLock, createTokenStore, SessionManager, type AuthApi } from '@/features/auth';
 import { checkout, saveSelection, type CheckoutSelection } from '@/features/checkout';
-import { ApiError, flightsApi, type AuthTokens, type Hold, type User } from '@/shared/api';
+import { ApiError, flightsApi, type AuthTokens, type Hold, type SeatMap, type User } from '@/shared/api';
 import bookingConfirmed from '@/shared/api/__fixtures__/booking-confirmed.json';
 import searchFixture from '@/shared/api/__fixtures__/search-uio-gps-rt.json';
 import type { BookingDetailDto, SearchResponseDto } from '@/shared/api/contract';
@@ -197,6 +197,122 @@ describe('camino feliz con sesión', () => {
     expect(input(/^Número de documento/).value).toBe('1710034065');
     expect(input(/^Fecha de nacimiento/).value).toBe('15/04/1990');
     expect(flightsApi.createHold).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('asientos (opcional) en el paso 2', () => {
+  const [seg1, seg2] = selected().outbound.itinerary.segments.map((x) => x.id);
+  let takenNow: Record<string, string[]>;
+  /** Un mapa sencillo de economía (filas 10 a 12); `takenNow` dice qué asientos están ocupados por tramo. */
+  const mapOf = (segmentId: string): SeatMap => ({
+    segmentId,
+    cabins: [
+      {
+        cabinClass: 'ECONOMY',
+        rows: [10, 11, 12].map((rowNumber) => ({
+          rowNumber,
+          seats: [...'ABCDEF'].map((l) => ({ seatNumber: `${rowNumber}${l}`, isAvailable: !(takenNow[segmentId] ?? []).includes(`${rowNumber}${l}`), characteristics: [] })),
+        })),
+      },
+    ],
+  });
+  const seat = (n: string) => document.querySelector(`[data-seat="${n}"]`) as HTMLElement;
+  const payButton = () => screen.getByRole('button', { name: /^Pagar \$/ });
+
+  beforeEach(() => {
+    takenNow = {};
+    vi.spyOn(flightsApi, 'getSeatMap').mockImplementation(async (_offer, segmentId) => mapOf(segmentId));
+  });
+
+  it('nace plegado con "asignaremos automáticamente": sin abrirlo no se pide ningún mapa y se reserva sin asientos', async () => {
+    saveSelection(selected());
+    renderApp(paths.checkoutDetails);
+    await fillPassenger();
+    const toggle = screen.getByRole('button', { name: f.seatsChoose });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByText(f.seatsAutoText)).toBeTruthy();
+    expect(flightsApi.getSeatMap).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: f.saveAndContinue }));
+    await screen.findByLabelText(/^Número de tarjeta/);
+    fillCard('4111111111111111');
+    fireEvent.click(payButton());
+    await screen.findByTestId('booking-code');
+    expect(vi.mocked(flightsApi.createBooking).mock.calls[0][0].passengers[0]).not.toHaveProperty('seats');
+    expect(flightsApi.getSeatMap).not.toHaveBeenCalled();
+  });
+
+  it('un asiento por tramo viaja como assignedSeats en el orden del viaje y se ve en el panel y en la revisión', async () => {
+    saveSelection(selected());
+    renderApp(paths.checkoutDetails);
+    await fillPassenger();
+    fireEvent.click(screen.getByRole('button', { name: f.seatsChoose }));
+    await screen.findByRole('tablist');
+    await waitFor(() => expect(seat('11A')).toBeTruthy());
+    fireEvent.click(seat('11A'));
+    fireEvent.click(screen.getAllByRole('tab')[1]);
+    await waitFor(() => expect(seat('12C')).toBeTruthy());
+    fireEvent.click(seat('12C'));
+    await waitFor(() => expect(screen.getByRole('complementary').textContent).toMatch(/GYE → GPS: 12C/));
+    expect(screen.getByRole('complementary').textContent).toMatch(/UIO → GYE: 11A/);
+    fireEvent.click(screen.getByRole('button', { name: f.saveAndContinue }));
+    await screen.findByLabelText(/^Número de tarjeta/);
+    expect(within(screen.getByRole('heading', { name: p.reviewTitle }).closest('div')!).getByText(/UIO → GYE: 11A · GYE → GPS: 12C/)).toBeTruthy();
+    fillCard('4111111111111111');
+    fireEvent.click(payButton());
+    await screen.findByTestId('booking-code');
+    expect(vi.mocked(flightsApi.createBooking).mock.calls[0][0].passengers[0].seats).toEqual([
+      { segmentId: seg1, seatNumber: '11A' },
+      { segmentId: seg2, seatNumber: '12C' },
+    ]);
+  });
+
+  it('SEAT_TAKEN al pagar: vuelve al paso 2 con aviso y el selector abierto; quita solo el asiento ocupado y conserva el otro', async () => {
+    saveSelection(selected());
+    renderApp(paths.checkoutDetails);
+    await fillPassenger();
+    fireEvent.click(screen.getByRole('button', { name: f.seatsChoose }));
+    await screen.findByRole('tablist');
+    await waitFor(() => expect(seat('11A')).toBeTruthy());
+    fireEvent.click(seat('11A'));
+    fireEvent.click(screen.getAllByRole('tab')[1]);
+    await waitFor(() => expect(seat('12C')).toBeTruthy());
+    fireEvent.click(seat('12C'));
+    await waitFor(() => expect(checkout.passengersDraft()[0]?.seats).toHaveLength(2));
+    fireEvent.click(screen.getByRole('button', { name: f.saveAndContinue }));
+    await screen.findByLabelText(/^Número de tarjeta/);
+
+    // Otra persona se lleva 11A en el primer tramo; la API responde 409 sin decir cuál.
+    takenNow[seg1] = ['11A'];
+    vi.mocked(flightsApi.createBooking).mockRejectedValueOnce(new ApiError({ status: 409, code: 'SEAT_TAKEN' }));
+    fillCard('4111111111111111');
+    fireEvent.click(payButton());
+
+    expect(await screen.findByText(f.seatsTakenTitle)).toBeTruthy();
+    expect(screen.getByText(f.seatsTakenText)).toBeTruthy();
+    expect(await screen.findByRole('tablist')).toBeTruthy();
+    await waitFor(() => expect(checkout.passengersDraft()[0]?.seats).toEqual([{ segmentId: seg2, seatNumber: '12C' }]));
+    await waitFor(() => expect(screen.getByRole('complementary').textContent).not.toMatch(/UIO → GYE: 11A/));
+    expect(screen.getByRole('complementary').textContent).toMatch(/GYE → GPS: 12C/);
+    // El hold sigue vivo: no se aparta otro.
+    expect(flightsApi.createHold).toHaveBeenCalledTimes(1);
+
+    // Elige otro asiento y paga: el pedido es nuevo y lleva los dos asientos.
+    fireEvent.click(screen.getAllByRole('tab')[0]);
+    await waitFor(() => expect(seat('11B')).toBeTruthy());
+    fireEvent.click(seat('11B'));
+    await waitFor(() => expect(checkout.passengersDraft()[0]?.seats).toHaveLength(2));
+    fireEvent.click(screen.getByRole('button', { name: f.saveAndContinue }));
+    await screen.findByLabelText(/^Número de tarjeta/);
+    fillCard('4111111111111111');
+    fireEvent.click(payButton());
+    await screen.findByTestId('booking-code');
+    const calls = vi.mocked(flightsApi.createBooking).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[1][0].passengers[0].seats).toEqual([
+      { segmentId: seg1, seatNumber: '11B' },
+      { segmentId: seg2, seatNumber: '12C' },
+    ]);
+    expect(calls[1][1]).not.toBe(calls[0][1]);
   });
 });
 

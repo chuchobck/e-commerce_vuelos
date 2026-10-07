@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowRight } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Controller, useForm, useWatch, type FieldErrors, type Resolver } from 'react-hook-form';
 import type { BookingPassenger, FieldError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
@@ -11,6 +11,7 @@ import { Button, Checkbox, ErrorSummary, Field, Input, Select, type SummaryError
 import {
   initialPassengerValues,
   isEcuadorianId,
+  passengerIdAt,
   passengersSchema,
   passengerTypes,
   sanitizeDocument,
@@ -18,8 +19,12 @@ import {
   tripDates,
   withSharedContact,
   type PassengersFormValues,
+  type SeatChoice,
+  type ToAssignedSeats,
 } from './passengers';
 import { apiFieldToForm } from './passengerFields';
+import { seatLines } from './seatLines';
+import { SeatsBlock } from './SeatsBlock';
 import type { CheckoutSelection } from './selection';
 
 const f = es.checkoutForms;
@@ -54,8 +59,23 @@ function summaryOf(errors: FieldErrors<PassengersFormValues>, count: number): Su
   return out;
 }
 
+/**
+ * Elegir asientos (opcional). El selector vive en `features/seats` y un módulo de `features` no
+ * importa de otro: la página lo pone aquí. El formulario solo guarda lo elegido y lo convierte a
+ * `assignedSeats` por tramo con la conversión del selector (`toAssignedSeats`).
+ */
+export interface SeatsSlot {
+  /** Ids de los tramos del viaje (`segmentId`): lo que un borrador de otro vuelo ya no sirve. */
+  segmentIds: string[];
+  toAssigned: ToAssignedSeats;
+  /** Abrir el bloque (p. ej. tras un 409 de asiento ocupado). */
+  forceOpen?: boolean;
+  render: (api: { passengers: { id: string; name: string; type: PassengersFormValues['passengers'][number]['type'] }[]; value: SeatChoice; onChange: (next: SeatChoice) => void }) => ReactNode;
+}
+
 interface PassengersFormProps {
   selection: CheckoutSelection;
+  seats?: SeatsSlot;
   draft: BookingPassenger[];
   accountEmail?: string;
   /** Campos que la API rechazó al pagar (p. ej. "passengers[0].birthDate"). */
@@ -70,7 +90,7 @@ interface PassengersFormProps {
  * del campo y al enviar, sin borrar lo escrito: errores bajo cada campo, resumen al inicio y foco al
  * primer campo con error. El correo de la cuenta precarga el contacto del primer pasajero.
  */
-export function PassengersForm({ selection, draft, accountEmail, rejected, onDraft, onDone }: PassengersFormProps) {
+export function PassengersForm({ selection, seats, draft, accountEmail, rejected, onDraft, onDone }: PassengersFormProps) {
   const types = useMemo(() => passengerTypes(selection.passengers), [selection.passengers]);
   const schema = useMemo(() => passengersSchema(tripDates(selection)), [selection]);
   const resolver = useMemo<Resolver<PassengersFormValues>>(() => (values, context, options) => zodResolver(schema)(withSharedContact(values), context, options), [schema]);
@@ -87,7 +107,7 @@ export function PassengersForm({ selection, draft, accountEmail, rejected, onDra
     formState: { errors },
   } = useForm<PassengersFormValues>({
     resolver,
-    defaultValues: initialPassengerValues(types, draft, accountEmail),
+    defaultValues: initialPassengerValues(types, draft, accountEmail, seats?.segmentIds),
     mode: 'onTouched',
     shouldFocusError: true,
   });
@@ -96,18 +116,20 @@ export function PassengersForm({ selection, draft, accountEmail, rejected, onDra
   // Borrador: con una pausa corta tras escribir, y al salir de la pantalla (salvo al continuar).
   const latest = useRef(values);
   latest.current = values;
+  const toAssignedRef = useRef(seats?.toAssigned);
+  toAssignedRef.current = seats?.toAssigned;
   const onDraftRef = useRef(onDraft);
   onDraftRef.current = onDraft;
   const signature = JSON.stringify(values);
   useEffect(() => {
     const id = setTimeout(() => {
-      if (!submitted.current) onDraftRef.current(toBookingPassengers(latest.current));
+      if (!submitted.current) onDraftRef.current(toBookingPassengers(latest.current, toAssignedRef.current));
     }, DRAFT_DELAY_MS);
     return () => clearTimeout(id);
   }, [signature]);
   useEffect(
     () => () => {
-      if (!submitted.current) onDraftRef.current(toBookingPassengers(latest.current));
+      if (!submitted.current) onDraftRef.current(toBookingPassengers(latest.current, toAssignedRef.current));
     },
     [],
   );
@@ -122,6 +144,9 @@ export function PassengersForm({ selection, draft, accountEmail, rejected, onDra
 
   const summary = attempts > 0 ? summaryOf(errors, types.length) : [];
   const adults = types.flatMap((t, i) => (t === 'ADULT' ? [i] : []));
+  // Lo que lleva cada pasajero en cada tramo (para el bloque de asientos y la línea de cada pasajero).
+  const draftPassengers = toBookingPassengers(values, seats?.toAssigned);
+  const lines = seatLines(draftPassengers, selection.outbound, selection.inbound);
   const nameOf = (i: number) => [values?.passengers?.[i]?.firstName, values?.passengers?.[i]?.lastName].filter(Boolean).join(' ');
 
   /** "Adulto 1", "Adulto 2", "Niño 1", "Infante 1": se numera por tipo. */
@@ -134,7 +159,7 @@ export function PassengersForm({ selection, draft, accountEmail, rejected, onDra
         void handleSubmit(
           (v) => {
             submitted.current = true;
-            onDone(toBookingPassengers(v));
+            onDone(toBookingPassengers(v, seats?.toAssigned));
           },
           () => setAttempts((n) => n + 1),
         )(e)
@@ -265,12 +290,22 @@ export function PassengersForm({ selection, draft, accountEmail, rejected, onDra
               <p className="text-sm text-muted">{f.infantNoSeat}</p>
             ) : (
               <p className="text-sm text-muted">
-                <span className="font-bold text-foreground">{f.seat}:</span> {f.seatAuto} <span>{f.seatSoon}</span>
+                <span className="font-bold text-foreground">{f.seat}:</span> {lines[i]?.text}
               </p>
             )}
           </fieldset>
         );
       })}
+
+      {seats ? (
+        <SeatsBlock lines={lines} forceOpen={seats.forceOpen}>
+          {seats.render({
+            passengers: types.map((type, i) => ({ id: passengerIdAt(i), type, name: nameOf(i) || `${TYPE_LABEL[type]} ${ordinal(i)}` })),
+            value: values?.seats ?? {},
+            onChange: (next) => setValue('seats', next, { shouldDirty: true }),
+          })}
+        </SeatsBlock>
+      ) : null}
 
       <div className="flex justify-end">
         <Button type="submit" size="lg">
