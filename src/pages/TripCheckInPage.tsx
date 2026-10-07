@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { routes } from '@/app/routes';
-import { BoardingPassCard } from '@/features/checkin';
+import { BoardingPassCard, checkInStatus } from '@/features/checkin';
 import { TripFallback } from '@/features/trips';
 import { flightsApi, type CheckInResult } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
@@ -65,14 +65,14 @@ export function TripCheckInPage() {
       </section>
     );
   } else {
-    const blocked = booking.status === 'CANCELLED' ? c.tripCancelled : booking.status === 'CHECKED_IN' ? c.done : null;
+    const { available, reason } = checkInStatus(booking);
     content = (
       <>
         <Card className="flex flex-col gap-6">
           <TripSummary outbound={booking.outbound} inbound={booking.inbound} />
-          {blocked ? (
+          {!available ? (
             <Alert variant="info">
-              <p>{blocked}</p>
+              <p>{reason}</p>
             </Alert>
           ) : (
             <>

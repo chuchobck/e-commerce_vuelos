@@ -10,7 +10,7 @@ import { LoginSchema, type LoginInput } from '@/features/auth';
 import { errorMessage } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { useErrorSummary } from '@/shared/lib/useErrorSummary';
-import { Alert, Button, Card, ErrorSummary, Field, Input, PasswordInput, toast } from '@/shared/ui';
+import { Alert, Button, Card, ErrorSummary, Field, Input, MockOnly, PasswordInput, toast } from '@/shared/ui';
 
 const a = es.auth;
 
@@ -76,7 +76,9 @@ export function LoginPage() {
             <LogIn aria-hidden="true" />
             {a.submitLogin}
           </Button>
-          <p className="text-sm text-muted">{a.demoHint}</p>
+          <MockOnly>
+            <p className="text-sm text-muted">{a.demoHint}</p>
+          </MockOnly>
         </form>
       </Card>
       <p className="text-center">

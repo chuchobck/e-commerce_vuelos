@@ -1,3 +1,5 @@
+import { es } from '@/shared/i18n';
+import { checkInWindow } from '@/shared/lib/checkin';
 import type { FlightsApi } from '../FlightsApi';
 import { ApiError } from '../errors';
 import type {
@@ -243,14 +245,9 @@ export class MockFlightsApi implements FlightsApi {
     await simulate('checkIn', [409, 503]);
     const booking = this.ownedBooking(request.bookingId, token);
     if (booking.status === 'CANCELLED') throw new ApiError(409, 'CONFLICT', 'La reserva está cancelada');
-    const dep = new Date(booking.outbound.offer.segments[0].departureTime).getTime();
-    const diff = dep - Date.now();
-    if (diff > 24 * 3_600_000) {
-      throw new ApiError(409, 'CHECKIN_WINDOW', 'El check-in abre 24 horas antes de la salida. Vuelve más cerca de la fecha de tu vuelo.');
-    }
-    if (diff < 3_600_000) {
-      throw new ApiError(409, 'CHECKIN_WINDOW', 'El check-in en línea cerró 1 hora antes de la salida. Acércate al mostrador del aeropuerto.');
-    }
+    const checkin = checkInWindow(booking.outbound.offer.segments[0].departureTime);
+    if (checkin.status === 'not-open') throw new ApiError(409, 'CHECKIN_WINDOW', es.checkin.notOpenError);
+    if (checkin.status === 'closed') throw new ApiError(409, 'CHECKIN_WINDOW', es.checkin.closed);
     this.commit(() => {
       booking.status = 'CHECKED_IN';
       booking.passengers.forEach((p, i) => {

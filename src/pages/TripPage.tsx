@@ -2,20 +2,50 @@ import { ArrowLeft, Ban, CalendarCheck, CalendarClock, Luggage, QrCode } from 'l
 import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
+import { checkInStatus } from '@/features/checkin';
+import { FlightStatusCard } from '@/features/flight-status';
 import { BookingStatusBadge, TripFallback } from '@/features/trips';
 import { flightsApi, type Booking } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { formatUSD } from '@/shared/lib/format';
 import { useAsync } from '@/shared/lib/useAsync';
-import { Button, Card, CardTitle, TripSummary } from '@/shared/ui';
+import { Button, Card, CardTitle, ErrorState, LoadingState, TripSummary } from '@/shared/ui';
 
 const t = es.trip;
+
+/**
+ * Check-in: enlace si la ventana está abierta; si no, botón deshabilitado con el motivo
+ * (cuándo abre o que ya cerró) escrito al lado y asociado con aria-describedby.
+ */
+function CheckInAction({ booking }: { booking: Booking }) {
+  const { available, reason } = checkInStatus(booking);
+  if (available) {
+    return (
+      <Button asChild fullWidth>
+        <Link to={routes.tripCheckIn(booking.id)}>
+          <CalendarCheck aria-hidden="true" />
+          {t.checkIn}
+        </Link>
+      </Button>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <Button fullWidth disabled aria-describedby="checkin-reason">
+        <CalendarCheck aria-hidden="true" />
+        {t.checkIn}
+      </Button>
+      <p id="checkin-reason" className="text-sm text-muted">
+        {reason}
+      </p>
+    </div>
+  );
+}
 
 /** Acciones de postventa disponibles según el estado de la reserva. */
 function TripActions({ booking }: { booking: Booking }) {
   if (booking.status === 'CANCELLED') return null;
-  const actions = [
-    booking.status === 'CONFIRMED' ? { to: routes.tripCheckIn(booking.id), label: t.checkIn, icon: CalendarCheck } : null,
+  const links = [
     booking.status === 'CHECKED_IN' ? { to: routes.tripPasses(booking.id), label: t.passes, icon: QrCode } : null,
     { to: routes.tripBaggage(booking.id), label: t.baggage, icon: Luggage },
     { to: routes.tripDateChange(booking.id), label: t.dateChange, icon: CalendarClock },
@@ -26,9 +56,14 @@ function TripActions({ booking }: { booking: Booking }) {
     <Card className="flex flex-col gap-4">
       <CardTitle>{t.manageTitle}</CardTitle>
       <ul className="flex flex-col gap-2">
-        {actions.map(({ to, label, icon: Icon }, i) => (
+        {booking.status === 'CONFIRMED' ? (
+          <li>
+            <CheckInAction booking={booking} />
+          </li>
+        ) : null}
+        {links.map(({ to, label, icon: Icon }) => (
           <li key={to}>
-            <Button asChild variant={i === 0 ? 'primary' : 'secondary'} fullWidth>
+            <Button asChild variant="secondary" fullWidth>
               <Link to={to}>
                 <Icon aria-hidden="true" />
                 {label}
@@ -38,6 +73,28 @@ function TripActions({ booking }: { booking: Booking }) {
         ))}
       </ul>
     </Card>
+  );
+}
+
+/** Estado del vuelo de ida con los datos del viaje: el viajero no tiene que escribir el número de vuelo. */
+function TripFlightStatus({ booking }: { booking: Booking }) {
+  const segment = booking.outbound.offer.segments[0];
+  const date = segment.departureTime.slice(0, 10);
+  const status = useAsync(() => flightsApi.getFlightStatus(segment.flightNumber, date), [segment.flightNumber, date]);
+
+  return (
+    <section aria-labelledby="trip-status-title" className="flex flex-col gap-4">
+      <h2 id="trip-status-title" className="text-2xl">
+        {t.flightStatusTitle}
+      </h2>
+      {status.status === 'success' ? (
+        <FlightStatusCard status={status.data} />
+      ) : status.status === 'error' ? (
+        <ErrorState error={status.error} onRetry={() => void status.execute()} headingLevel="h3" />
+      ) : (
+        <LoadingState label={t.flightStatusLoading} />
+      )}
+    </section>
   );
 }
 
@@ -70,6 +127,8 @@ export function TripPage() {
           </div>
 
           <TripActions booking={data} />
+
+          {data.status !== 'CANCELLED' ? <TripFlightStatus booking={data} /> : null}
 
           <Card>
             <CardTitle className="mb-6">{t.passengers}</CardTitle>

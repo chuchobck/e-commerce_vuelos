@@ -8,6 +8,7 @@ export { ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogTitle, D
 export { ErrorSummary, type SummaryError } from './error-summary';
 export { CompactField, Field } from './field';
 export { Input } from './input';
+export { MockOnly } from './mock-only';
 export { NumericInput, QuantityInput } from './numeric-input';
 export { PasswordInput } from './password-input';
 export { RadioGroup, type RadioOption } from './radio-group';
