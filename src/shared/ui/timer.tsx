@@ -6,7 +6,7 @@ import { formatCountdown } from '@/shared/lib/format';
 import { Button } from './button';
 
 /** A partir de este umbral se muestra el aviso y se anuncia de forma asertiva. */
-export const TIMER_WARNING_SECONDS = 120;
+const TIMER_WARNING_SECONDS = 120;
 
 interface TimerProps {
   /** Fecha ISO en que termina el tiempo. */

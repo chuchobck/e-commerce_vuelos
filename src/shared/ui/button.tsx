@@ -4,7 +4,7 @@ import { forwardRef, type ButtonHTMLAttributes, type MouseEvent } from 'react';
 import { cn } from '@/shared/lib/cn';
 import { Spinner } from './spinner';
 
-export const buttonVariants = cva(
+const buttonVariants = cva(
   [
     'inline-flex select-none items-center justify-center gap-2 rounded border-2 font-bold no-underline',
     'transition-colors duration-150 motion-reduce:transition-none',

@@ -15,7 +15,6 @@ export const es = {
     mainNav: 'Navegación principal',
     footerNav: 'Enlaces del pie de página',
     loading: 'Cargando…',
-    required: 'obligatorio',
     optional: 'opcional',
     close: 'Cerrar',
     notifications: 'Notificaciones',
@@ -71,13 +70,10 @@ export const es = {
     continue: 'Continuar',
     goHome: 'Ir al inicio',
     searchFlights: 'Buscar vuelos',
-    loading: 'Cargando',
     edit: 'Modificar',
     showPassword: 'Mostrar contraseña',
     passwordShown: 'Contraseña visible',
     perPerson: 'por persona',
-    from: 'Desde',
-    total: 'Total',
     openCalendar: 'Elegir {label} en el calendario',
     increase: 'Aumentar {label}',
     decrease: 'Disminuir {label}',
@@ -86,7 +82,6 @@ export const es = {
 
   states: {
     errorTitle: 'No pudimos completar la acción',
-    emptyTitle: 'No hay nada para mostrar',
   },
 
   errors: {
@@ -380,7 +375,6 @@ export const es = {
     view: 'Ver reserva {code}',
     listLabel: 'Lista de reservas',
     passengersCount: '{count} pasajero(s)',
-    demoHint: 'Cuenta de prueba con reservas: demo@quinde.ec',
   },
 
   checkin: {

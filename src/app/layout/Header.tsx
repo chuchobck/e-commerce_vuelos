@@ -9,7 +9,7 @@ import { Button, toast } from '@/shared/ui';
 import { MobileMenu } from './MobileMenu';
 import { NAV_ITEMS } from './nav-items';
 
-export function Logo() {
+function Logo() {
   return (
     <Link
       to="/"
@@ -22,7 +22,7 @@ export function Logo() {
   );
 }
 
-export function ThemeToggle() {
+function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   return (

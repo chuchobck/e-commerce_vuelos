@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { BookingPage } from '@/pages/BookingPage';
 import { CheckInPage } from '@/pages/CheckInPage';
 import { FlightStatusPage } from '@/pages/FlightStatusPage';
@@ -10,9 +10,13 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 import { PurchasePage } from '@/pages/PurchasePage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { ResultsPage } from '@/pages/ResultsPage';
-import { UiKitPage } from '@/pages/UiKitPage';
 import { RootLayout } from './layout/RootLayout';
 import { RouteErrorPage } from './layout/RouteErrorPage';
+
+/** Catálogo interno de componentes: solo existe en desarrollo. En producción la ruta cae en el 404 y el código ni se empaqueta. */
+const devRoutes: RouteObject[] = import.meta.env.DEV
+  ? [{ path: '/componentes', lazy: async () => ({ Component: (await import('@/pages/UiKitPage')).UiKitPage }) }]
+  : [];
 
 export const router = createBrowserRouter([
   {
@@ -29,7 +33,7 @@ export const router = createBrowserRouter([
       { path: '/ingresar', element: <LoginPage /> },
       { path: '/registrarse', element: <RegisterPage /> },
       { path: '/ayuda', element: <HelpPage /> },
-      { path: '/componentes', element: <UiKitPage /> },
+      ...devRoutes,
       { path: '*', element: <NotFoundPage /> },
     ],
   },

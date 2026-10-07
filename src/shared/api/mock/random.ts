@@ -1,6 +1,6 @@
 /** Utilidades deterministas para que el mock devuelva siempre los mismos vuelos por fecha. */
 
-export function hashString(value: string): number {
+function hashString(value: string): number {
   let h = 2166136261;
   for (let i = 0; i < value.length; i++) {
     h ^= value.charCodeAt(i);

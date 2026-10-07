@@ -42,7 +42,7 @@ function offsetOf(code: string) {
 }
 
 /** Vuelos directos de una ruta en una fecha (deterministas). */
-export function directSegments(origin: string, destination: string, date: string): FlightSegment[] {
+function directSegments(origin: string, destination: string, date: string): FlightSegment[] {
   const r = routeIndex(origin, destination);
   if (r < 0) return [];
   const rand = seeded(`${origin}-${destination}-${date}`);

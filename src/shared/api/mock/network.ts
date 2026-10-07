@@ -37,7 +37,7 @@ function forcedStatus(operation: string): SimulatedStatus | null {
 }
 
 /** Lanza ocasionalmente uno de los errores permitidos para la operación. */
-export function maybeFail(operation: string, allowed: SimulatedStatus[]): void {
+function maybeFail(operation: string, allowed: SimulatedStatus[]): void {
   const forced = forcedStatus(operation);
   if (forced) throw new ApiError(forced, CODES[forced], `Error simulado (${operation})`);
   if (allowed.length === 0 || Math.random() >= apiConfig.mockErrorRate) return;

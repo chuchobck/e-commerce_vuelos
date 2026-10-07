@@ -6,7 +6,7 @@ import { DB_VERSION, type MockDb } from './store';
 /** Hash de "quinde2026" (cuenta de prueba documentada en la pantalla de ingreso). */
 const DEMO_HASH = 'dc6515ef8bcbcf58716f4db57317cc72f1c5e0c95fdb6444455d887e648370f5';
 
-export const DEMO_USER_ID = 'usr_demo';
+const DEMO_USER_ID = 'usr_demo';
 
 const ONE_ADULT: PassengerCount = { adults: 1, children: 0, infants: 0 };
 

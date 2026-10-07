@@ -7,7 +7,7 @@ import { Button } from './button';
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
-export const DialogClose = DialogPrimitive.Close;
+const DialogClose = DialogPrimitive.Close;
 
 /**
  * Diálogo modal: atrapa el foco, se cierra con Esc y devuelve el foco al botón que lo abrió (Radix).
@@ -49,7 +49,7 @@ export function DialogDescription({ className, ...props }: ComponentPropsWithout
   return <DialogPrimitive.Description className={cn('text-base text-muted', className)} {...props} />;
 }
 
-export function DialogFooter({ className, ...props }: { className?: string; children: ReactNode }) {
+function DialogFooter({ className, ...props }: { className?: string; children: ReactNode }) {
   return <div className={cn('mt-2 flex flex-col-reverse gap-4 sm:flex-row sm:justify-end', className)} {...props} />;
 }
 

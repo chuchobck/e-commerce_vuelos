@@ -75,7 +75,7 @@ export function Field({ label, hint, error, required = false, id, className, lab
   );
 }
 
-export function FieldLabel({
+function FieldLabel({
   htmlFor,
   optional,
   className,

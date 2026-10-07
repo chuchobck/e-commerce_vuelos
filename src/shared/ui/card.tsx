@@ -6,10 +6,6 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>((
 ));
 Card.displayName = 'Card';
 
-export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('mb-4 flex flex-col gap-2', className)} {...props} />;
-}
-
 /** El nivel de encabezado lo decide quien usa la tarjeta (`as`) para respetar la jerarquía de la página. */
 export function CardTitle({
   as: Tag = 'h2',
@@ -17,8 +13,4 @@ export function CardTitle({
   ...props
 }: HTMLAttributes<HTMLHeadingElement> & { as?: 'h2' | 'h3' | 'h4' }) {
   return <Tag className={cn('text-xl font-bold', className)} {...props} />;
-}
-
-export function CardFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('mt-6 flex flex-wrap items-center gap-4', className)} {...props} />;
 }

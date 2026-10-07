@@ -5,7 +5,7 @@ import { Toaster } from '@/shared/ui';
 import { Footer } from './Footer';
 import { Header } from './Header';
 
-export const MAIN_ID = 'contenido';
+const MAIN_ID = 'contenido';
 /** Ancla del buscador de vuelos (atajo Alt + B). */
 export const SEARCH_ANCHOR_ID = 'buscador';
 
