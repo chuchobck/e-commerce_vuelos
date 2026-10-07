@@ -58,14 +58,21 @@ describe.skipIf(!IS_LOCAL)(`compra contra el backend local: ${IS_LOCAL ? BASE : 
 
   it('cuenta nueva e ingreso, y una búsqueda real para apartar', async () => {
     await api.register({ email, password });
-    token = (await api.login({ email, password })).accessToken;
+    // La suite de cuenta termina agotando a propósito el límite de ingreso (429): se espera lo que pida.
+    const login = () => api.login({ email, password });
+    const first = await login().catch((e: ApiError) => e);
+    if (first instanceof ApiError && first.status === 429) {
+      console.info(`[test:api] ingreso limitado por la suite anterior: espero ${first.retryAfter ?? 60} s`);
+      await new Promise((r) => setTimeout(r, ((first.retryAfter ?? 60) + 1) * 1000));
+    } else if (first instanceof Error) throw first;
+    token = first instanceof ApiError ? (await login()).accessToken : first.accessToken;
     const day = new Date(Date.now() + 10 * 86400e3).toISOString().slice(0, 10);
     const result = await api.search({ origin: 'UIO', destination: 'GYE', departDate: day, passengers: { adults: 1, children: 0, infants: 0 }, cabin: 'ECONOMY' });
     const offer = result.offers[0];
     expect(offer).toBeDefined();
     const fare = offer.itineraries[0].fares.find((f) => f.cabin === 'ECONOMY')!;
     request = { offerId: offer.id, itinerarySelections: [{ itineraryId: offer.itineraries[0].id, cabinClass: 'ECONOMY', fareBrand: fare.brand }], passengers: { adults: 1, children: 0, infants: 0 } };
-  });
+  }, 120_000);
 
   it('hold + GET hold: 15 minutos según el servidor', async () => {
     const hold = await api.createHold(request, key());
