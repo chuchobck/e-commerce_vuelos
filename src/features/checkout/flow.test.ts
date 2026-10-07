@@ -164,6 +164,9 @@ function setup({ storage = memoryStorage(), selection = SELECTION as CheckoutSel
         visible.push(fn);
         return () => visible.splice(visible.indexOf(fn), 1);
       },
+      sleep: async (ms) => {
+        now.t += ms;
+      },
     });
   return { flow: make(), reload: make, api, storage, now, intervals, visible, selection: () => saved, setSelection: (s: CheckoutSelection | null) => (saved = s) };
 }
@@ -341,11 +344,33 @@ describe('máquina de la compra: pago y resultado', () => {
     expect(s.flow.getState().step).toBe('confirmed');
   });
 
-  it('202: en proceso', async () => {
+  it('202: en proceso; se consulta con esperas crecientes hasta el estado final', async () => {
     const s = await ready();
     s.api.setOutcome(() => booking('PENDING_PAYMENT'));
+    vi.mocked(s.api.api.getBooking).mockResolvedValueOnce(booking('PENDING_PAYMENT')).mockResolvedValueOnce(booking('CONFIRMED'));
+    const seen: string[] = [];
+    s.flow.subscribe((st) => seen.push(st.step));
     await s.flow.pay('PAY-PEND-AAAA1111');
-    expect(s.flow.getState()).toMatchObject({ step: 'processing', gaveUp: false });
+    await vi.waitFor(() => expect(s.flow.getState()).toMatchObject({ step: 'confirmed' }));
+    expect(seen).toContain('processing');
+    expect(s.api.api.getBooking).toHaveBeenCalledTimes(2);
+    expect(s.api.calls.createBooking).toHaveLength(1);
+  });
+
+  it('202 que no termina en 2 minutos: "seguimos procesando", sin reintentar la compra', async () => {
+    const s = await ready();
+    s.api.setOutcome(() => booking('PENDING_PAYMENT'));
+    vi.mocked(s.api.api.getBooking).mockResolvedValue(booking('PENDING_PAYMENT'));
+    await s.flow.pay('PAY-PEND-AAAA1111');
+    await vi.waitFor(() => expect(s.flow.getState()).toMatchObject({ step: 'processing', gaveUp: true }));
+    expect(s.api.calls.createBooking).toHaveLength(1);
+  });
+
+  it('volver a entrar al paso tras reservar no borra el resultado', async () => {
+    const s = await ready();
+    await s.flow.pay('PAY-OK-AAAA1111');
+    await s.flow.start(signedIn);
+    expect(s.flow.getState().step).toBe('confirmed');
   });
 
   it('410 (hold vencido al pagar): "expired" sin perder los pasajeros', async () => {

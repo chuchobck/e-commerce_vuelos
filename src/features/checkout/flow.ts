@@ -15,6 +15,7 @@ import type { AttemptStore, PassengerDraftStore } from './draft';
 import { HOLD_RESYNC_MS, holdIsLive } from './holdClock';
 import type { IntentKeys } from './idempotency';
 import { holdOf, initialState, reduce, type CheckoutEvent, type CheckoutState } from './machine';
+import { isFinalBooking, pollBooking } from './polling';
 import type { CheckoutSelection } from './selection';
 
 export type CheckoutApi = Pick<FlightsApi, 'createHold' | 'getHold' | 'cancelHold' | 'createBooking' | 'getBooking'>;
@@ -39,6 +40,8 @@ export interface CheckoutDeps {
   every?: (fn: () => void, ms: number) => () => void;
   /** Avisa cuando la pestaña vuelve a estar visible; devuelve cómo dejar de escuchar. */
   onVisible?: (fn: () => void) => () => void;
+  /** Espera del seguimiento de una reserva en proceso (inyectable en pruebas). */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /** El pedido del hold con la forma del contrato: un itinerario y su familia por tramo. */
@@ -82,6 +85,8 @@ export class CheckoutFlow {
   private stopWatching: (() => void) | null = null;
   /** La selección con la que se trabaja: si el usuario elige otro vuelo, la compra empieza de cero. */
   private selectionId: string | undefined;
+  /** Seguimiento en curso de una reserva en proceso (se reemplaza o se corta al cambiar de compra). */
+  private following: string | null = null;
 
   constructor(private readonly deps: CheckoutDeps) {
     this.now = deps.now ?? Date.now;
@@ -132,7 +137,8 @@ export class CheckoutFlow {
     this.authorized = authorized;
     const selection = this.deps.selection.load();
     if (!selection) {
-      this.dispatch({ type: 'NO_SELECTION' });
+      // Tras reservar ya no hay selección: el resultado se conserva hasta salir de la pantalla.
+      if (!['confirmed', 'processing', 'failed'].includes(this.state.step)) this.dispatch({ type: 'NO_SELECTION' });
       return Promise.resolve();
     }
     if (selection.id !== this.selectionId) {
@@ -278,14 +284,36 @@ export class CheckoutFlow {
     return this.paying;
   }
 
-  /** La reserva existe: la compra terminó (el hold ya es de la reserva). */
+  /** La reserva existe: la compra terminó (el hold ya es de la reserva). Si sigue en proceso, se sigue. */
   private booked(booking: Booking): void {
-    this.dispatch({ type: 'BOOKED', booking });
     this.pending = null;
     this.deps.attempt.clear();
     this.deps.keys.clear();
     this.deps.draft.clear();
     this.deps.selection.clear();
+    void this.follow(booking);
+  }
+
+  /**
+   * Muestra una reserva y, si está en proceso (202), consulta GET /bookings/{id} con esperas
+   * crecientes hasta un estado final o hasta el tope (polling.ts). Nunca reintenta la compra.
+   * También lo usa la confirmación al llegar a ella de nuevo (p. ej. tras recargar).
+   */
+  async follow(booking: Booking, authorized?: Authorized): Promise<void> {
+    if (authorized) this.authorized = authorized;
+    this.dispatch({ type: 'BOOKED', booking });
+    if (isFinalBooking(booking) || this.following === booking.id) return;
+    this.following = booking.id;
+    const final = await pollBooking({
+      get: () => this.authorized(() => this.deps.api.getBooking(booking.id)),
+      sleep: this.deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))),
+      now: this.now,
+      cancelled: () => this.following !== booking.id,
+    });
+    if (this.following !== booking.id) return;
+    this.following = null;
+    if (final) this.dispatch({ type: 'BOOKED', booking: final });
+    else this.dispatch({ type: 'POLL_GAVE_UP' });
   }
 
   /** El hold ya no sirve: el mismo vuelo necesitará un hold nuevo (y una clave nueva). */
@@ -352,6 +380,7 @@ export class CheckoutFlow {
 
   /** Olvida el estado en memoria (otra compra, otra cuenta). */
   reset(): void {
+    this.following = null;
     this.stopWatching?.();
     this.stopWatching = null;
     this.pending = null;
