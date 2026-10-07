@@ -21,7 +21,7 @@ export function PaymentReview({ selection, passengers }: { selection: CheckoutSe
         <div className="flex flex-col gap-1">
           <dt className="flex flex-wrap items-baseline justify-between gap-2 font-bold">
             {p.reviewFlight}
-            <Link to={routes.results(selection.searchQuery)} className="font-normal">
+            <Link to={routes.results(selection.searchQuery)} className="inline-flex min-h-12 items-center font-normal">
               {p.changeFlight}
             </Link>
           </dt>
@@ -38,7 +38,7 @@ export function PaymentReview({ selection, passengers }: { selection: CheckoutSe
         <div className="flex flex-col gap-1">
           <dt className="flex flex-wrap items-baseline justify-between gap-2 font-bold">
             {p.reviewPassengers}
-            <Link to={routes.checkoutDetails()} className="font-normal">
+            <Link to={routes.checkoutDetails()} className="inline-flex min-h-12 items-center font-normal">
               {p.editPassengers}
             </Link>
           </dt>
