@@ -14,7 +14,7 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 
 ---
 
-## 1. Estado actual (2026-10-07, cierre de F3)
+## 1. Estado actual (2026-10-07, cierre de F3; F5 en rama aparte)
 
 - Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 3. 171 archivos en `src`, unas 13.300 líneas de TypeScript (sin contar los tipos generados).
 - 262 pruebas en verde con `npm run test` y 17 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta, solo contra el backend local). Lint, typecheck y build sin errores.
@@ -26,6 +26,7 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 - Compra: los 3 pasos tienen pantalla, indicador, resumen y temporizador; la selección del paso 1 sobrevive a ingresar, a refrescar y a un cierre de sesión por seguridad. Faltan el formulario de pasajeros, el asiento y el pago (F4).
 - Mis viajes: lista, detalle con estado del vuelo, check-in por viaje (ventana 48 h / 60 min) y cancelación (mock). Pases, equipaje y cambio de fecha son pantallas de espera (F6).
 - Ofertas es una pantalla inicial (F7). Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
+- **F5 (rama `fase-5-asientos`, sin fusionar):** selector de asientos como módulo independiente (`features/seats`) con demo en `/componentes/asientos`. Aún no está en el paso 2 y no se verificó con la API real (sección 5b). 306 pruebas en verde.
 
 > Regla de mantenimiento: al cerrar cada fase se actualiza esta sección y las columnas "Estado" de las tablas. Si este README y el código no coinciden, se corrige el README en el mismo commit.
 
@@ -125,7 +126,7 @@ Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `np
 | `results` | Resultados y familias tarifarias reales | Hecho (mock y API real) |
 | `auth` | Sesión (`SessionManager`: tokens, renovación, pestañas, restauración), `AuthProvider`/`useAuth`, formularios de ingreso y registro (`RequireAuth` vive en `app/`) | Hecho (mock y API real) |
 | `checkout` | Compra en 3 pasos: selección, hold, cuenta, resumen | Parcial (faltan pasajeros y pago) |
-| `seats` | Mapa de asientos (avión) | Planificado (carpeta creada) |
+| `seats` | Selector de asientos (mapa en forma de avión, lista alternativa, filtros, recomendación, conflictos 409/422) | Hecho como módulo independiente (F5, rama `fase-5-asientos`); se enchufa al paso 2 en F4 (ver sección 5b) |
 | `trips` | Mis viajes y detalle del viaje | Parcial (mock) |
 | `checkin` | Check-in dentro del viaje y pases de abordar | Parcial (check-in por viaje; pases en F6) |
 | `aftersale` | Equipaje, cambio de fecha, cancelación | Parcial (cancelación en la página del viaje) |
@@ -164,6 +165,7 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo**. A la de
 | `/perfil` | Mis datos (solo lectura) y cerrar sesión | Sesión | `GET /auth/me`, `POST /auth/logout` | Hecho (mock y API real) |
 | `/ayuda` | Ayuda y textos legales | Público | Ninguna | Hecho |
 | `/componentes` | Catálogo interno | Solo desarrollo (404 en producción) | Ninguna | Hecho |
+| `/componentes/asientos` | Demo del selector de asientos (1 adulto, familia con niño y bebé, escala, ATR) | Solo desarrollo (404 en producción) | `GET /offers/{id}/seatmap` | Hecho (F5) |
 
 Rutas viejas que redirigen: `/mis-reservas` → `/mis-viajes`, `/reserva/:id` → `/mis-viajes/:id`, `/check-in` → `/mis-viajes`, `/compra` → `/compra/datos`.
 
@@ -195,6 +197,69 @@ Reglas del flujo:
 - Se puede volver al paso anterior sin perder lo escrito.
 
 Pago simulado: la pantalla lo dice de forma visible. Los datos de tarjeta no salen del navegador ni se guardan; a la API solo se envía una referencia de pago.
+
+---
+
+## 5b. Selector de asientos (F5)
+
+Módulo independiente `src/features/seats`, sin ninguna dependencia del estado del checkout. Se ve y se prueba en `/componentes/asientos` (solo desarrollo, con el mock).
+
+### Cómo se enchufa
+
+```tsx
+import { SeatSelector, seatSegmentsFromLegs, toAssignedSeats, type SeatAssignments } from '@/features/seats';
+
+const segments = seatSegmentsFromLegs(outbound, inbound);       // SelectedLeg del paso 1 (cabina = la de la tarifa)
+const passengers = [{ id: 'p1', name: 'Ana', type: 'ADULT' }];  // type: ADULT | YOUTH | CHILD | INFANT
+const [seats, setSeats] = useState<SeatAssignments>({});        // {} = todo automático
+
+<SeatSelector
+  offerId={hold.offerId}
+  segments={segments}
+  passengers={passengers}
+  value={seats}
+  onChange={setSeats}
+  onConflict={(c) => { /* informativo: el asiento ya se quitó de `value` */ }}
+  serverError={bookingError}   // el ApiError de POST /bookings; null si no hay
+/>
+```
+
+| Prop | Qué es |
+|---|---|
+| `offerId` | `offerId` de la oferta (el mapa se pide con `GET /offers/{offerId}/seatmap?segmentId=…`, público) |
+| `segments` | `SeatSegment[]`: `id` (= `segmentId`), vuelo, origen, destino, `cabin` de la tarifa, `leg` (`outbound`/`inbound`) e `indexInLeg`/`legSize` para rotular "Ida, tramo 1 de 2". `seatSegmentsFromLegs(outbound, inbound?)` los arma desde la selección |
+| `passengers` | `{ id, name, type }`. El `id` debe ser el `passengerId` que irá en `PassengerItem`. Los `INFANT` se muestran pero no ocupan asiento |
+| `value` / `onChange` | Componente controlado. Formato: `Record<passengerId, Record<segmentId, seatNumber>>`, p. ej. `{ p1: { 'seg-1': '12A' } }`. Sin entradas = "asignar automáticamente" (camino feliz: no hay que tocar nada) |
+| `onConflict` | Avisa un asiento elegido que dejó de servir (`SEAT_TAKEN` o `CABIN_MISMATCH`) con `segmentId`, `passengerId`, `seatNumber` y `alternative` (el libre más cercano de la cabina correcta). Llega **después** de que `onChange` entregó el valor sin ese asiento |
+| `serverError` | El error de la reserva. Con `SEAT_TAKEN` (409) o `SEAT_CABIN_MISMATCH` (422) el selector vuelve a pedir los mapas de los tramos con asientos elegidos, quita lo que ya no sirve, conserva lo demás y lo explica. Cualquier otro error se ignora. Se procesa al cambiar la referencia del objeto |
+
+**Mapeo a `PassengerItem`:** `toAssignedSeats(value, passengerId, segments)` devuelve `{ segmentId, seatNumber }[]`, exactamente `PassengerItem.assignedSeats` (una prueba lo comprueba contra los tipos generados). Si queda vacío, **omitir el campo**. Los bebés nunca tienen entrada. Cuidado: el `PassengerData.seatId` del mock actual guarda un solo asiento (solo el primer tramo); F4 debe pasar a `assignedSeats` por tramo.
+
+### Qué hace
+
+- Un mapa por tramo (pestañas Ida / Vuelta / escalas), generado desde las filas y letras del contrato: pasillo, alas (solo referencia visual), salidas de emergencia, filas con espacio extra y baños (decoración: la API no manda baños ni alas).
+- Chips por pasajero: se elige quién, luego el asiento, y pasa solo al siguiente sin asiento. Elegir de nuevo el propio asiento lo quita.
+- Filtros (ventana, pasillo, juntos, más espacio), "Recomiéndame" (sienta al grupo junto si puede), "Asignar automáticamente" y alternativa en lista (tabla) siempre disponible.
+- Estados con icono, patrón y texto: libre (letra), ocupado (rayado y X), elegido (relleno, visto y número del pasajero), salida (puerta), espacio extra (flecha vertical), otra cabina (punteado y candado).
+- Accesibilidad: cuadrícula ARIA con roving tabindex (flechas, Inicio/Fin, Ctrl+Inicio/Fin, RePág/AvPág, Enter/Espacio), `aria-label` por asiento ("Asiento 12A, ventana, espacio extra, disponible"), anuncios con `aria-live`/`role="alert"`, zoom con botones (100 a 200 %), asientos de 44 px, scroll solo dentro del contenedor del mapa, menos movimiento respetado.
+- Al volver a la pestaña del navegador el mapa se refresca (mínimo 3 s entre peticiones); mapas en memoria 20 s para no gastar el límite de 60 consultas/minuto al cambiar de pestaña.
+
+### Decisiones y diferencias
+
+- **Cabina:** solo se pueden elegir asientos de la cabina de la tarifa (el contrato lo dice); los de otra cabina se ven, pero bloqueados. La lista solo muestra los de la cabina elegible.
+- **`isAvailable`** es `false` si el asiento está asignado o su cabina no tiene stock; solo `true` cuenta como libre (todos los campos del contrato son opcionales y se toleran faltantes). No existe "retenido".
+- **"Más espacio"** incluye `EXTRA_LEGROOM` y `EMERGENCY_EXIT`. **"Juntos"** busca tiras de asientos libres seguidas, sin cruzar el pasillo, para el total de pasajeros con asiento.
+- **Reglas de salida de emergencia:** el contrato no define restricciones. La interfaz no inventa ninguna; solo evita recomendar una salida si viaja un niño y avisa en la leyenda. Hay que confirmar con la aerolínea/API si debe bloquearse.
+- **409 y 422 no dicen qué asiento falló.** Por eso el selector compara lo elegido con un mapa recién pedido; si no encuentra nada, muestra un aviso general. El `detail` técnico nunca se muestra ni se interpreta.
+- **Mock:** ya existía `getSeatMap` en `FlightsApi` y el diseño de cabinas de la semilla (A320, A319, ATR72). Su ocupación es determinista pero con semilla por vuelo y fecha (no por `offerId`+`segmentId`): el mismo vuelo muestra la misma ocupación aunque cambie la oferta, como en un avión real. Se agregó `shared/api/mock/seatSimulation.ts` (asientos ocupados simulados y los errores 409/422) y los botones de la demo lo usan.
+- **Textos:** viven en `shared/i18n/seats.ts` (se incluye como `es.seats`) para no chocar con F4 en `es.ts`; se pueden mover a `es.ts` al fusionar.
+- Fuera de esta fase: copiar la elección de un tramo al siguiente y bloquear por tipo de pasajero.
+
+### Pruebas
+
+- `src/features/seats/model/*.test.ts`: generación del mapa (A320, A319, ATR72), selección, filtros, recomendación, revisión contra mapa nuevo y compatibilidad con `assignedSeats`.
+- `src/features/seats/components/SeatSelector.test.tsx`: teclado, `aria-label`, selección y avance, zoom, lista, estados de carga/vacío/error, refresco al volver a la pestaña, 409 y 422.
+- `e2e/seats-demo.mjs`: recorrido con Playwright sobre la demo (mock) a 320, 768 y 1280 px, con capturas. No es parte de `npm run test` ni agrega dependencias (ver el encabezado del archivo).
 
 ---
 
@@ -334,8 +399,9 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 
 ## 8. Pruebas
 
-- **Hoy:** 262 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429).
+- **Hoy:** 306 pruebas con Vitest (262 hasta F3, más 44 del selector de asientos) (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429).
 - **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 por minuto).
+- **E2E:** `e2e/seats-demo.mjs` (selector de asientos, mock, 320/768/1280 px).
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
 - Al cerrar cada fase: lint, typecheck, build, pruebas, recorrido solo con teclado, 320 px, zoom al 200 % y modo oscuro.
 
@@ -350,7 +416,7 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 | F2 | Contrato: tipos generados desde el OpenAPI, `FlightsApi` alineada, API real en lo público (búsqueda, asientos, estado) | Hecha (tag `fase-2`) |
 | F3 | Cuenta: ingreso, registro, renovación de sesión y rutas protegidas contra la API real | Hecha (tag `fase-3`) |
 | F4 | Compra en 3 pasos completa | Siguiente |
-| F5 | Mapa de asientos en forma de avión | Pendiente |
+| F5 | Mapa de asientos en forma de avión | Hecha en la rama `fase-5-asientos` como módulo independiente; falta verificarla con la API real y enchufarla al paso 2 |
 | F6 | Mis viajes: detalle, check-in, pases, equipaje, cambio de fecha, cancelación | Pendiente |
 | F7 | Ofertas y pulido del inicio | Pendiente |
 | F8 | Calidad y entrega: pruebas de extremo a extremo, accesibilidad, despliegue | Pendiente |
