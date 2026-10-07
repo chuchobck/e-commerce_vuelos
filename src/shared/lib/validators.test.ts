@@ -5,6 +5,7 @@ import {
   NAME_PATTERN,
   PASSPORT_PATTERN,
   PHONE_EC_PATTERN,
+  compactDocument,
   isFutureExpiry,
   isValidCedula,
   isValidExpiryFormat,
@@ -80,17 +81,18 @@ describe('nombres', () => {
     }
   });
   it('rechaza números y símbolos', () => {
-    for (const name of ['Juan2', 'Ana@', 'Luis_', 'José.']) {
+    for (const name of ['Juan2', 'Ana@', 'Luis_', '.José', ' Ana']) {
       expect(NAME_PATTERN.test(name)).toBe(false);
     }
   });
 });
 
 describe('otros patrones', () => {
-  it('pasaporte alfanumérico de 6 a 12', () => {
+  it('documento de 5 a 20 letras o dígitos (como el backend, ya compactado)', () => {
     expect(PASSPORT_PATTERN.test('A1234567')).toBe(true);
     expect(PASSPORT_PATTERN.test('A123')).toBe(false);
     expect(PASSPORT_PATTERN.test('A1234 567')).toBe(false);
+    expect(PASSPORT_PATTERN.test(compactDocument('ab-123 456'))).toBe(true);
   });
   it('número de vuelo con el formato de la API (aerolínea + número sin ceros a la izquierda)', () => {
     expect(FLIGHT_NUMBER_PATTERN.test('LA1400')).toBe(true);

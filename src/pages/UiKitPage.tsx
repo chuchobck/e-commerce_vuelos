@@ -49,7 +49,7 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-const inTwoMinutes = () => new Date(Date.now() + 130_000).toISOString();
+const inTwoMinutes = () => Date.now() + 130_000;
 
 /** Catálogo del sistema de diseño (ruta /componentes, no enlazada en la navegación). */
 export function UiKitPage() {
@@ -57,7 +57,7 @@ export function UiKitPage() {
   const [cedula, setCedula] = useState('');
   const [doc, setDoc] = useState('CEDULA');
   const [checked, setChecked] = useState(false);
-  const [expiresAt, setExpiresAt] = useState(inTwoMinutes);
+  const [deadline, setDeadline] = useState(inTwoMinutes);
   const [op, setOp] = useState('*');
   const [status, setStatus] = useState<SimulatedStatus>(503);
   const [forced, setForced] = useState(getForcedError);
@@ -172,9 +172,9 @@ export function UiKitPage() {
       </Block>
 
       <Block title={k.timerTitle}>
-        <Timer expiresAt={expiresAt} onExtend={() => setExpiresAt(inTwoMinutes())} />
+        <Timer deadline={deadline} onExtend={() => setDeadline(inTwoMinutes())} />
         <div>
-          <Button variant="ghost" onClick={() => setExpiresAt(inTwoMinutes())}>
+          <Button variant="ghost" onClick={() => setDeadline(inTwoMinutes())}>
             {k.timerRestart}
           </Button>
         </div>

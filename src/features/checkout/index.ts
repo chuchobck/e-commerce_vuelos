@@ -6,7 +6,9 @@
 export { AccountBlock } from './AccountBlock';
 export { CheckoutSteps } from './CheckoutSteps';
 export { CheckoutSummary } from './CheckoutSummary';
-export { HoldStatus } from './HoldStatus';
+export { HoldPanel } from './HoldPanel';
+export { PassengersForm } from './PassengersForm';
+export { PaymentForm } from './PaymentForm';
 export {
   clearSelection,
   loadSelection,
@@ -15,8 +17,9 @@ export {
   type CheckoutSelection,
   type SelectedLeg,
 } from './selection';
-export { useCheckoutHold } from './useCheckoutHold';
 export { checkout } from './instance';
 export { useCheckout } from './useCheckout';
-export { holdDeadline, holdSecondsLeft } from './holdClock';
-export type { CheckoutState, HoldEnd, PaymentProblem } from './machine';
+export { useReleaseOnExit } from './useReleaseOnExit';
+export { holdOf, type CheckoutState, type HoldEnd, type PaymentProblem } from './machine';
+export { purchaseNotice } from './messages';
+export { isDraftComplete } from './passengers';
