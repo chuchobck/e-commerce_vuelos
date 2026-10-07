@@ -1,0 +1,12 @@
+{
+  "holdId": "cad8bc7c-3489-4861-a4f3-76bd7a523ec2",
+  "status": "HELD",
+  "expiresAt": "2026-10-07T10:12:28.812Z",
+  "ttlMinutes": 15,
+  "lockedPrice": {
+    "currency": "USD",
+    "baseFare": "135.52",
+    "taxes": "27.10",
+    "total": "162.62"
+  }
+}
