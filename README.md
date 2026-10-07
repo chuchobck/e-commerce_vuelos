@@ -57,8 +57,20 @@ npm run dev               # http://localhost:5173
 
 Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
 
-- **URL de la API real.** Vacía = se usa la API simulada y se ven las pistas "Para probar". Con valor = se usa la API real y las pistas desaparecen. (Hasta F2 la implementación HTTP no existe: con valor se ocultan las pistas pero los datos siguen viniendo del mock, y en desarrollo la consola lo avisa.)
-- **Frecuencia de errores simulados.** Solo afecta al mock; sirve para diseñar y probar los estados de error.
+- **`VITE_API_URL`** elige el modo, sin mezclas:
+  - **Vacía → mock completo.** Todo funciona sin backend y se ven las pistas "Para probar".
+  - **Con valor → API real.** Búsqueda, mapa de asientos y estado de vuelo van a la API; cuenta, compra y postventa muestran "se conecta en una fase posterior" hasta F3, F4 y F6. Las pistas "Para probar" no se ven.
+- **`VITE_LAST_FLIGHT_DATE`**: último día con salidas de la semilla del backend (la semilla genera 90 días desde su carga y esa ventana es fija). El buscador no deja elegir fechas posteriores; vacía = hoy + 89 días.
+- **`VITE_MOCK_ERROR_RATE`**: frecuencia de errores simulados. Solo afecta al mock; sirve para diseñar los estados de error.
+
+#### A qué API apuntar
+
+| Backend | URL | Para qué |
+|---|---|---|
+| Local (recomendado en desarrollo) | `http://localhost:3010/flights/v1` | Navegador y `npm run test:api`. El backend debe tener `CORS_ORIGINS=http://localhost:5173`. Con el backend en WSL, desde Windows funciona `localhost` (no `127.0.0.1`). |
+| Render | `https://quinde-vuelos-api.onrender.com/flights/v1` | Solo verificación de lectura con `npm run test:api` (corre en Node, no necesita CORS). Su CORS no incluye `localhost`. Duerme tras 15 min: la primera petición tarda cerca de un minuto. |
+
+`npm run test:api` toma la URL de `API_TEST_URL` o, si no está, de `VITE_API_URL` del `.env`. Ejemplo contra Render: `API_TEST_URL=https://quinde-vuelos-api.onrender.com/flights/v1 npm run test:api`.
 
 Todas las variables que empiezan con `VITE_` quedan visibles en el navegador: **no se ponen secretos ahí**.
 

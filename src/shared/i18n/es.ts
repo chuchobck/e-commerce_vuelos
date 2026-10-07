@@ -367,6 +367,8 @@ export const es = {
     confirmationText: 'Te enviamos los detalles a {email}. Desde Mis viajes puedes hacer el check-in y administrar tu viaje.',
     confirmationLoginText: 'Ingresa con la cuenta con la que compraste para ver tu confirmación.',
     goToTrip: 'Ver mi viaje',
+    notConnectedTitle: 'La compra se conecta en la siguiente fase',
+    notConnectedText: 'Ya puedes buscar y comparar vuelos reales. Apartar el precio, los datos de los pasajeros y el pago llegan en la siguiente fase del proyecto.',
   },
 
   timer: {

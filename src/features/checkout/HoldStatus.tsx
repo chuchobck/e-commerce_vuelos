@@ -22,6 +22,14 @@ interface HoldStatusProps {
 export function HoldStatus({ state, expired, onExpire, onExtend, extending, onRetry, searchAgain }: HoldStatusProps) {
   if (state.status === 'idle' || state.status === 'loading') return <LoadingState label={p.holding} />;
   if (state.status === 'error') {
+    // Con la API real la compra aún no está conectada (F4): se explica, no es un error del viajero.
+    if (isApiError(state.error) && state.error.code === 'NOT_CONNECTED') {
+      return (
+        <Alert variant="info" title={p.notConnectedTitle} action={searchAgain}>
+          <p>{p.notConnectedText}</p>
+        </Alert>
+      );
+    }
     return isApiError(state.error) && state.error.status === 404 ? (
       <Alert variant="error" live="assertive" title={p.notFoundTitle} action={searchAgain}>
         <p>{p.notFoundText}</p>
