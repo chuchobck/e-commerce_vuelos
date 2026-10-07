@@ -19,8 +19,29 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - Un módulo de `features` no importa de otro. Lo común sube a `shared`.
 - Desde fuera, un módulo se importa por su `index.ts` (`@/features/trips`), nunca por rutas internas.
   Dentro del módulo se usan imports relativos.
-- Solo `src/shared/api` habla con la red (`fetch`, `XMLHttpRequest`, axios prohibidos fuera).
-  La UI conoce solo la interfaz `FlightsApi`; nunca se inventan endpoints.
+- Solo `src/shared/api` habla con la red (`fetch`, `XMLHttpRequest`, axios prohibidos fuera); el único
+  `fetch` real está en `shared/api/http/client.ts`. La UI conoce solo la interfaz `FlightsApi`;
+  nunca se inventan endpoints.
+
+## Contrato y API real (desde F2)
+
+- Fuente de las formas: `contracts/vuelos-openapi.yaml` → `npm run api:types` → `src/shared/api/generated/`
+  (versionado, no se edita a mano). `shared/api/contract.ts` solo les pone nombre.
+- Si la UI necesita otra forma, la conversión es una función pura en `shared/api/mapping.ts` con prueba.
+  Mock y API real pasan por el mismo mapeo; el mock está tipado contra los tipos generados.
+- Dinero: centavos enteros (`shared/lib/money.ts`), nunca flotantes para sumar; un solo formato
+  de presentación (`formatMoney`). Horas: la API da UTC; se muestran en hora local del aeropuerto.
+- Si la API real y el contrato discrepan, manda lo que responde la API (verificarlo) y se anota en el
+  README (sección 6).
+- Con la API real no se inventan datos (textos, rutas, duraciones, precios): salen de las respuestas.
+- Modos: `VITE_API_URL` vacía = mock completo; con valor = API real. No se mezclan. Lo que aún no está
+  conectado lanza `NotYetConnectedError` y la UI lo explica.
+- Reintentos automáticos solo en lecturas (una vez: red, tiempo agotado o 503, con Retry-After ≤ 10 s);
+  nunca en escrituras.
+- El detalle técnico de un error (`detail`) nunca se muestra: se mapea a mensajes de `shared/i18n`.
+- El catálogo de aeropuertos y la tabla de pares con vuelos son estáticos (`shared/api/airports.ts`):
+  mantenerlos sincronizados con la semilla del backend; sus pruebas lo vigilan.
+- Límite de la API: 20 búsquedas por minuto por IP. No disparar búsquedas en ráfaga (usar caché).
 - Rutas: nunca como texto suelto. Patrones en `paths`, enlaces con `routes.*` (`routes.trip(id)`),
   todo en `src/app/routes.ts`. Rutas con sesión van bajo `RequireAuth` en `routeTable.tsx`.
 - `/compra/*` no exige sesión: el ingreso ocurre dentro del paso 2. La selección del paso 1 vive
@@ -59,8 +80,9 @@ Check-in por `bookingId`, solo dueño con sesión, ventana de 48 h a 60 min ante
 
 ## Al cerrar cada fase
 
-1. `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` en verde.
-2. `npm run dev` arranca sin errores en consola; no dejar procesos corriendo.
+1. `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` en verde, y `npm run test:api`
+   contra la API real cuando la fase toque la API (local y Render).
+2. `npm run dev` arranca sin errores en consola, en modo mock y en modo real; no dejar procesos corriendo.
 3. Recorrido solo con teclado (header, menú móvil, páginas nuevas), 320 px, zoom 200 %, modo oscuro.
 4. Actualizar el README: sección 1 "Estado actual", columnas "Estado" y cualquier diferencia con el código.
 5. Reporte: qué se hizo, commits, verificaciones, diferencias README/código, decisiones tomadas y qué no se verificó.

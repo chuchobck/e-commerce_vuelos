@@ -242,7 +242,7 @@ export const es = {
     ],
     stepsTitle: 'Compra en 3 pasos',
     step1Title: 'Elige tu vuelo',
-    step1Text: 'Compara horarios y escoge Light, Classic o Flex según el equipaje que necesitas.',
+    step1Text: 'Compara horarios y escoge Basic, Classic o Flex según el equipaje que necesitas.',
     step2Title: 'Tu cuenta y pasajeros',
     step2Text: 'Ingresa o crea tu cuenta y confirma quién viaja. Tus datos se precargan.',
     step3Title: 'Paga y listo',
@@ -563,7 +563,7 @@ export const es = {
     faqs: [
       {
         q: '¿Qué equipaje incluye cada tarifa?',
-        a: 'Light incluye un artículo personal y equipaje de mano de 10 kg. Classic suma una maleta de 23 kg. Flex suma dos maletas de 23 kg y cambios sin costo.',
+        a: 'Basic incluye solo un artículo personal. Classic suma un equipaje de mano y una maleta en bodega. Flex suma un equipaje de mano y dos maletas, con cambios sin costo. En ejecutiva, Business Flex incluye dos de mano y dos maletas. Al elegir tu vuelo verás exactamente qué incluye cada tarifa.',
       },
       {
         q: '¿Tengo que elegir asiento?',
@@ -586,9 +586,10 @@ export const es = {
     baggageCaption: 'Equipaje incluido en cada tarifa (por pasajero)',
     baggageCols: { fare: 'Tarifa', personal: 'Artículo personal', carry: 'Equipaje de mano', checked: 'Maletas en bodega', changes: 'Cambios' },
     baggageRows: [
-      { fare: 'Light', personal: 'Sí', carry: '10 kg', checked: 'No incluye', changes: 'Con cargo de US$ 45' },
-      { fare: 'Classic', personal: 'Sí', carry: '10 kg', checked: '1 de 23 kg', changes: 'Con cargo de US$ 25' },
-      { fare: 'Flex', personal: 'Sí', carry: '10 kg', checked: '2 de 23 kg', changes: 'Sin costo y reembolsable' },
+      { fare: 'Basic', personal: 'Sí', carry: 'No incluye', checked: 'No incluye', changes: 'No admite cambios ni reembolso' },
+      { fare: 'Classic', personal: 'Sí', carry: '1', checked: '1', changes: 'Con cargo; reembolsable' },
+      { fare: 'Flex', personal: 'Sí', carry: '1', checked: '2', changes: 'Sin costo; reembolsable' },
+      { fare: 'Business Flex', personal: 'Sí', carry: '2', checked: '2', changes: 'Sin costo; reembolsable' },
     ],
     contactPhone: 'Llámanos: {phone}',
     contactEmail: 'Escríbenos: {email}',
