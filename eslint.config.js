@@ -45,7 +45,8 @@ const boundaries = [
 const NETWORK_MESSAGE = 'Solo src/shared/api habla con la red. Usa flightsApi.';
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules'] },
+  // Los tipos generados desde el contrato no se editan a mano (npm run api:types).
+  { ignores: ['dist', 'coverage', 'node_modules', 'src/shared/api/generated'] },
   {
     files: ['src/**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended, jsxA11y.flatConfigs.recommended],

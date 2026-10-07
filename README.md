@@ -45,6 +45,13 @@ npm run dev               # http://localhost:5173
 | `npm run test` | Pruebas (Vitest) |
 | `npm run typecheck` | Revisión de tipos |
 | `npm run lint` | ESLint: accesibilidad (jsx-a11y) y reglas de arquitectura de la sección 3 |
+| `npm run api:types` | Regenera los tipos del contrato en `src/shared/api/generated/` |
+
+### Contrato y tipos generados
+
+- `contracts/vuelos-openapi.yaml` es una copia del contrato del backend; su origen y fecha están en `contracts/PROCEDENCIA.md`.
+- `npm run api:types` genera `src/shared/api/generated/vuelos.ts` con `openapi-typescript`. Ese archivo **se versiona** y no se edita a mano: es el único lugar que define las formas del contrato.
+- Si el contrato cambia: descargar el YAML nuevo, actualizar `PROCEDENCIA.md`, correr `npm run api:types` y después `npm run typecheck`. El mock está tipado contra esos tipos, así que cualquier diferencia hace fallar la compilación hasta que se corrija.
 
 ### Variables de entorno
 
