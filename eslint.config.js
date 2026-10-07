@@ -12,7 +12,7 @@ import tseslint from 'typescript-eslint';
  * Las rutas se comparan ya resueltas, así que valen igual para `@/…` que para `../…`.
  */
 const FEATURES = fs
-  .readdirSync('src/features', { withFileTypes: true })
+  .readdirSync(new URL('./src/features', import.meta.url), { withFileTypes: true })
   .filter((d) => d.isDirectory())
   .map((d) => d.name);
 
@@ -45,7 +45,8 @@ const boundaries = [
 const NETWORK_MESSAGE = 'Solo src/shared/api habla con la red. Usa flightsApi.';
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules'] },
+  // Los tipos generados desde el contrato no se editan a mano (npm run api:types).
+  { ignores: ['dist', 'coverage', 'node_modules', 'src/shared/api/generated'] },
   {
     files: ['src/**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended, jsxA11y.flatConfigs.recommended],
@@ -102,6 +103,12 @@ export default tseslint.config(
       'no-restricted-properties': 'off',
       'no-restricted-imports': 'off',
     },
+  },
+  {
+    // Integración contra la API real (npm run test:api): corre en Node.
+    files: ['tests/**/*.ts'],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: { globals: globals.node },
   },
   {
     files: ['*.config.{js,ts}'],

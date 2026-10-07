@@ -7,7 +7,7 @@ import { routes } from '@/app/routes';
 import { TripFallback } from '@/features/trips';
 import { errorMessage, flightsApi } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { formatUSD } from '@/shared/lib/format';
+import { formatMoney } from '@/shared/lib/format';
 import { useAsync } from '@/shared/lib/useAsync';
 import { Alert, Button, Card, toast, TripSummary } from '@/shared/ui';
 
@@ -57,7 +57,7 @@ export function TripCancelPage() {
             <TripSummary outbound={booking.outbound} inbound={booking.inbound} />
             <p className="flex flex-col">
               <span className="text-sm text-muted">{t.total}</span>
-              <span className="text-2xl font-bold tabular-nums">{formatUSD(booking.totalPaid)}</span>
+              <span className="text-2xl font-bold tabular-nums">{formatMoney(booking.totalPaid)}</span>
             </p>
           </Card>
           {booking.status === 'CANCELLED' ? (

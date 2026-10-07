@@ -1,28 +1,30 @@
 import type { FlightsApi } from './FlightsApi';
 import { apiConfig } from './config';
-import { MockFlightsApi } from './mock/MockFlightsApi';
+import { RealFlightsApi } from './RealFlightsApi';
+import { createFlightsApi } from './select';
 
 /**
- * Punto único de acceso a los datos.
- *
- * Mientras no exista la API real se usa siempre el mock. Cuando la API esté documentada:
- *   1. Crear `HttpFlightsApi implements FlightsApi` en src/shared/api/http/ usando `apiConfig.apiUrl`.
- *   2. Devolverla aquí cuando `apiConfig.apiUrl` tenga valor.
- * No se inventan endpoints: la UI solo conoce la interfaz FlightsApi.
+ * Punto único de acceso a los datos. VITE_API_URL vacía = mock; con valor = API real
+ * (ver select.ts). La interfaz solo conoce FlightsApi.
  */
-function createFlightsApi(): FlightsApi {
-  if (apiConfig.apiUrl && import.meta.env.DEV) {
-    console.info(`[Quinde] VITE_API_URL=${apiConfig.apiUrl} definida, pero la implementación HTTP aún no existe. Se usa el mock.`);
-  }
-  return new MockFlightsApi();
-}
+export const flightsApi: FlightsApi = createFlightsApi(apiConfig.apiUrl, { dev: import.meta.env.DEV });
 
-export const flightsApi: FlightsApi = createFlightsApi();
+/**
+ * En modo real, al cargar la app se hace un GET /health silencioso para despertar el servidor
+ * gratuito de Render mientras el usuario escribe su búsqueda. Si falla, no pasa nada.
+ */
+export function warmUpServer(): void {
+  if (flightsApi instanceof RealFlightsApi) void flightsApi.warmUp().catch(() => undefined);
+}
 
 export type { FlightsApi } from './FlightsApi';
 export * from './types';
 export { apiConfig } from './config';
-export { ApiError, errorMessage, isApiError } from './errors';
+export { apiModeFor, type ApiMode } from './select';
+export { AIRPORTS, cityOf, destinationsFrom, findAirport, hasFlights, type Airport, type RegionId } from './airports';
+export { ApiError, errorMessage, fieldErrorMessage, isApiError, NotYetConnectedError, type FieldError } from './errors';
+export { faresForCabin, itinerarySignature } from './mapping';
+export { useServerWaking } from './http/useServerWaking';
 export {
   MOCK_OPERATIONS,
   SIMULATED_STATUSES,

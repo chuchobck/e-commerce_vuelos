@@ -1,6 +1,6 @@
 import { addDays, subDays } from 'date-fns';
 import { describe, expect, it } from 'vitest';
-import { es } from '@/shared/i18n';
+import { es, fmt } from '@/shared/i18n';
 import { toDisplayDate, today } from './dates';
 import {
   birthDateMessage,
@@ -85,7 +85,11 @@ describe('fechas futuras', () => {
     expect(firstError(futureDateField.safeParse(toDisplayDate(subDays(today(), 1))))).toBe(v.datePast);
     expect(firstError(futureDateField.safeParse('31/02/2027'))).toBe(v.dateInvalid);
     expect(firstError(futureDateField.safeParse('2027-01-01'))).toBe(v.dateInvalid);
-    expect(firstError(futureDateField.safeParse(toDisplayDate(addDays(today(), 400))))).toBe(v.dateTooFar);
+    // Fuera de la ventana de salidas de la API (hoy + 89 días): el mensaje dice hasta cuándo hay vuelos.
+    expect(firstError(futureDateField.safeParse(toDisplayDate(addDays(today(), 90))))).toBe(
+      fmt(v.dateTooFar, { date: toDisplayDate(addDays(today(), 89)) }),
+    );
+    expect(firstError(futureDateField.safeParse(toDisplayDate(addDays(today(), 89))))).toBeNull();
   });
   it('la fecha opcional acepta vacío', () => {
     expect(optionalFutureDateField.safeParse('').success).toBe(true);

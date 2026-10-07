@@ -5,6 +5,7 @@ import { Page } from '@/app/layout/Page';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { routes } from '@/app/routes';
 import { CheckoutSteps, CheckoutSummary, HoldStatus, loadSelection, selectionTotal, useCheckoutHold } from '@/features/checkout';
+import { apiConfig } from '@/shared/api';
 import { es } from '@/shared/i18n';
 import { Alert, Button, Card, CardTitle, EmptyState } from '@/shared/ui';
 
@@ -15,7 +16,7 @@ export function CheckoutPaymentPage() {
   const { session } = useAuth();
   const [selection] = useState(loadSelection);
   // En el paso 3 nunca se crea un hold: solo se recupera el del paso 2.
-  const ready = !!session && !!selection?.holdId;
+  const ready = apiConfig.usingMock && !!session && !!selection?.holdId;
   const { hold, active, statusProps } = useCheckoutHold(ready ? selection : null, { create: false });
 
   const backToDetails = (
@@ -59,7 +60,11 @@ export function CheckoutPaymentPage() {
   return (
     <Page title={p.paymentTitle} heading={p.paymentHeading}>
       <CheckoutSteps current={2} />
-      {ready ? (
+      {!apiConfig.usingMock ? (
+        <Alert variant="info" title={p.notConnectedTitle} action={backToDetails}>
+          <p>{p.notConnectedText}</p>
+        </Alert>
+      ) : ready ? (
         <HoldStatus {...statusProps} searchAgain={searchAgain} />
       ) : (
         <Alert variant="warning" title={p.needsHoldTitle} action={backToDetails}>

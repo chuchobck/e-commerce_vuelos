@@ -7,7 +7,7 @@ import { FlightStatusCard } from '@/features/flight-status';
 import { BookingStatusBadge, TripFallback } from '@/features/trips';
 import { flightsApi, type Booking } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { formatUSD } from '@/shared/lib/format';
+import { formatMoney } from '@/shared/lib/format';
 import { useAsync } from '@/shared/lib/useAsync';
 import { Button, Card, CardTitle, ErrorState, LoadingState, TripSummary } from '@/shared/ui';
 
@@ -78,7 +78,7 @@ function TripActions({ booking }: { booking: Booking }) {
 
 /** Estado del vuelo de ida con los datos del viaje: el viajero no tiene que escribir el número de vuelo. */
 function TripFlightStatus({ booking }: { booking: Booking }) {
-  const segment = booking.outbound.offer.segments[0];
+  const segment = booking.outbound.itinerary.segments[0];
   const date = segment.departureTime.slice(0, 10);
   const status = useAsync(() => flightsApi.getFlightStatus(segment.flightNumber, date), [segment.flightNumber, date]);
 
@@ -119,7 +119,7 @@ export function TripPage() {
             </Card>
             <Card className="flex flex-col gap-4">
               <CardTitle>{t.total}</CardTitle>
-              <p className="text-3xl font-bold tabular-nums">{formatUSD(data.totalPaid)}</p>
+              <p className="text-3xl font-bold tabular-nums">{formatMoney(data.totalPaid)}</p>
               <p className="text-muted">
                 {t.contact}: {data.contact.email}
               </p>

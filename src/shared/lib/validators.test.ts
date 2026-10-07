@@ -92,10 +92,12 @@ describe('otros patrones', () => {
     expect(PASSPORT_PATTERN.test('A123')).toBe(false);
     expect(PASSPORT_PATTERN.test('A1234 567')).toBe(false);
   });
-  it('número de vuelo', () => {
-    expect(FLIGHT_NUMBER_PATTERN.test('QD100')).toBe(true);
-    expect(FLIGHT_NUMBER_PATTERN.test('qd1234')).toBe(true);
-    expect(FLIGHT_NUMBER_PATTERN.test('LA100')).toBe(false);
+  it('número de vuelo con el formato de la API (aerolínea + número sin ceros a la izquierda)', () => {
+    expect(FLIGHT_NUMBER_PATTERN.test('LA1400')).toBe(true);
+    expect(FLIGHT_NUMBER_PATTERN.test('av45')).toBe(true);
+    expect(FLIGHT_NUMBER_PATTERN.test('LA0140')).toBe(false);
+    expect(FLIGHT_NUMBER_PATTERN.test('LA12345')).toBe(false);
+    expect(FLIGHT_NUMBER_PATTERN.test('1400')).toBe(false);
   });
 });
 

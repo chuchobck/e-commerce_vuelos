@@ -14,7 +14,7 @@ import {
   selectionTotal,
   useCheckoutHold,
 } from '@/features/checkout';
-import { errorMessage, flightsApi, type Hold } from '@/shared/api';
+import { apiConfig, errorMessage, flightsApi, type Hold } from '@/shared/api';
 import { es } from '@/shared/i18n';
 import { Alert, Button, Card, CardTitle, ConfirmDialog, EmptyState, toast } from '@/shared/ui';
 
@@ -28,7 +28,8 @@ export function CheckoutDetailsPage() {
   const { session } = useAuth();
   const navigate = useNavigate();
   const [selection] = useState(loadSelection);
-  const { hold, active, statusProps } = useCheckoutHold(selection, { create: !!session });
+  // Con la API real el hold aún no existe (F4): no se intenta.
+  const { hold, active, statusProps } = useCheckoutHold(apiConfig.usingMock ? selection : null, { create: !!session });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -81,13 +82,21 @@ export function CheckoutDetailsPage() {
   return (
     <Page title={p.detailsTitle} heading={p.detailsHeading}>
       <CheckoutSteps current={1} />
-      {session ? <HoldStatus {...statusProps} searchAgain={searchAgain} /> : null}
-
-      <AccountBlock
-        userName={session?.user.firstName.split(' ')[0]}
-        loginHref={routes.login(here)}
-        registerHref={routes.register(here)}
-      />
+      {apiConfig.usingMock ? (
+        <>
+          {session ? <HoldStatus {...statusProps} searchAgain={searchAgain} /> : null}
+          <AccountBlock
+            userName={session?.user.firstName.split(' ')[0]}
+            loginHref={routes.login(here)}
+            registerHref={routes.register(here)}
+          />
+        </>
+      ) : (
+        // Con la API real, cuenta y hold se conectan en F3 y F4: se explica en vez de fallar.
+        <Alert variant="info" title={p.notConnectedTitle}>
+          <p>{p.notConnectedText}</p>
+        </Alert>
+      )}
 
       <CheckoutSummary
         outbound={hold?.outbound ?? selection.outbound}

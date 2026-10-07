@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { cn } from '@/shared/lib/cn';
-import type { RegionId } from './regions';
+import type { RegionId } from '@/shared/api';
 
 /**
  * Escena pequeña de cada región, en el mismo estilo geométrico de la panorámica.

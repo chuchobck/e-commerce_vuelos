@@ -1,4 +1,4 @@
-import type { Cabin, SearchParams } from '@/shared/api';
+import type { SearchCabin, SearchParams } from '@/shared/api';
 import { displayToIso, isoToDisplay, parseIsoDate } from '@/shared/lib/dates';
 import { CABINS, MAX_PASSENGERS, SEARCH_DEFAULTS, type SearchFormInput } from './searchSchema';
 
@@ -59,7 +59,7 @@ export function queryToForm(q: URLSearchParams): SearchFormInput {
     adults: Math.max(1, count(q, KEYS.adults, SEARCH_DEFAULTS.adults)),
     children: count(q, KEYS.children, 0),
     infants: count(q, KEYS.infants, 0),
-    cabin: CABINS.includes(cabin as Cabin) ? (cabin as Cabin) : SEARCH_DEFAULTS.cabin,
+    cabin: CABINS.includes(cabin as SearchCabin) ? (cabin as SearchCabin) : SEARCH_DEFAULTS.cabin,
   };
 }
 

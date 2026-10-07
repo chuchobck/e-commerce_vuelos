@@ -5,8 +5,11 @@ import { es as esLocale } from 'date-fns/locale';
 const DISPLAY_DATE = 'dd/MM/yyyy';
 /** Formato de intercambio (URL y API). */
 const ISO_DATE = 'yyyy-MM-dd';
-/** Máximo de días hacia adelante que se pueden comprar. */
-const MAX_BOOKING_DAYS = 330;
+/**
+ * La semilla del backend genera salidas para 90 días desde su carga (hoy + 89 días como máximo).
+ * Esa ventana es FIJA desde la carga: VITE_LAST_FLIGHT_DATE fija su último día real.
+ */
+const SEARCH_WINDOW_DAYS = 89;
 
 export const dateLocale = esLocale;
 
@@ -45,8 +48,14 @@ export function displayToIso(display: string): string {
   return date ? toIsoDate(date) : '';
 }
 
-export function maxBookingDate(): Date {
-  return addDays(today(), MAX_BOOKING_DAYS);
+/**
+ * Última fecha de salida que se puede buscar: hoy + 89 días, o antes si VITE_LAST_FLIGHT_DATE
+ * (yyyy-MM-dd, el último día de la semilla del backend) es anterior.
+ */
+export function lastFlightDate(configured: string | undefined = import.meta.env.VITE_LAST_FLIGHT_DATE): Date {
+  const rolling = addDays(today(), SEARCH_WINDOW_DAYS);
+  const fixed = parseIsoDate(configured?.trim());
+  return fixed && fixed < rolling ? fixed : rolling;
 }
 
 /** Edad cumplida en una fecha de referencia (por ejemplo, la fecha del vuelo). */
