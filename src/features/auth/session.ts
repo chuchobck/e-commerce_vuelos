@@ -268,11 +268,20 @@ export class SessionManager {
   }
 
   private setAccess(tokens: AuthTokens): void {
-    const expiresAt = jwtExpiresAt(tokens.accessToken) ?? this.now() + tokens.expiresIn * 1000;
-    this.access = { token: tokens.accessToken, expiresAt };
+    // `expires_in` es relativo al momento de recibirlo: no depende de que el reloj del equipo coincida
+    // con el del servidor. El `exp` del JWT es absoluto; con un reloj adelantado, cada token nuevo
+    // parecería vencido y se renovaría en bucle. Solo se usa si falta `expires_in`.
+    const lifetime =
+      Number.isFinite(tokens.expiresIn) && tokens.expiresIn > 0
+        ? tokens.expiresIn * 1000
+        : Math.max(0, (jwtExpiresAt(tokens.accessToken) ?? 0) - this.now());
+    this.access = { token: tokens.accessToken, expiresAt: this.now() + lifetime };
     this.cancelTimer?.();
-    // Renovación proactiva: un poco antes del margen, para no esperar a que una petición falle.
-    const delay = Math.max(0, expiresAt - this.now() - REFRESH_SKEW_MS - 5_000);
+    this.cancelTimer = null;
+    if (lifetime === 0) return;
+    // Renovación proactiva: un poco antes del margen, para no esperar a que una petición falle;
+    // nunca antes de media vida, para que un token muy corto no provoque renovaciones seguidas.
+    const delay = Math.max(lifetime / 2, lifetime - REFRESH_SKEW_MS - 5_000);
     this.cancelTimer = this.schedule(() => {
       void this.refresh().catch(() => undefined);
     }, delay);

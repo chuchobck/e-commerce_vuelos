@@ -156,6 +156,16 @@ describe('renovación', () => {
     expect(scheduled.at(-1)).toBe(900_000 - REFRESH_SKEW_MS - 5_000);
   });
 
+  it('un reloj local adelantado no provoca renovaciones en bucle (usa expires_in, no el exp del JWT)', async () => {
+    // El servidor emite con su hora; el equipo va 16 minutos adelante: el `exp` ya "pasó" localmente.
+    const api = fakeApi(() => T0);
+    const { manager, scheduled } = tab({ api, clock: () => T0 + 16 * 60_000 });
+    await manager.login({ email: 'a@b.cc', password: 'x'.repeat(12) }, false);
+    expect(scheduled.at(-1)).toBe(900_000 - REFRESH_SKEW_MS - 5_000);
+    await manager.authorized(async () => 'ok');
+    expect(api.stats.refreshCalls).toBe(0);
+  });
+
   it('reactiva: ante un 401 renueva una vez y reintenta la petición una vez', async () => {
     const api = fakeApi(() => T0);
     const { manager } = tab({ api });
