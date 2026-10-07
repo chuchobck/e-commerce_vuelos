@@ -27,7 +27,9 @@ export function MobileMenu() {
       <DialogPrimitive.Trigger asChild>
         <Button variant="secondary" className="min-w-12 px-2 sm:px-4 lg:hidden" aria-label={es.nav.openMenu}>
           <Menu aria-hidden="true" />
-          <span aria-hidden="true">{es.nav.menuTitle}</span>
+          <span aria-hidden="true" className="hidden sm:inline">
+            {es.nav.menuTitle}
+          </span>
         </Button>
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
