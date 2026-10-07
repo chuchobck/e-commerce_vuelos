@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { SEARCH_ANCHOR_ID } from '@/app/layout/RootLayout';
-import { TripSummary } from '@/features/results/TripSummary';
+import { TripSummary } from '@/features/results';
 import { errorMessage, flightsApi, isApiError, type Hold } from '@/shared/api';
 import { es } from '@/shared/i18n';
 import { formatUSD } from '@/shared/lib/format';

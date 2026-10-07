@@ -37,8 +37,10 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], options: { im
 
   useEffect(() => {
     if (immediate) void execute();
+    // Al desmontar o cambiar las dependencias se invalida la respuesta pendiente.
+    const calls = callId;
     return () => {
-      callId.current++;
+      calls.current++;
     };
   }, [execute, immediate]);
 

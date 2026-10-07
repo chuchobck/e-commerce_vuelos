@@ -88,6 +88,8 @@ export function ConfirmDialog({
         <DialogDescription>{description}</DialogDescription>
         <DialogFooter>
           <DialogClose asChild>
+            {/* Foco inicial en la opción segura de una acción destructiva (patrón alertdialog de WAI-ARIA). */}
+            {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
             <Button variant="secondary" autoFocus>
               {cancelLabel}
             </Button>

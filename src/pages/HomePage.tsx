@@ -1,11 +1,8 @@
 import { CreditCard, Ticket, UserRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SEARCH_ANCHOR_ID } from '@/app/layout/RootLayout';
-import { Escapes } from '@/features/home/Escapes';
-import { Panorama } from '@/features/home/Panorama';
-import { RegionArt } from '@/features/home/RegionArt';
-import { REGION_BG, REGIONS } from '@/features/home/regions';
-import { SearchForm } from '@/features/search/SearchForm';
+import { Escapes, Panorama, REGION_BG, REGIONS, RegionArt } from '@/features/home';
+import { SearchForm } from '@/features/search';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { usePageTitle } from '@/shared/lib/usePageTitle';

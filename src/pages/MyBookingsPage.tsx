@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { SEARCH_ANCHOR_ID } from '@/app/layout/RootLayout';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { BookingStatusBadge } from '@/features/bookings/BookingStatusBadge';
+import { BookingStatusBadge } from '@/features/bookings';
 import { flightsApi, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { formatLongDate, formatTime, formatUSD } from '@/shared/lib/format';
