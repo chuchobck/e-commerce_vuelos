@@ -4,17 +4,19 @@ import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
 import { useAuth } from '@/features/auth';
-import { checkout, CheckoutSteps, purchaseNotice, useCheckout } from '@/features/checkout';
+import { BookingCode, checkout, CheckoutSteps, purchaseNotice, useCheckout } from '@/features/checkout';
 import { flightsApi, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { Alert, Button, EmptyState, ErrorState, LoadingState } from '@/shared/ui';
+import { Alert, Button, Card, CardTitle, EmptyState, ErrorState, LoadingState, TripSummary } from '@/shared/ui';
 
 const p = es.purchase;
 const f = es.checkoutForms;
+const title = p.confirmationTitle;
 
 /**
  * Final de la compra (no es un paso): confirmada, en proceso (se sigue hasta el estado final) o
- * fallida. Al llegar de nuevo (recargar, enlace) se lee la reserva y se retoma el seguimiento.
+ * fallida. Se puede abrir por URL directa con una reserva del usuario (recargar, enlace): se lee la
+ * reserva y se retoma el seguimiento. Una reserva ajena o inexistente da un 404 amable.
  */
 export function CheckoutConfirmationPage() {
   const { id = '' } = useParams();
@@ -55,15 +57,20 @@ export function CheckoutConfirmationPage() {
     );
   } else if (loadError) {
     content =
-      isApiError(loadError) && loadError.status === 404 ? (
+      isApiError(loadError) && (loadError.status === 404 || loadError.status === 400) ? (
         <EmptyState
           title={es.trip.notFoundTitle}
           text={es.trip.notFoundText}
           icon={<Ticket className="size-8" />}
           action={
-            <Button asChild>
-              <Link to={routes.trips()}>{es.nav.trips}</Link>
-            </Button>
+            <div className="flex flex-wrap justify-center gap-4">
+              <Button asChild>
+                <Link to={routes.trips()}>{es.nav.trips}</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link to={routes.search()}>{p.searchAnother}</Link>
+              </Button>
+            </div>
           }
         />
       ) : (
@@ -78,30 +85,47 @@ export function CheckoutConfirmationPage() {
       const pax = booking.passengers.find((x) => x.id === passengerId);
       return pax ? `${pax.firstName} ${pax.lastName}` : passengerId;
     };
+    const failed = current.step === 'failed';
     content = (
       <>
-        {current.step === 'confirmed' ? (
-          <Alert variant="success" live="polite" title={fmt(p.confirmationCode, { code: booking.code })}>
-            <p>{fmt(p.confirmationText, { email: booking.passengers[0]?.email ?? '' })}</p>
-          </Alert>
-        ) : notice ? (
-          <Alert variant={notice.tone} live="polite" title={notice.title}>
-            <p>{notice.text}</p>
-          </Alert>
-        ) : null}
-        {current.step === 'processing' && !current.gaveUp ? <LoadingState label={es.trip.status[booking.status]} /> : null}
-        {booking.tickets.length > 0 && current.step !== 'failed' ? (
-          <section className="flex flex-col gap-2">
-            <h2 className="text-xl">{f.ticketsTitle}</h2>
-            <ul className="flex flex-col gap-1 tabular-nums">
-              {booking.tickets.map((t) => (
-                <li key={t.id}>{t.number ? fmt(f.ticketLine, { name: name(t.passengerId), number: t.number }) : fmt(f.ticketPending, { name: name(t.passengerId) })}</li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
+        {/* Región viva: lo que cambia (en proceso → confirmada) se anuncia sin mover el foco. */}
+        <div aria-live="polite" className="flex flex-col gap-4">
+          {current.step === 'confirmed' ? (
+            <Alert variant="success" title={fmt(p.confirmationCode, { code: booking.code })}>
+              <p>{fmt(p.confirmationText, { email: booking.passengers[0]?.email ?? '' })}</p>
+            </Alert>
+          ) : notice ? (
+            <Alert variant={notice.tone} title={notice.title}>
+              <p>{notice.text}</p>
+            </Alert>
+          ) : null}
+          {current.step === 'processing' && !current.gaveUp ? <LoadingState label={es.trip.status[booking.status]} /> : null}
+        </div>
+
+        {failed ? null : <BookingCode code={booking.code} />}
+
+        {failed ? null : (
+          <Card className="flex flex-col gap-6">
+            <CardTitle>{p.summaryTitle}</CardTitle>
+            <TripSummary outbound={booking.outbound} inbound={booking.inbound} />
+            {booking.tickets.length > 0 ? (
+              <section aria-labelledby="tickets-heading" className="flex flex-col gap-2">
+                <h3 id="tickets-heading" className="text-lg font-bold">
+                  {f.ticketsTitle}
+                </h3>
+                <ul className="flex flex-col gap-1 tabular-nums">
+                  {booking.tickets.map((t) => (
+                    <li key={t.id}>{t.number ? fmt(f.ticketLine, { name: name(t.passengerId), number: t.number }) : fmt(f.ticketPending, { name: name(t.passengerId) })}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </Card>
+        )}
+        {current.step === 'confirmed' ? <p className="text-muted">{p.afterBooking}</p> : null}
+
         <div className="flex flex-wrap gap-4">
-          {current.step === 'failed' ? (
+          {failed ? (
             <Button asChild>
               <Link to={routes.search()}>
                 <Search aria-hidden="true" />
@@ -109,15 +133,15 @@ export function CheckoutConfirmationPage() {
               </Link>
             </Button>
           ) : (
-            <Button asChild>
-              <Link to={routes.trip(booking.id)}>
+            <Button asChild size="lg">
+              <Link to={routes.trips()}>
                 <Ticket aria-hidden="true" />
-                {p.goToTrip}
+                {p.viewTrips}
               </Link>
             </Button>
           )}
-          <Button asChild variant="secondary">
-            <Link to={routes.trips()}>{es.nav.trips}</Link>
+          <Button asChild variant="secondary" size={failed ? 'md' : 'lg'}>
+            <Link to={failed ? routes.trips() : routes.search()}>{failed ? es.nav.trips : p.searchAnother}</Link>
           </Button>
         </div>
       </>
@@ -125,7 +149,7 @@ export function CheckoutConfirmationPage() {
   }
 
   return (
-    <Page title={p.confirmationTitle} heading={p.confirmationHeading} width="narrow">
+    <Page title={title} heading={p.confirmationHeading} width="narrow">
       <CheckoutSteps current={3} />
       {content}
     </Page>

@@ -14,13 +14,19 @@ import { Alert, Badge, Button, Card, CardTitle, Field, Input } from '@/shared/ui
 const f = es.checkoutForms;
 
 const CardSchema = z.object({
-  number: cardNumberField,
+  number: z.string().transform(onlyDigits).pipe(cardNumberField),
   holder: z.string().trim().min(1, es.validation.required),
   expiry: cardExpiryField,
   cvv: cvvField,
 });
+type CardInput = z.input<typeof CardSchema>;
 
-const EMPTY: CardDetails = { number: '', holder: '', expiry: '', cvv: '' };
+const EMPTY: CardInput = { number: '', holder: '', expiry: '', cvv: '' };
+
+/** "4111111111111111" → "4111 1111 1111 1111": solo se ve así; en el estado van los dígitos. */
+export function formatCardNumber(raw: string): string {
+  return onlyDigits(raw).slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 ');
+}
 
 /** "0828" o "08/28" → "08/28" mientras se escribe. */
 function maskExpiry(raw: string): string {
@@ -36,9 +42,9 @@ interface PaymentFormProps {
 }
 
 /**
- * Formulario PROVISIONAL de pago (F4a; F4b lo reemplaza). La tarjeta va solo a `payments`
- * (shared/payments), que devuelve la referencia; nunca se guarda ni se envía a la API de vuelos.
- * El formulario se vacía apenas se usa la tarjeta.
+ * Tarjeta del pago simulado. La tarjeta va solo a `payments` (shared/payments), que devuelve la
+ * referencia; nunca se guarda, no se registra ni se envía a la API de vuelos. El formulario se
+ * vacía apenas se usa la tarjeta (también tras un rechazo: se escribe otra).
  */
 export function PaymentForm({ amount, busy, onPay }: PaymentFormProps) {
   const {
@@ -47,7 +53,7 @@ export function PaymentForm({ amount, busy, onPay }: PaymentFormProps) {
     reset,
     setValue,
     formState: { errors },
-  } = useForm<CardDetails>({ resolver: zodResolver(CardSchema), defaultValues: EMPTY, mode: 'onTouched', shouldFocusError: true });
+  } = useForm<CardInput, unknown, CardDetails>({ resolver: zodResolver(CardSchema), defaultValues: EMPTY, mode: 'onTouched', shouldFocusError: true });
 
   const sending = useRef(false);
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -74,11 +80,11 @@ export function PaymentForm({ amount, busy, onPay }: PaymentFormProps) {
     <Card className="flex flex-col gap-4">
       <CardTitle className="flex flex-wrap items-center gap-2">
         <CreditCard aria-hidden="true" className="size-6 text-primary" />
-        {es.purchase.steps.payment}
+        {f.cardTitle}
         {payments.simulated ? <Badge tone="warning">{f.simulatedTitle}</Badge> : null}
       </CardTitle>
       {payments.simulated ? (
-        <Alert variant="info" title={f.simulatedTitle}>
+        <Alert variant="info" title={f.simulatedBanner}>
           <p>{f.simulatedText}</p>
         </Alert>
       ) : null}
@@ -93,21 +99,26 @@ export function PaymentForm({ amount, busy, onPay }: PaymentFormProps) {
           <p className="text-sm text-muted">{f.testCardsNote}</p>
         </div>
       ) : null}
-      <form noValidate onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2" autoComplete="on">
+      <form noValidate onSubmit={onSubmit} aria-label={f.cardTitle} className="grid gap-4 sm:grid-cols-2" autoComplete="on">
         <Field id="card-number" label={f.cardNumber} hint={f.cardNumberHint} error={errors.number?.message} required className="sm:col-span-2">
-          <Input inputMode="numeric" autoComplete="cc-number" {...register('number', { onChange: (e) => setValue('number', onlyDigits(e.target.value).slice(0, 19)) })} />
+          <Input
+            inputMode="numeric"
+            autoComplete="cc-number"
+            maxLength={23}
+            {...register('number', { onChange: (e) => setValue('number', formatCardNumber(e.target.value)) })}
+          />
         </Field>
         <Field id="card-holder" label={f.cardHolder} error={errors.holder?.message} required className="sm:col-span-2">
-          <Input autoComplete="cc-name" {...register('holder')} />
+          <Input autoComplete="cc-name" maxLength={60} {...register('holder')} />
         </Field>
         <Field id="card-expiry" label={f.cardExpiry} hint={f.cardExpiryHint} error={errors.expiry?.message} required>
-          <Input inputMode="numeric" autoComplete="cc-exp" {...register('expiry', { onChange: (e) => setValue('expiry', maskExpiry(e.target.value)) })} />
+          <Input inputMode="numeric" autoComplete="cc-exp" maxLength={5} {...register('expiry', { onChange: (e) => setValue('expiry', maskExpiry(e.target.value)) })} />
         </Field>
         <Field id="card-cvv" label={f.cvv} hint={f.cvvHint} error={errors.cvv?.message} required>
-          <Input inputMode="numeric" autoComplete="cc-csc" type="password" {...register('cvv', { onChange: (e) => setValue('cvv', onlyDigits(e.target.value).slice(0, 4)) })} />
+          <Input inputMode="numeric" autoComplete="cc-csc" type="password" maxLength={4} {...register('cvv', { onChange: (e) => setValue('cvv', onlyDigits(e.target.value).slice(0, 4)) })} />
         </Field>
         <div className="sm:col-span-2">
-          <Button type="submit" size="lg" loading={busy} disabled={busy}>
+          <Button type="submit" size="lg" loading={busy} disabled={busy} fullWidth className="sm:w-auto">
             {busy ? f.paying : fmt(f.pay, { total: formatMoney(amount) })}
           </Button>
         </div>

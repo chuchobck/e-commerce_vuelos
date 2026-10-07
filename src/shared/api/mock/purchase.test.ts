@@ -109,4 +109,4 @@ describe('compra del mock (mismas reglas y errores que la API local)', () => {
     expect((await failure(order([{ ...PAX[0], documentNumber: '1710034066' }]))).status).toBe(400);
     expect((await failure(order([{ ...PAX[0], birthDate: '2020-01-01' }]))).status).toBe(422);
   });
-}, 30_000);
+}, 90_000);

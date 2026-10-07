@@ -201,6 +201,11 @@ export function toHoldRequest(request: CreateHoldRequest): HoldRequestDto {
   };
 }
 
+/** Desglose del precio congelado (tarifa base e impuestos), si la API lo trae. */
+function breakdownOf(dto: MoneyDto): Hold['fareBreakdown'] {
+  return dto.baseFare !== undefined && dto.taxes !== undefined ? { base: parseMoney(dto.baseFare, dto.currency), taxes: parseMoney(dto.taxes, dto.currency) } : undefined;
+}
+
 /** POST /offers/hold. Recién creado, le quedan exactamente `ttlMinutes` (la respuesta no trae remainingSeconds). */
 export function mapHoldCreated(dto: HoldResponseDto, receivedAt: number): Hold {
   return {
@@ -210,6 +215,7 @@ export function mapHoldCreated(dto: HoldResponseDto, receivedAt: number): Hold {
     remainingSeconds: dto.ttlMinutes * 60,
     receivedAt,
     lockedPrice: mapMoney(dto.lockedPrice),
+    fareBreakdown: breakdownOf(dto.lockedPrice),
   };
 }
 
@@ -222,6 +228,7 @@ export function mapHoldStatus(dto: HoldStatusDto, holdId: string, receivedAt: nu
     remainingSeconds: Math.max(0, dto.remainingSeconds),
     receivedAt,
     lockedPrice: mapMoney(dto.lockedPrice),
+    fareBreakdown: breakdownOf(dto.lockedPrice),
   };
 }
 

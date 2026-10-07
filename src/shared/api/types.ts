@@ -149,6 +149,8 @@ export interface Hold {
   /** Date.now() local al recibir la respuesta. */
   receivedAt: number;
   lockedPrice: Money;
+  /** Tarifa base e impuestos del precio congelado, si la API los da. */
+  fareBreakdown?: { base: Money; taxes: Money };
 }
 
 export type PassengerTypeCode = PassengerItemDto['passengerType'];
