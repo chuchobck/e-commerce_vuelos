@@ -14,13 +14,15 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 
 ---
 
-## 1. Estado actual (2026-10-06)
+## 1. Estado actual (2026-10-06, cierre de F1)
 
-- 110 archivos, unas 8.100 líneas de TypeScript. 43 pruebas en verde, typecheck sin errores, build compila.
-- Todo funciona contra una **API simulada** (mock). Todavía no hay conexión con la API real.
-- Inicio, resultados, ingreso, registro, ayuda, estado de vuelo y mis reservas funcionan con el mock.
-- La compra está a medias: faltan pasajeros, asiento y pago.
-- Pendiente: reordenar la navegación (sección 4) y conectar la API real (sección 9).
+- Repositorio git con `main` y la rama `feat/f1-orden`. 125 archivos en `src`, unas 9.600 líneas de TypeScript.
+- 101 pruebas en verde; lint, typecheck y build sin errores.
+- Todo funciona contra una **API simulada** (mock). Todavía no hay conexión con la API real (F2).
+- Navegación nueva (sección 4) aplicada: menú por momento del viajero, rutas centralizadas en `src/app/routes.ts`, rutas protegidas con `RequireAuth` y redirecciones desde las rutas viejas.
+- Compra: los 3 pasos tienen pantalla, indicador, resumen y temporizador; la selección del paso 1 sobrevive a ingresar y a refrescar. Faltan el formulario de pasajeros, el asiento y el pago (F4).
+- Mis viajes: lista, detalle con estado del vuelo, check-in por viaje (ventana 48 h / 60 min) y cancelación. Pases, equipaje y cambio de fecha son pantallas de espera (F6).
+- Ofertas y Mi perfil son pantallas iniciales (F7 y F3).
 
 > Regla de mantenimiento: al cerrar cada fase se actualiza esta sección y las columnas "Estado" de las tablas. Si este README y el código no coinciden, se corrige el README en el mismo commit.
 
@@ -42,12 +44,13 @@ npm run dev               # http://localhost:5173
 | `npm run build` | Compila para producción |
 | `npm run test` | Pruebas (Vitest) |
 | `npm run typecheck` | Revisión de tipos |
+| `npm run lint` | ESLint: accesibilidad (jsx-a11y) y reglas de arquitectura de la sección 3 |
 
 ### Variables de entorno
 
 Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
 
-- **URL de la API real.** Vacía = se usa la API simulada. Con valor = se usa la API real.
+- **URL de la API real.** Vacía = se usa la API simulada y se ven las pistas "Para probar". Con valor = se usa la API real y las pistas desaparecen. (Hasta F2 la implementación HTTP no existe: con valor se ocultan las pistas pero los datos siguen viniendo del mock, y en desarrollo la consola lo avisa.)
 - **Frecuencia de errores simulados.** Solo afecta al mock; sirve para diseñar y probar los estados de error.
 
 Todas las variables que empiezan con `VITE_` quedan visibles en el navegador: **no se ponen secretos ahí**.
@@ -60,31 +63,33 @@ Todas las variables que empiezan con `VITE_` quedan visibles en el navegador: **
 src/
 ├─ main.tsx, index.css        arranque y tokens de diseño (claro y oscuro)
 ├─ app/
-│  ├─ router.tsx              todas las rutas
+│  ├─ routes.ts               tabla única de rutas (paths, routes.trip(id), returnTo, redirecciones)
+│  ├─ routeTable.tsx          qué página atiende cada ruta; router.tsx la monta
+│  ├─ RequireAuth.tsx         rutas con sesión (manda a /ingresar?volver=…)
 │  ├─ providers/              tema y sesión del usuario
 │  └─ layout/                 header, menú móvil, footer, plantilla de página, página de error
 ├─ pages/                     una página por ruta; solo arma piezas, sin lógica de negocio
-├─ features/                  una carpeta por módulo funcional
-│  ├─ home/                   panorámica, regiones, "Escápate"
-│  ├─ search/                 buscador, validaciones, búsqueda guardada en la URL
-│  ├─ results/                tarjeta de vuelo, tarifas, resumen
-│  ├─ bookings/               estado de la reserva
-│  └─ forms/                  validaciones de formularios
+├─ features/                  una carpeta por módulo; cada uno expone solo lo de su index.ts
+│  ├─ home/  search/  results/
+│  ├─ auth/  checkout/  seats/
+│  ├─ trips/  checkin/  aftersale/
+│  └─ flight-status/  offers/
 └─ shared/
    ├─ api/                    contrato FlightsApi + implementaciones (mock y real)
    ├─ i18n/                   todos los textos en español
-   ├─ lib/                    fechas, formatos, validadores, esquemas, hooks
-   └─ ui/                     componentes base
+   ├─ lib/                    fechas, formatos, validadores, esquemas, ventana de check-in, hooks
+   └─ ui/                     componentes base (incluye el resumen de viaje y MockOnly)
 ```
 
-Reglas de dependencia (para no perderse):
+Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `npm run lint`:
 
-1. `pages` usa `features` y `shared`. `features` usa `shared`. `shared` no usa a nadie.
-2. Un módulo de `features` no importa de otro módulo de `features`. Lo común sube a `shared`.
-3. **Solo `shared/api` habla con la red.** Ningún componente llama a `fetch` directamente.
+1. `pages` usa `app`, `features` y `shared`. `features` usa `shared` y, como única excepción, `app/routes.ts` (no importa nada) para enlazar sin escribir rutas sueltas. `shared` no usa a nadie.
+2. Un módulo de `features` no importa de otro módulo de `features`, y desde fuera se importa solo por su `index.ts` (`@/features/trips`, nunca `@/features/trips/Archivo`). Lo común sube a `shared`.
+3. **Solo `shared/api` habla con la red.** `fetch`, `XMLHttpRequest` y axios están prohibidos fuera de ahí.
 4. Ningún texto visible va escrito en el componente: todo sale de `shared/i18n`.
 5. Ningún color fuera de los tokens de `index.css`.
 6. Un componente por archivo. Componentes de presentación sin lógica de negocio.
+7. Ninguna ruta se escribe como texto: se usa `routes.*` o `paths.*` de `app/routes.ts`.
 
 ### Módulos objetivo
 
@@ -93,14 +98,14 @@ Reglas de dependencia (para no perderse):
 | `home` | Inicio | Hecho |
 | `search` | Buscador | Hecho |
 | `results` | Resultados y tarifas | Hecho |
-| `auth` | Ingreso, registro, sesión, rutas protegidas | Parcial (mock) |
-| `checkout` | Compra en 3 pasos | Parcial |
-| `seats` | Mapa de asientos (avión) | Planificado |
-| `trips` | Mis viajes y detalle del viaje | Parcial |
-| `checkin` | Check-in y pases de abordar | Por mover dentro de un viaje |
-| `aftersale` | Equipaje, cambio de fecha, cancelación | Parcial (cancelación) |
-| `flight-status` | Estado de vuelo | Hecho (mock) |
-| `offers` | Ofertas por destino | Planificado |
+| `auth` | Validaciones de ingreso y registro (la sesión y `RequireAuth` viven en `app/`) | Parcial (mock) |
+| `checkout` | Compra en 3 pasos: selección, hold, cuenta, resumen | Parcial (faltan pasajeros y pago) |
+| `seats` | Mapa de asientos (avión) | Planificado (carpeta creada) |
+| `trips` | Mis viajes y detalle del viaje | Parcial (mock) |
+| `checkin` | Check-in dentro del viaje y pases de abordar | Parcial (check-in por viaje; pases en F6) |
+| `aftersale` | Equipaje, cambio de fecha, cancelación | Parcial (cancelación en la página del viaje) |
+| `flight-status` | Estado de vuelo (público y dentro del viaje) | Hecho (mock) |
+| `offers` | Ofertas por destino | Planificado (carpeta creada) |
 
 ---
 
@@ -118,24 +123,26 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo**. A la de
 |---|---|---|---|---|
 | `/` | Inicio con buscador | Público | `POST /search` | Hecho |
 | `/resultados` | Vuelos y tarifas (paso 1) | Público | `POST /search` | Hecho |
-| `/ofertas` | Precios más bajos por destino | Público | `POST /search` | Planificado |
-| `/compra/datos` | Cuenta y pasajeros (paso 2) | Sesión | hold, `/auth/*`, mapa de asientos | Planificado |
-| `/compra/pago` | Pago y confirmación (paso 3) | Sesión | `POST /bookings` | Planificado |
-| `/compra/confirmacion/:id` | Compra lista | Sesión | `GET /bookings/{id}` | Planificado |
-| `/mis-viajes` | Lista de viajes | Sesión | `GET /bookings` | Hoy es `/mis-reservas` |
-| `/mis-viajes/:id` | Detalle del viaje (centro de postventa) | Sesión | detalle, boletos, estado | Hoy es `/reserva/:id` |
-| `/mis-viajes/:id/check-in` | Check-in | Sesión | `POST .../check-in` | Hoy es `/check-in` público |
-| `/mis-viajes/:id/pases` | Pases de abordar | Sesión | `GET .../boarding-passes` | Planificado |
-| `/mis-viajes/:id/equipaje` | Agregar equipaje | Sesión | `baggage-options`, `baggage` | Planificado |
-| `/mis-viajes/:id/cambiar-fecha` | Cambio de fecha | Sesión | `date-change` | Planificado |
-| `/mis-viajes/:id/cancelar` | Cancelación | Sesión | `cancellation-quote`, `cancel` | Parcial |
+| `/ofertas` | Precios más bajos por destino | Público | `POST /search` | Pantalla de espera (F7) |
+| `/compra/datos` | Cuenta y pasajeros (paso 2) | Sesión dentro del paso | hold, `/auth/*`, mapa de asientos | Parcial: cuenta, hold, temporizador y resumen; pasajeros en F4 |
+| `/compra/pago` | Pago (paso 3) | Sesión dentro del paso | `POST /bookings` | Parcial: resumen y temporizador; pago en F4 |
+| `/compra/confirmacion/:id` | Compra lista | Sesión | `GET /bookings/{id}` | Hecho (mock); se llega a ella en F4 |
+| `/mis-viajes` | Lista de viajes | Sesión | `GET /bookings` | Hecho (mock) |
+| `/mis-viajes/:id` | Detalle del viaje (centro de postventa) | Sesión | detalle, boletos, estado | Hecho (mock), con estado del vuelo |
+| `/mis-viajes/:id/check-in` | Check-in | Sesión | `POST .../check-in` | Hecho (mock) |
+| `/mis-viajes/:id/pases` | Pases de abordar | Sesión | `GET .../boarding-passes` | Pantalla de espera (F6) |
+| `/mis-viajes/:id/equipaje` | Agregar equipaje | Sesión | `baggage-options`, `baggage` | Pantalla de espera (F6) |
+| `/mis-viajes/:id/cambiar-fecha` | Cambio de fecha | Sesión | `date-change` | Pantalla de espera (F6) |
+| `/mis-viajes/:id/cancelar` | Cancelación | Sesión | `cancellation-quote`, `cancel` | Parcial (sin cotización) |
 | `/estado-vuelo` | Estado de un vuelo | Público | `GET /flights/{n}/status` | Hecho (mock) |
-| `/ingresar`, `/registrarse` | Cuenta | Público | `/auth/*` | Hecho (mock) |
-| `/perfil` | Mis datos | Sesión | `GET /auth/me` | Planificado |
+| `/ingresar`, `/registrarse` | Cuenta (vuelven a `?volver=`) | Público | `/auth/*` | Hecho (mock) |
+| `/perfil` | Mis datos | Sesión | `GET /auth/me` | Parcial: muestra la sesión actual |
 | `/ayuda` | Ayuda y textos legales | Público | Ninguna | Hecho |
-| `/componentes` | Catálogo interno | Solo desarrollo | Ninguna | Hecho |
+| `/componentes` | Catálogo interno | Solo desarrollo (404 en producción) | Ninguna | Hecho |
 
-Por qué el check-in no es una sección del menú: en la API el check-in se hace por `bookingId` y solo el dueño de la reserva puede hacerlo. No existe búsqueda por código de reserva y apellido, así que un check-in sin cuenta no puede funcionar. Vive dentro de cada viaje, y el inicio muestra un aviso cuando un viaje entra en la ventana de check-in.
+Rutas viejas que redirigen: `/mis-reservas` → `/mis-viajes`, `/reserva/:id` → `/mis-viajes/:id`, `/check-in` → `/mis-viajes`, `/compra` → `/compra/datos`.
+
+Por qué el check-in no es una sección del menú: en la API el check-in se hace por `bookingId` y solo el dueño de la reserva puede hacerlo. No existe búsqueda por código de reserva y apellido, así que un check-in sin cuenta no puede funcionar. Vive dentro de cada viaje. Pendiente (F6): que el inicio muestre un aviso cuando un viaje entra en la ventana de check-in.
 
 ---
 
@@ -220,9 +227,9 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 
 ## 8. Pruebas
 
-- **Hoy:** 43 pruebas con Vitest (validadores, esquemas, buscador).
+- **Hoy:** 101 pruebas con Vitest: validadores, esquemas, buscador, tabla de rutas y redirecciones, `RequireAuth`, selección de compra, ventana de check-in, check-in del mock y pistas solo con mock.
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
-- Al cerrar cada fase: typecheck, build, pruebas, recorrido solo con teclado, 320 px, zoom al 200 % y modo oscuro.
+- Al cerrar cada fase: lint, typecheck, build, pruebas, recorrido solo con teclado, 320 px, zoom al 200 % y modo oscuro.
 
 ---
 
@@ -231,8 +238,8 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 | Fase | Qué | Estado |
 |---|---|---|
 | F0 | Fundación: diseño, layout, rutas, mock, inicio | Hecha |
-| F1 | Orden: repositorio git, navegación y rutas nuevas, limpieza | Siguiente |
-| F2 | Contrato: tipos generados desde el OpenAPI, `FlightsApi` alineada, API real en lo público (búsqueda, asientos, estado) | Pendiente |
+| F1 | Orden: repositorio git, navegación y rutas nuevas, limpieza | Hecha (rama `feat/f1-orden`, por fusionar) |
+| F2 | Contrato: tipos generados desde el OpenAPI, `FlightsApi` alineada, API real en lo público (búsqueda, asientos, estado) | Siguiente |
 | F3 | Cuenta: ingreso, registro, renovación de sesión y rutas protegidas contra la API real | Pendiente |
 | F4 | Compra en 3 pasos completa | Pendiente |
 | F5 | Mapa de asientos en forma de avión | Pendiente |
