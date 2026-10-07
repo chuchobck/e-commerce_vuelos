@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { es, fmt } from '@/shared/i18n';
 import { formatMoney } from '@/shared/lib/format';
 import { TEST_CARDS } from '@/shared/payments';
-import { PaymentForm } from './PaymentForm';
+import { formatCardNumber, PaymentForm } from './PaymentForm';
 
 const f = es.checkoutForms;
 const AMOUNT = { cents: 7392, currency: 'USD' };
@@ -32,6 +32,19 @@ describe('formulario de pago (simulado)', () => {
     expect((screen.getByLabelText(new RegExp(`^${f.cvv}`)) as HTMLInputElement).value).toBe('');
     expect(setItem).not.toHaveBeenCalled();
     vi.restoreAllMocks();
+  });
+
+  it('rotula el pago simulado y el número se ve espaciado (se acepta pegado con cualquier separador)', () => {
+    render(<PaymentForm amount={AMOUNT} busy={false} onPay={vi.fn()} />);
+    expect(screen.getAllByText(f.simulatedBanner).length).toBeGreaterThan(0);
+    const input = screen.getByLabelText(new RegExp('^' + f.cardNumber)) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '4111-1111 1111.1111x' } });
+    expect(input.value).toBe('4111 1111 1111 1111');
+    expect(formatCardNumber('4111111111111111999')).toBe('4111 1111 1111 1111 999');
+    expect(input.getAttribute('autocomplete')).toBe('cc-number');
+    for (const [label, token] of [[f.cardHolder, 'cc-name'], [f.cardExpiry, 'cc-exp'], [f.cvv, 'cc-csc']]) {
+      expect((screen.getByLabelText(new RegExp('^' + label)) as HTMLInputElement).getAttribute('autocomplete')).toBe(token);
+    }
   });
 
   it('una tarjeta inválida no llega a pagarse: error en su campo', async () => {

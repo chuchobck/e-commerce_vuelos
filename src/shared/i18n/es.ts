@@ -379,6 +379,7 @@ export const es = {
     copyFailed: 'No pudimos copiarlo. Tu código es {code}: selecciónalo para copiarlo.',
     afterBooking: 'El equipaje adicional, el cambio de fecha y el check-in se gestionan en Mis viajes.',
     searchAnother: 'Buscar otro vuelo',
+    viewTrips: 'Ver mis viajes',
     confirmationTitle: 'Compra lista',
     confirmationHeading: 'Tu compra está lista',
     confirmationCode: 'Tu código de reserva es {code}.',

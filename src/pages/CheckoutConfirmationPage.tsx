@@ -136,7 +136,7 @@ export function CheckoutConfirmationPage() {
             <Button asChild size="lg">
               <Link to={routes.trips()}>
                 <Ticket aria-hidden="true" />
-                {es.nav.trips}
+                {p.viewTrips}
               </Link>
             </Button>
           )}
