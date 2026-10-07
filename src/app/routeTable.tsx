@@ -38,7 +38,14 @@ export function buildRoutes({ dev }: { dev: boolean }): RouteObject[] {
   // `import.meta.env.DEV` va primero para que la compilación de producción descarte el catálogo.
   const devRoutes: RouteObject[] =
     import.meta.env.DEV && dev
-      ? [{ id: 'uiKit', path: paths.uiKit, lazy: async () => ({ Component: (await import('@/pages/UiKitPage')).UiKitPage }) }]
+      ? [
+          { id: 'uiKit', path: paths.uiKit, lazy: async () => ({ Component: (await import('@/pages/UiKitPage')).UiKitPage }) },
+          {
+            id: 'uiKitSeats',
+            path: paths.uiKitSeats,
+            lazy: async () => ({ Component: (await import('@/pages/SeatsDemoPage')).SeatsDemoPage }),
+          },
+        ]
       : [];
 
   return [

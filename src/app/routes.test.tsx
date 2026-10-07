@@ -41,6 +41,7 @@ describe('tabla de rutas', () => {
     profile: routes.profile(),
     help: routes.help('preguntas'),
     uiKit: paths.uiKit,
+    uiKitSeats: paths.uiKitSeats,
   };
 
   it.each(Object.entries(samples))('%s se atiende en su ruta', (id, href) => {
