@@ -27,3 +27,4 @@ export { holdOf, type CheckoutState, type HoldEnd, type PaymentProblem } from '.
 export { purchaseNotice } from './messages';
 export { isDraftComplete } from './passengers';
 export { passengersLine } from './CheckoutAside';
+export { seatLines } from './seatLines';

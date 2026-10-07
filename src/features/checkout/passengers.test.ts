@@ -40,7 +40,7 @@ const person = (over: Partial<PassengerFormValue> = {}): PassengerFormValue => (
   phone: '991234567',
   ...over,
 });
-const form = (passengers: PassengerFormValue[], sameContact = false): PassengersFormValues => ({ passengers, sameContact });
+const form = (passengers: PassengerFormValue[], sameContact = false): PassengersFormValues => ({ passengers, sameContact, seats: {} });
 const errorsOf = (r: ReturnType<ReturnType<typeof passengersSchema>['safeParse']>) => (r.success ? [] : r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`));
 
 describe('pasajeros del paso 2', () => {

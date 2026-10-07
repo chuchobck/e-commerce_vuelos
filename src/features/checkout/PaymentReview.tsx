@@ -4,6 +4,7 @@ import type { BookingPassenger } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { formatLongDate, formatTime } from '@/shared/lib/format';
 import { Card, CardTitle } from '@/shared/ui';
+import { anySeatChosen, seatLines } from './seatLines';
 import type { CheckoutSelection } from './selection';
 
 const p = es.purchase;
@@ -14,6 +15,7 @@ const p = es.purchase;
  */
 export function PaymentReview({ selection, passengers }: { selection: CheckoutSelection; passengers: BookingPassenger[] }) {
   const legs = [selection.outbound, ...(selection.inbound ? [selection.inbound] : [])];
+  const lines = seatLines(passengers, selection.outbound, selection.inbound);
   return (
     <Card className="flex flex-col gap-4">
       <CardTitle>{p.reviewTitle}</CardTitle>
@@ -47,6 +49,18 @@ export function PaymentReview({ selection, passengers }: { selection: CheckoutSe
               {pax.firstName} {pax.lastName}
             </dd>
           ))}
+        </div>
+        <div className="flex flex-col gap-1">
+          <dt className="font-bold">{es.checkoutForms.seatsTitle}</dt>
+          {anySeatChosen(lines) ? (
+            lines.map((l) => (
+              <dd key={l.passengerId} className="text-muted">
+                {l.name}: {l.text}
+              </dd>
+            ))
+          ) : (
+            <dd className="text-muted">{es.checkoutForms.seatAutoShort}</dd>
+          )}
         </div>
         {passengers[0] ? (
           <div className="flex flex-col gap-1">

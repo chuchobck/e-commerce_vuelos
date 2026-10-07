@@ -46,6 +46,11 @@ export function CheckoutPaymentPage() {
     }
   }, [state, selection]);
 
+  // Asiento ocupado o de otra cabina: se corrige en el paso 2 (el hold sigue vivo).
+  useEffect(() => {
+    if (state.step === 'held' && state.bookingError) navigate(routes.checkoutDetails(), { replace: true });
+  }, [state, navigate]);
+
   // Hay reserva (confirmada, en proceso o fallida): la confirmación la muestra.
   useEffect(() => {
     if (state.step === 'confirmed' || state.step === 'processing' || state.step === 'failed') {
@@ -102,7 +107,7 @@ export function CheckoutPaymentPage() {
       }
     >
       <CheckoutSteps current={2} />
-      <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} onCancel={cancel} />}>
+      <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} passengers={checkout.passengersDraft()} onCancel={cancel} />}>
         <HoldNotice
           state={state}
           onSearchAgain={() => navigate(routes.results(checkout.searchAgain() ?? selection.searchQuery))}
