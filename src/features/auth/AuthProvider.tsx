@@ -18,6 +18,8 @@ export interface AuthContextValue extends SessionState {
   logout: () => Promise<void>;
   /** Ejecuta una petición con sesión (renovación y reintento único ante 401). */
   authorized: <T>(call: () => Promise<T>) => Promise<T>;
+  /** Vuelve a intentar restaurar la sesión tras un problema de conexión (estado `unavailable`). */
+  retryRestore: () => Promise<void>;
 }
 
 export function useAuth(): AuthContextValue {
@@ -30,5 +32,6 @@ export function useAuth(): AuthContextValue {
     register: (credentials, persistent) => manager.register(credentials, persistent),
     logout: () => manager.logout(),
     authorized: (call) => manager.authorized(call),
+    retryRestore: () => manager.retryRestore(),
   };
 }

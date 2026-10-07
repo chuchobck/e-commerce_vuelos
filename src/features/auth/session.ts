@@ -24,7 +24,8 @@ export interface AuthApi {
   me(): Promise<User>;
 }
 
-export type SessionStatus = 'restoring' | 'anonymous' | 'authenticated';
+/** `unavailable`: hay una sesión guardada, pero no se pudo restaurar por un problema de conexión. */
+export type SessionStatus = 'restoring' | 'anonymous' | 'authenticated' | 'unavailable';
 /** Por qué terminó una sesión sin que el usuario la cerrara en esta pestaña. */
 export type SessionEndReason = 'security' | 'elsewhere';
 
@@ -32,6 +33,8 @@ export interface SessionState {
   status: SessionStatus;
   user: User | null;
   ended: SessionEndReason | null;
+  /** Solo en `unavailable`: el error de conexión con el que falló la restauración. */
+  restoreError?: unknown;
 }
 
 export interface SessionDeps {
@@ -118,6 +121,13 @@ export class SessionManager {
     return this.restoring;
   }
 
+  /** Reintenta una restauración que falló por un problema de conexión. */
+  retryRestore(): Promise<void> {
+    if (this.state.status !== 'unavailable') return this.restore();
+    this.restoring = this.doRestore();
+    return this.restoring;
+  }
+
   private async doRestore(): Promise<void> {
     if (!this.deps.store.read()) {
       this.setState({ status: 'anonymous', user: null, ended: null });
@@ -125,14 +135,13 @@ export class SessionManager {
     }
     this.setState({ ...this.state, status: 'restoring' });
     try {
-      await this.refresh();
+      // `authorized` renueva antes si no hay access token; en un reintento puede que ya lo haya.
       const user = await this.authorized(() => this.deps.api.me());
       this.setState({ status: 'authenticated', user, ended: null });
     } catch (error) {
-      // Sin conexión o servidor caído: el token queda guardado para el próximo intento.
+      // Sin conexión o servidor caído: la sesión sigue guardada y no se trata como cerrada.
       if (!(error instanceof SessionEndedError) && !isAuthRejection(error)) {
-        this.access = null;
-        this.setState({ status: 'anonymous', user: null, ended: null });
+        this.setState({ status: 'unavailable', user: null, ended: null, restoreError: error });
       }
     }
   }

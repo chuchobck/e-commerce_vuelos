@@ -310,6 +310,26 @@ describe('cierre de sesión y restauración', () => {
     expect(api.stats.refreshCalls).toBe(0);
   });
 
+  it('sin conexión al restaurar: "no disponible" (no anónimo), el token sigue guardado y reintentar funciona', async () => {
+    const api = fakeApi(() => T0);
+    const session = memoryStorage();
+    await tab({ api, session }).manager.login({ email: 'a@b.cc', password: 'x'.repeat(12) }, false);
+    const realMe = api.me;
+    api.me = async () => {
+      throw new ApiError({ status: 0, code: 'NETWORK' });
+    };
+    const reloaded = tab({ api, session }).manager;
+    await reloaded.restore();
+    expect(reloaded.getState()).toMatchObject({ status: 'unavailable', user: null, ended: null, restoreError: { code: 'NETWORK' } });
+    expect(session.dump()['quinde.auth.refresh']).toBeDefined();
+    api.me = realMe;
+    const refreshes = api.stats.refreshCalls;
+    await reloaded.retryRestore();
+    expect(reloaded.getState()).toMatchObject({ status: 'authenticated', user: USER });
+    // El access token de la renovación anterior sigue vigente: el reintento no renueva otra vez.
+    expect(api.stats.refreshCalls).toBe(refreshes);
+  });
+
   it('restaurar dos veces (StrictMode) hace una sola renovación', async () => {
     const api = fakeApi(() => T0);
     const session = memoryStorage();

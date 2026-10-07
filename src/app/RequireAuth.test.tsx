@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AuthProvider, createLocalLock, createTokenStore, SessionManager, type AuthApi } from '@/features/auth';
@@ -84,6 +84,24 @@ describe('RequireAuth', () => {
     expect(returnTo).toBe('/mis-viajes/bkg_1/check-in?x=1#pases');
     // La página de ingreso acepta ese destino y vuelve ahí al terminar.
     expect(safeReturnTo(returnTo)).toBe('/mis-viajes/bkg_1/check-in?x=1#pases');
+  });
+
+  it('sin conexión al restaurar no manda a /ingresar: lo explica y reintentar entra', async () => {
+    let offline = true;
+    const { m } = manager({
+      storedToken: true,
+      refresh: async () => {
+        if (offline) throw new ApiError({ status: 0, code: 'NETWORK' });
+        return TOKENS;
+      },
+    });
+    renderAt(m, '/mis-viajes');
+    expect(await screen.findByText(es.session.unavailable)).toBeTruthy();
+    expect(screen.getByText(es.errors.network)).toBeTruthy();
+    expect(screen.queryByTestId('login')).toBeNull();
+    offline = false;
+    fireEvent.click(screen.getByRole('button', { name: es.states.retry }));
+    expect(await screen.findByText('Privado')).toBeTruthy();
   });
 
   it('si la renovación al restaurar es rechazada, termina en /ingresar', async () => {

@@ -541,6 +541,7 @@ export const es = {
     restoring: 'Restaurando tu sesión…',
     expired: 'Tu sesión se cerró por seguridad. Ingresa de nuevo.',
     endedElsewhere: 'Cerraste sesión en otra pestaña.',
+    unavailable: 'No pudimos recuperar tu sesión',
   },
 
   profile: {
