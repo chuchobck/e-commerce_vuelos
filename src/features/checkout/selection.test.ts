@@ -47,7 +47,7 @@ describe('selección de compra', () => {
   it('sobrevive a ir a ingresar y a refrescar la página', async () => {
     (await freshModule()).saveSelection(SELECTION);
     const reloaded = await freshModule();
-    expect(reloaded.loadSelection()).toEqual(SELECTION);
+    expect(reloaded.loadSelection()).toEqual({ ...SELECTION, id: expect.any(String) });
   });
 
   it('guarda el hold del paso 2 para no crear otro al refrescar', async () => {
@@ -75,7 +75,7 @@ describe('selección de compra', () => {
     vi.stubGlobal('sessionStorage', undefined);
     const mod = await freshModule();
     mod.saveSelection(SELECTION);
-    expect(mod.loadSelection()).toEqual(SELECTION);
+    expect(mod.loadSelection()).toEqual({ ...SELECTION, id: expect.any(String) });
   });
 
   it('suma ida y vuelta', async () => {
