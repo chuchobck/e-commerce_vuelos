@@ -1,9 +1,10 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from 'react';
+import { forwardRef, useEffect, useState, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from 'react';
 import { es } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { Button } from './button';
+import { Checkbox } from './checkbox';
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -64,6 +65,8 @@ interface ConfirmDialogProps {
   loading?: boolean;
   /** Acción destructiva: el botón de confirmar usa el estilo de peligro. */
   destructive?: boolean;
+  /** Si se da, hay que marcar esta casilla ("Entiendo que esta acción no se puede deshacer") para poder confirmar. */
+  acknowledge?: string;
 }
 
 /**
@@ -80,12 +83,20 @@ export function ConfirmDialog({
   onConfirm,
   loading = false,
   destructive = false,
+  acknowledge,
 }: ConfirmDialogProps) {
+  const [understood, setUnderstood] = useState(false);
+  // Cada vez que se abre, la casilla empieza sin marcar.
+  useEffect(() => {
+    if (!open) setUnderstood(false);
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent role="alertdialog" hideClose>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
+        {acknowledge ? <Checkbox label={acknowledge} checked={understood} onCheckedChange={(checked) => setUnderstood(checked === true)} /> : null}
         <DialogFooter>
           <DialogClose asChild>
             {/* Foco inicial en la opción segura de una acción destructiva (patrón alertdialog de WAI-ARIA). */}
@@ -94,7 +105,7 @@ export function ConfirmDialog({
               {cancelLabel}
             </Button>
           </DialogClose>
-          <Button variant={destructive ? 'danger' : 'primary'} loading={loading} onClick={onConfirm}>
+          <Button variant={destructive ? 'danger' : 'primary'} loading={loading} disabled={!!acknowledge && !understood} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </DialogFooter>

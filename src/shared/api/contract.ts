@@ -25,6 +25,20 @@ export type BookingRequestDto = Schemas['BookingRequest'];
 export type PassengerItemDto = Schemas['PassengerItem'];
 export type BookingDetailDto = Schemas['BookingDetail'];
 export type TicketDto = Schemas['Ticket'];
+export type TicketListDto = Schemas['TicketListResponse'];
+export type BookingListDto = Schemas['BookingListResponse'];
+export type BaggageOptionDto = Schemas['BaggageOptionsResponse'][number];
+export type AddBaggageRequestDto = Schemas['AddBaggageRequest'];
+export type BaggageAddedDto = Schemas['BaggageAddedResponse'];
+export type DateChangeSearchRequestDto = Schemas['DateChangeSearchRequest'];
+export type DateChangeOptionDto = Schemas['DateChangeSearchResponse'][number];
+export type DateChangeRequestDto = Schemas['DateChangeRequest'];
+export type CancellationQuoteDto = Schemas['CancellationQuoteResponse'];
+export type CancelBookingRequestDto = Schemas['CancelBookingRequest'];
+export type CheckInResponseDto = Schemas['CheckInResponse'];
+export type BoardingPassDto = Schemas['BoardingPass'];
+export type PaymentReferenceDto = Schemas['PaymentReference'];
+export type BoardingPassListDto = Schemas['BoardingPassListResponse'];
 
 /** Cabinas del contrato. */
 export type CabinClass = CabinPricingDto['cabinClass'];

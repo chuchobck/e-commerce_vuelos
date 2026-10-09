@@ -46,8 +46,17 @@ export interface HttpClientOptions {
   log?: (message: string, detail?: unknown) => void;
 }
 
+/** Respuesta correcta con su código HTTP: la postventa distingue 200/201 (hecho) de 202 (en proceso). */
+export interface HttpResult<T> {
+  status: number;
+  /** `undefined` si la respuesta no trae cuerpo (p. ej. un 202 vacío o un 204). */
+  body: T | undefined;
+}
+
 export interface HttpClient {
   request<T>(method: string, path: string, options?: RequestOptions): Promise<T>;
+  /** Como `request`, pero devuelve también el código HTTP. Mismas reglas de reintento y errores. */
+  requestWithStatus<T>(method: string, path: string, options?: RequestOptions): Promise<HttpResult<T>>;
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -63,7 +72,7 @@ export function createHttpClient({
 }: HttpClientOptions): HttpClient {
   const base = baseUrl.replace(/\/+$/, '');
 
-  async function attempt<T>(method: string, path: string, options: RequestOptions): Promise<T> {
+  async function attempt<T>(method: string, path: string, options: RequestOptions): Promise<HttpResult<T>> {
     const url = new URL(`${base}${path}`);
     for (const [k, v] of Object.entries(options.query ?? {})) url.searchParams.set(k, v);
 
@@ -110,7 +119,7 @@ export function createHttpClient({
       log(`[api] ${method} ${path}: ${response.status} ${error.code ?? ''} ${error.detail ?? ''}`, body);
       throw error;
     }
-    return body as T;
+    return { status: response.status, body: body as T | undefined };
   }
 
   function startSlowWatch() {
@@ -124,7 +133,7 @@ export function createHttpClient({
     };
   }
 
-  async function withRetry<T>(method: string, path: string, options: RequestOptions): Promise<T> {
+  async function withRetry<T>(method: string, path: string, options: RequestOptions): Promise<HttpResult<T>> {
     try {
       return await attempt<T>(method, path, options);
     } catch (error) {
@@ -139,21 +148,28 @@ export function createHttpClient({
 
   const inflight = new Map<string, Promise<unknown>>();
 
+  function send<T>(method: string, path: string, options: RequestOptions): Promise<HttpResult<T>> {
+    if (!options.retry) return withRetry<T>(method, path, options);
+    const key = JSON.stringify([
+      method,
+      path,
+      options.query ?? null,
+      options.body ?? null,
+      options.auth ? (getAccessToken?.() ?? null) : null,
+    ]);
+    const pending = inflight.get(key);
+    if (pending) return pending as Promise<HttpResult<T>>;
+    const promise = withRetry<T>(method, path, options).finally(() => inflight.delete(key));
+    inflight.set(key, promise);
+    return promise;
+  }
+
   return {
-    request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
-      if (!options.retry) return withRetry<T>(method, path, options);
-      const key = JSON.stringify([
-        method,
-        path,
-        options.query ?? null,
-        options.body ?? null,
-        options.auth ? (getAccessToken?.() ?? null) : null,
-      ]);
-      const pending = inflight.get(key);
-      if (pending) return pending as Promise<T>;
-      const promise = withRetry<T>(method, path, options).finally(() => inflight.delete(key));
-      inflight.set(key, promise);
-      return promise;
+    async request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+      return (await send<T>(method, path, options)).body as T;
+    },
+    requestWithStatus<T>(method: string, path: string, options: RequestOptions = {}): Promise<HttpResult<T>> {
+      return send<T>(method, path, options);
     },
   };
 }

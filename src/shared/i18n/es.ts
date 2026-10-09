@@ -3,10 +3,12 @@
  * Regla: ningún texto visible se escribe directamente en un componente.
  * Para interpolar valores usa `fmt(es.x.y, { clave: valor })` desde src/shared/i18n/fmt.ts.
  */
+import { aftersaleEs } from './aftersale';
 import { seatsEs } from './seats';
 
 export const es = {
   seats: seatsEs,
+  aftersale: aftersaleEs,
 
   app: {
     name: 'Quinde',
@@ -102,13 +104,25 @@ export const es = {
     unavailable503Wait: 'El servicio no está disponible en este momento. Vuelve a intentarlo en {seconds} segundos.',
     server5xx: 'El servidor tuvo un problema. No es tu culpa: inténtalo de nuevo en unos minutos.',
     badRequest400: 'Algunos datos de la búsqueda no son válidos. Revísalos y vuelve a intentarlo.',
-    forbidden403: 'No tienes permiso para hacer esto. Ingresa con la cuenta correcta.',
+    forbidden403: 'Tu cuenta no tiene permiso para esta acción. Si crees que es un error, cierra sesión y vuelve a ingresar.',
     rateLimited: 'Hiciste muchas consultas seguidas. Espera {seconds} segundos y vuelve a intentarlo.',
     rateLimitedNoTime: 'Hiciste muchas consultas seguidas. Espera un minuto y vuelve a intentarlo.',
     retryIn: 'Podrás intentarlo de nuevo en {seconds} s',
     notConnected: 'Esta función se conecta en una fase posterior. Por ahora no está disponible con el servidor real.',
     checkInNotAvailable: 'El check-in no está disponible ahora para este vuelo: abre 48 horas antes y cierra 60 minutos antes de la salida.',
     offerGone: 'Esa tarifa ya no está disponible. Vuelve a buscar para ver los precios actualizados.',
+    checkInFailed: 'No pudimos completar el check-in. Inténtalo de nuevo; si sigue igual, hazlo en el mostrador del aeropuerto.',
+    boardingPassNotAvailable: 'Todavía no hay pases de abordar: primero haz el check-in.',
+    baggageLimit: 'Llegaste al máximo de maletas extra para este pasajero. Baja la cantidad.',
+    fareNotChangeable: 'Tu tarifa no permite cambiar la fecha.',
+    changeOfferExpired: 'Esa opción de cambio venció. Busca de nuevo para ver los precios al día.',
+    quoteExpired: 'La cotización venció. Pide una nueva para ver el reembolso actualizado.',
+    alreadyCancelled: 'Esta reserva ya está cancelada.',
+    cutoffPassed: 'Ya pasó el plazo para hacer este cambio.',
+    flightDeparted: 'Este vuelo ya salió, así que no se puede hacer este cambio.',
+    paymentNotAuthorized: 'El pago no fue autorizado. No se te cobró nada: prueba con otro pago.',
+    paymentReferenceInvalid: 'La referencia de pago no sirve (ya se usó o no es válida). Usa otra distinta.',
+    bookingNotConfirmed: 'La reserva todavía no está confirmada, por eso no se puede hacer esto. Espera un momento y actualiza.',
     waking: 'El servidor se está despertando, puede tardar hasta un minuto.',
     fields: {
       date: 'Revisa la fecha del vuelo.',
@@ -539,6 +553,7 @@ export const es = {
     total: 'Total pagado',
     contact: 'Contacto',
     seatAuto: 'Asiento asignado automáticamente',
+    extraBags: '{count} maleta(s) extra',
     seat: 'Asiento {seat}',
     document: '{type} {number}',
     infantSeat: 'Viaja en brazos',

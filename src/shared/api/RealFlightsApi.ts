@@ -1,47 +1,85 @@
 import type {
+  BaggageAddedDto,
+  BaggageOptionDto,
+  BoardingPassListDto,
   BookingDetailDto,
+  BookingListDto,
+  CancellationQuoteDto,
+  CheckInResponseDto,
+  DateChangeOptionDto,
   FlightStatusDto,
   HoldResponseDto,
   HoldStatusDto,
   SearchResponseDto,
   SeatMapDto,
+  TicketDto,
+  TicketListDto,
   TokenResponseDto,
   UserResponseDto,
 } from './contract';
-import { NotYetConnectedError } from './errors';
 import type { FlightsApi } from './FlightsApi';
 import type { HttpClient } from './http/client';
 import { deviceFingerprint } from './http/deviceFingerprint';
 import {
+  mapBaggageAdded,
+  mapBaggageOptions,
+  mapBoardingPasses,
   mapBooking,
+  mapBookingList,
+  mapCancellationQuote,
+  mapCheckIn,
+  mapDateChangeOptions,
   mapFlightStatus,
   mapHoldCreated,
   mapHoldStatus,
   mapSearchResponse,
+  mapTicket,
+  mapTicketList,
   mapTokens,
   mapUser,
+  toAddBaggageRequest,
   toBookingRequest,
+  toCancelRequest,
+  toDateChangeRequest,
+  toDateChangeSearchRequest,
   toHoldRequest,
   toSearchRequest,
 } from './mapping';
 import type {
+  AddBaggageRequest,
   AuthTokens,
+  BaggageAdded,
+  BaggageOption,
+  BoardingPass,
+  BookedTicket,
   Booking,
+  BookingPage,
+  CancelRequest,
+  CancellationQuote,
+  CheckInResult,
   CreateBookingRequest,
   CreateHoldRequest,
   Credentials,
+  DateChangeOption,
+  DateChangeQuery,
+  DateChangeRequest,
   FlightStatus,
   Hold,
+  ListBookingsParams,
+  PostSaleOutcome,
   SearchParams,
   SearchResult,
   SeatMap,
   User,
 } from './types';
 
+/** DISCREPANCIA: los importes de postventa que llegan sin moneda se asumen en dólares (toda la API vende en USD). */
+const CURRENCY = 'USD';
+
 /**
  * Implementación contra la API real: las operaciones públicas (búsqueda, mapa de asientos y
- * estado de vuelo, F2), la cuenta (F3) y la compra (hold y reserva, F4a). Mis viajes y la
- * postventa lanzan NotYetConnectedError, que la interfaz explica sin romper la pantalla (F6).
+ * estado de vuelo, F2), la cuenta (F3), la compra (hold y reserva, F4a) y la postventa (F6). Las escrituras
+ * no se reintentan solas y llevan Idempotency-Key.
  */
 export class RealFlightsApi implements FlightsApi {
   constructor(private readonly http: HttpClient) {}
@@ -131,16 +169,80 @@ export class RealFlightsApi implements FlightsApi {
     return mapBooking(await this.http.request<BookingDetailDto>('GET', `/bookings/${encodeURIComponent(bookingId)}`, { auth: true, retry: true }));
   }
 
-  async listBookings(): Promise<never> {
-    throw new NotYetConnectedError('listBookings');
+  /* Postventa. Las lecturas pueden reintentarse una vez; las escrituras nunca. */
+
+  async listBookings({ cursor, limit }: ListBookingsParams = {}): Promise<BookingPage> {
+    const query: Record<string, string> = {};
+    if (cursor) query.cursor = cursor;
+    if (limit) query.limit = String(limit);
+    return mapBookingList(await this.http.request<BookingListDto>('GET', '/bookings', { auth: true, retry: true, query }));
   }
-  async cancelBooking(): Promise<never> {
-    throw new NotYetConnectedError('cancelBooking');
+
+  async getTickets(bookingId: string): Promise<BookedTicket[]> {
+    return mapTicketList(await this.http.request<TicketListDto>('GET', `/bookings/${encodeURIComponent(bookingId)}/tickets`, { auth: true, retry: true }));
   }
-  async checkIn(): Promise<never> {
-    throw new NotYetConnectedError('checkIn');
+
+  async getTicket(bookingId: string, ticketId: string): Promise<BookedTicket> {
+    const path = `/bookings/${encodeURIComponent(bookingId)}/tickets/${encodeURIComponent(ticketId)}`;
+    return mapTicket(await this.http.request<TicketDto>('GET', path, { auth: true, retry: true }));
   }
-  async getBoardingPasses(): Promise<never> {
-    throw new NotYetConnectedError('getBoardingPasses');
+
+  async checkIn(bookingId: string, idempotencyKey: string): Promise<CheckInResult> {
+    // DISCREPANCIA: el contrato no declara Idempotency-Key en el check-in; se envía igual (una cabecera de más no estorba).
+    const dto = await this.http.request<CheckInResponseDto>('POST', `/bookings/${encodeURIComponent(bookingId)}/check-in`, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+      auth: true,
+    });
+    return mapCheckIn(dto);
+  }
+
+  async getBoardingPasses(bookingId: string): Promise<BoardingPass[]> {
+    return mapBoardingPasses(await this.http.request<BoardingPassListDto>('GET', `/bookings/${encodeURIComponent(bookingId)}/boarding-passes`, { auth: true, retry: true }));
+  }
+
+  async getBaggageOptions(bookingId: string): Promise<BaggageOption[]> {
+    return mapBaggageOptions(await this.http.request<BaggageOptionDto[]>('GET', `/bookings/${encodeURIComponent(bookingId)}/baggage-options`, { auth: true, retry: true }));
+  }
+
+  async addBaggage(bookingId: string, request: AddBaggageRequest, idempotencyKey: string): Promise<PostSaleOutcome<BaggageAdded>> {
+    const { status, body } = await this.http.requestWithStatus<BaggageAddedDto>('POST', `/bookings/${encodeURIComponent(bookingId)}/baggage`, {
+      body: toAddBaggageRequest(request),
+      headers: { 'Idempotency-Key': idempotencyKey },
+      auth: true,
+    });
+    return status === 202 ? { status: 'pending' } : { status: 'done', data: mapBaggageAdded(body, request) };
+  }
+
+  async searchDateChange(bookingId: string, changes: DateChangeQuery[]): Promise<DateChangeOption[]> {
+    // POST de solo lectura: admite el reintento de lecturas.
+    const dto = await this.http.request<DateChangeOptionDto[]>('POST', `/bookings/${encodeURIComponent(bookingId)}/date-change/search`, {
+      body: toDateChangeSearchRequest(changes),
+      auth: true,
+      retry: true,
+    });
+    return mapDateChangeOptions(dto ?? [], CURRENCY);
+  }
+
+  async confirmDateChange(bookingId: string, request: DateChangeRequest, idempotencyKey: string): Promise<PostSaleOutcome<Booking | null>> {
+    const { status, body } = await this.http.requestWithStatus<BookingDetailDto>('POST', `/bookings/${encodeURIComponent(bookingId)}/date-change`, {
+      body: toDateChangeRequest(request),
+      headers: { 'Idempotency-Key': idempotencyKey },
+      auth: true,
+    });
+    if (status === 202) return { status: 'pending' };
+    return { status: 'done', data: body?.bookingId ? mapBooking(body) : null };
+  }
+
+  async getCancellationQuote(bookingId: string): Promise<CancellationQuote> {
+    return mapCancellationQuote(await this.http.request<CancellationQuoteDto>('GET', `/bookings/${encodeURIComponent(bookingId)}/cancellation-quote`, { auth: true, retry: true }));
+  }
+
+  async cancelBooking(bookingId: string, request: CancelRequest, idempotencyKey: string): Promise<PostSaleOutcome<void>> {
+    const { status } = await this.http.requestWithStatus('POST', `/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+      body: toCancelRequest(request),
+      headers: { 'Idempotency-Key': idempotencyKey },
+      auth: true,
+    });
+    return status === 202 ? { status: 'pending' } : { status: 'done', data: undefined };
   }
 }

@@ -5,8 +5,20 @@
 import { addMoney, multiplyMoney, parseMoney, zeroMoney, type Money } from '@/shared/lib/money';
 import { airportOffsetMinutes } from './airports';
 import type {
+  AddBaggageRequestDto,
+  BaggageAddedDto,
+  BaggageOptionDto,
+  BoardingPassListDto,
   BookingDetailDto,
+  BookingListDto,
   BookingRequestDto,
+  CancelBookingRequestDto,
+  CancellationQuoteDto,
+  CheckInResponseDto,
+  DateChangeOptionDto,
+  DateChangeRequestDto,
+  DateChangeSearchRequestDto,
+  TicketListDto,
   CabinPricingDto,
   FlightOfferDto,
   FlightStatusDto,
@@ -26,14 +38,27 @@ import type {
   UserResponseDto,
 } from './contract';
 import type {
+  AddBaggageRequest,
   AuthTokens,
+  BaggageAdded,
+  BaggageOption,
+  BoardingPass,
   BookedFare,
   BookedLeg,
   BookedPassenger,
   Booking,
+  BookingPage,
   BookingPassenger,
+  BookingStatus,
+  BookingSummary,
+  CancelRequest,
+  CancellationQuote,
+  CheckInResult,
   CreateBookingRequest,
   CreateHoldRequest,
+  DateChangeOption,
+  DateChangeQuery,
+  DateChangeRequest,
   Fare,
   FlightOffer,
   FlightStatus,
@@ -116,7 +141,7 @@ export function mapFare(dto: CabinPricingDto, passengers: PassengerCount): Fare 
   };
 }
 
-function mapSegment(dto: SegmentDto): Segment {
+export function mapSegment(dto: SegmentDto): Segment {
   return {
     id: dto.segmentId,
     flightNumber: dto.flightNumber,
@@ -299,11 +324,20 @@ function mapBookedPassenger(dto: PassengerItemDto): BookedPassenger {
     email: dto.contact.email,
     phone: dto.contact.phone,
     seats: dto.assignedSeats ?? [],
+    extraBaggage: (dto.extraBaggage ?? []).map(({ itineraryId, quantity }) => ({ itineraryId, quantity })),
   };
 }
 
-function mapTicket(dto: TicketDto): Booking['tickets'][number] {
-  return { id: dto.ticketId, passengerId: dto.passengerId, number: dto.eTicketNumber ?? null, status: dto.status, issuedAt: dto.issuedAt ?? null };
+export function mapTicket(dto: TicketDto): Booking['tickets'][number] {
+  return {
+    id: dto.ticketId,
+    passengerId: dto.passengerId,
+    number: dto.eTicketNumber ?? null,
+    status: dto.status,
+    issuedAt: dto.issuedAt ?? null,
+    segments: (dto.segments ?? []).map((s) => ({ segmentId: s.segmentId, status: s.status, coupon: s.couponNumber ?? null })),
+    failureReason: dto.failureReason ?? null,
+  };
 }
 
 export function mapBooking(dto: BookingDetailDto): Booking {
@@ -321,4 +355,152 @@ export function mapBooking(dto: BookingDetailDto): Booking {
     total: mapMoney(dto.grandTotal),
     changes: (dto.changes ?? []).map((c) => ({ at: c.changedAt ?? '', description: c.description ?? '' })),
   };
+}
+
+/* ------------------------------------- Postventa (F6) ------------------------------------- */
+
+const BOOKING_STATUSES: readonly BookingStatus[] = [
+  'PENDING',
+  'PENDING_PAYMENT',
+  'TICKET_ISSUING',
+  'CONFIRMED',
+  'FAILED',
+  'CHANGE_PENDING',
+  'CANCELLATION_PENDING',
+  'CANCELLED',
+];
+
+/** El estado de un resumen de la lista: el contrato lo deja como texto libre, así que se reconoce o es `null`. */
+export function toBookingStatus(value: string | undefined): BookingStatus | null {
+  return BOOKING_STATUSES.find((s) => s === value) ?? null;
+}
+
+function mapSummary(item: NonNullable<BookingListDto['items']>[number]): BookingSummary | null {
+  // Sin id o sin ruta no hay nada que mostrar ni a dónde ir: se descarta.
+  if (!item.bookingId || !item.origin || !item.destination) return null;
+  return {
+    id: item.bookingId,
+    code: item.pnr ?? '',
+    status: toBookingStatus(item.status),
+    origin: item.origin,
+    destination: item.destination,
+    departureDate: item.departureDate ?? '',
+    total: item.grandTotal ? mapMoney(item.grandTotal) : zeroMoney(),
+  };
+}
+
+/** GET /bookings (todos los campos del contrato son opcionales). */
+export function mapBookingList(dto: BookingListDto): BookingPage {
+  return {
+    items: (dto.items ?? []).map(mapSummary).filter((b): b is BookingSummary => b !== null),
+    nextCursor: dto.nextCursor ? dto.nextCursor : null,
+  };
+}
+
+export function mapTicketList(dto: TicketListDto): Booking['tickets'] {
+  return dto.tickets.map(mapTicket);
+}
+
+export function mapCheckIn(dto: CheckInResponseDto): CheckInResult {
+  return {
+    bookingId: dto.bookingId,
+    status: dto.status,
+    passengers: dto.checkedInPassengers.map((p) => ({
+      passengerId: p.passengerId,
+      status: p.status,
+      segments: (p.segments ?? []).map((s) => ({ segmentId: s.segmentId, seat: s.seat ?? null, status: s.status })),
+    })),
+  };
+}
+
+export function mapBoardingPasses(dto: BoardingPassListDto): BoardingPass[] {
+  return dto.boardingPasses.map((p) => ({
+    passengerId: p.passengerId,
+    segmentId: p.segmentId,
+    seat: p.seat,
+    boardingGroup: p.boardingGroup ?? null,
+    boardingPosition: p.boardingPosition ?? null,
+    barcode: p.barcode,
+    barcodeType: p.barcodeType,
+  }));
+}
+
+export function mapBaggageOptions(dtos: BaggageOptionDto[]): BaggageOption[] {
+  return dtos.flatMap((o) =>
+    o.passengerId && o.itineraryId
+      ? [
+          {
+            passengerId: o.passengerId,
+            itineraryId: o.itineraryId,
+            price: o.price ? mapMoney(o.price) : null,
+            maxAllowed: o.maxAllowed ?? 0,
+            alreadyPurchased: o.alreadyPurchased ?? 0,
+          },
+        ]
+      : [],
+  );
+}
+
+export function toAddBaggageRequest(request: AddBaggageRequest): AddBaggageRequestDto {
+  return {
+    passengerId: request.passengerId,
+    itineraryId: request.itineraryId,
+    quantity: request.quantity,
+    payment: { paymentReference: request.paymentReference },
+  };
+}
+
+export function mapBaggageAdded(dto: BaggageAddedDto | undefined, request: AddBaggageRequest): BaggageAdded {
+  return { passengerId: dto?.passengerId ?? request.passengerId, itineraryId: dto?.itineraryId ?? request.itineraryId, totalBaggage: dto?.totalBaggage ?? null };
+}
+
+export function toDateChangeSearchRequest(changes: DateChangeQuery[]): DateChangeSearchRequestDto {
+  return { changes: changes.map(({ itineraryId, newDepartureDate }) => ({ itineraryId, newDepartureDate })) };
+}
+
+/**
+ * Los importes de la diferencia de precio llegan como texto sin moneda: se asume la de la reserva.
+ * DISCREPANCIA: el contrato no dice la moneda ni si `totalToPay` negativo significa reembolso.
+ */
+export function mapDateChangeOptions(dtos: DateChangeOptionDto[], currency: string): DateChangeOption[] {
+  const amount = (value: string | undefined) => parseMoney(value ?? '0', currency);
+  return dtos.flatMap((o) =>
+    o.changeOfferId
+      ? [
+          {
+            id: o.changeOfferId,
+            expiresAt: o.expiresAt ?? '',
+            segments: (o.segments ?? []).map(mapSegment),
+            price: {
+              fare: amount(o.priceDifference?.fareDifference),
+              taxes: amount(o.priceDifference?.taxDifference),
+              fee: amount(o.priceDifference?.changeFee),
+              total: amount(o.priceDifference?.totalToPay),
+            },
+          },
+        ]
+      : [],
+  );
+}
+
+export function toDateChangeRequest(request: DateChangeRequest): DateChangeRequestDto {
+  return {
+    changeOfferId: request.changeOfferId,
+    ...(request.paymentReference ? { payment: { paymentReference: request.paymentReference } } : {}),
+    ...(request.seats?.length ? { assignedSeats: request.seats } : {}),
+  };
+}
+
+export function mapCancellationQuote(dto: CancellationQuoteDto): CancellationQuote {
+  return {
+    quoteId: dto.quoteId,
+    refundable: dto.isRefundable,
+    refund: parseMoney(dto.refundAmount, dto.currency),
+    penalty: parseMoney(dto.penaltyAmount, dto.currency),
+    expiresAt: dto.expiresAt,
+  };
+}
+
+export function toCancelRequest(request: CancelRequest): CancelBookingRequestDto {
+  return { quoteId: request.quoteId, ...(request.reason ? { reason: request.reason } : {}) };
 }

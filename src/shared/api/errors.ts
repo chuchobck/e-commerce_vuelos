@@ -78,8 +78,32 @@ export function errorMessage(error: unknown): string {
       return e.network;
     case 'CHECK_IN_NOT_AVAILABLE':
       return e.checkInNotAvailable;
+    case 'CHECK_IN_FAILED':
+      return e.checkInFailed;
+    case 'BOARDING_PASS_NOT_AVAILABLE':
+      return e.boardingPassNotAvailable;
     case 'OFFER_NO_LONGER_AVAILABLE':
       return e.offerGone;
+    case 'BAGGAGE_LIMIT_EXCEEDED':
+      return e.baggageLimit;
+    case 'FARE_NOT_CHANGEABLE':
+      return e.fareNotChangeable;
+    case 'CHANGE_OFFER_EXPIRED':
+      return e.changeOfferExpired;
+    case 'QUOTE_EXPIRED':
+      return e.quoteExpired;
+    case 'ALREADY_CANCELLED':
+      return e.alreadyCancelled;
+    case 'CUTOFF_PASSED':
+      return e.cutoffPassed;
+    case 'FLIGHT_ALREADY_DEPARTED':
+      return e.flightDeparted;
+    case 'PAYMENT_NOT_AUTHORIZED':
+      return e.paymentNotAuthorized;
+    case 'PAYMENT_REFERENCE_INVALID':
+      return e.paymentReferenceInvalid;
+    case 'BOOKING_NOT_CONFIRMED':
+      return e.bookingNotConfirmed;
     default:
       break;
   }
