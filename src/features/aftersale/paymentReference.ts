@@ -10,10 +10,6 @@ export function isPaymentReference(value: string): boolean {
   return PAYMENT_REFERENCE.test(value);
 }
 
-export function referenceOutcome(value: string): SimulatedOutcome | null {
-  return (PAYMENT_REFERENCE.exec(value)?.[1] as SimulatedOutcome | undefined) ?? null;
-}
-
 /** Referencia por defecto de un cobro: aprobada y distinta cada vez (la API rechaza reusar una referencia). */
 export function newPaymentReference(outcome: SimulatedOutcome = 'OK'): string {
   return newSimulatedReference(outcome);

@@ -6,7 +6,7 @@ export { absMoney, amountDue, needsPayment, newDateProblem, priceDirection, sugg
 export { baggageTotal, lineKey, remainingFor, selectedLines, totalBags, type BaggageLine, type BaggageSelection } from './baggage';
 export { BaggageSelector } from './BaggageSelector';
 export { classifyPaymentError, type PaymentProblem } from './outcome';
-export { isPaymentReference, newPaymentReference, referenceFor, referenceOutcome, PAYMENT_REFERENCE } from './paymentReference';
+export { isPaymentReference, newPaymentReference, referenceFor, PAYMENT_REFERENCE } from './paymentReference';
 export { PaymentField } from './PaymentField';
 export { PostSaleNotice } from './PostSaleNotice';
 export { baggageScope, overallOf, purchaseBaggage, type BaggageDeps, type BaggageOverall, type BaggageToBuy, type LineResult, type LineStatus } from './purchaseBaggage';

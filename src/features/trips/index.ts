@@ -7,6 +7,6 @@ export { TripFilters } from './TripFilters';
 export { TripTabs, type TripSection } from './TripTabs';
 export { bookingActions, type ActionState, type TripAction, type TripActions as TripActionStates } from './bookingActions';
 export { classifyTrip, countTrips, tripsFor, TRIP_FILTERS, type TripFilter } from './tripFilters';
-export { clearTripExtras, useTripExtras, type TripExtra } from './useTripDetails';
+export { useTripExtras, type TripExtra } from './useTripDetails';
 export { useBooking, type BookingState } from './useBooking';
 export { TRIPS_PAGE_SIZE, useTrips, type TripsState } from './useTrips';

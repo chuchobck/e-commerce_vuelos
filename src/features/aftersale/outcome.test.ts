@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/shared/api';
 import { classifyPaymentError } from './outcome';
-import { isPaymentReference, newPaymentReference, referenceFor, referenceOutcome } from './paymentReference';
+import { isPaymentReference, newPaymentReference, referenceFor } from './paymentReference';
 
 describe('qué le pasó a un cobro', () => {
   const err = (status: number, code?: ApiError['code']) => new ApiError({ status, code });
@@ -31,7 +31,7 @@ describe('referencias de pago', () => {
     for (const outcome of ['OK', 'PEND', 'REJ'] as const) {
       const ref = newPaymentReference(outcome);
       expect(isPaymentReference(ref)).toBe(true);
-      expect(referenceOutcome(ref)).toBe(outcome);
+      expect(ref.startsWith(`PAY-${outcome}-`)).toBe(true);
     }
     expect(newPaymentReference()).toMatch(/^PAY-OK-/);
     expect(newPaymentReference()).not.toBe(newPaymentReference());
@@ -40,7 +40,6 @@ describe('referencias de pago', () => {
   it('rechaza lo que no es una referencia (nunca un número de tarjeta)', () => {
     for (const bad of ['', 'PAY-OK-', 'PAY-OK-abc', 'PAY-XX-ABCD1234', '4111111111111111', 'PAY-OK-AB']) {
       expect(isPaymentReference(bad)).toBe(false);
-      expect(referenceOutcome(bad)).toBeNull();
     }
   });
 
@@ -49,6 +48,6 @@ describe('referencias de pago', () => {
     const refs = [0, 1, 2].map((i) => referenceFor(base, i));
     expect(refs).toEqual(['PAY-REJ-ABC123', 'PAY-REJ-ABC1232', 'PAY-REJ-ABC1233']);
     expect(new Set(refs).size).toBe(3);
-    expect(refs.every((r) => isPaymentReference(r) && referenceOutcome(r) === 'REJ')).toBe(true);
+    expect(refs.every((r) => isPaymentReference(r) && r.startsWith('PAY-REJ-'))).toBe(true);
   });
 });

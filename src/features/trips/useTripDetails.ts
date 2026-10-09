@@ -26,11 +26,6 @@ function extraOf(booking: Booking): TripExtra {
   };
 }
 
-/** Vacía la memoria (pruebas). */
-export function clearTripExtras(): void {
-  cache.clear();
-}
-
 /**
  * DISCREPANCIA: la lista de la API (BookingListResponse) no trae número de vuelo ni hora. Para mostrarlos en cada
  * tarjeta se pide el detalle de las reservas a la vista, de a 3 y una sola vez cada una. Si un detalle falla, la
