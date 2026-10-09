@@ -117,7 +117,7 @@ function UserMenu() {
 export function Header() {
   const { pathname } = useLocation();
   return (
-    <header className="border-b-2 border-border bg-surface">
+    <header className="border-b-2 border-border bg-surface print:hidden">
       <div className="container-page flex min-h-20 items-center justify-between gap-2 sm:gap-4">
         <Logo />
 

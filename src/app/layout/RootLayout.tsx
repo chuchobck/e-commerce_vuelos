@@ -76,18 +76,22 @@ export function RootLayout() {
           e.preventDefault();
           focusElement(document.getElementById(MAIN_ID));
         }}
-        className="sr-only z-[70] rounded bg-primary px-6 py-4 font-bold text-primary-foreground no-underline focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        className="sr-only z-[70] rounded bg-primary print:hidden px-6 py-4 font-bold text-primary-foreground no-underline focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
       >
         {es.a11y.skipToContent}
       </a>
       <Header />
-      <ServerWakingNotice />
-      <SessionNotices />
+      <div className="print:hidden">
+        <ServerWakingNotice />
+        <SessionNotices />
+      </div>
       <main id={MAIN_ID} tabIndex={-1} className="flex flex-1 flex-col outline-none">
         <Outlet />
       </main>
       <Footer />
-      <Toaster />
+      <div className="print:hidden">
+        <Toaster />
+      </div>
     </div>
   );
 }

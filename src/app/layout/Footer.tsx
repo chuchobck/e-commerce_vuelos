@@ -25,7 +25,7 @@ const COLUMNS = [
 /** Pie simétrico de tres columnas iguales (Ayuda · Legal · Contacto). */
 export function Footer() {
   return (
-    <footer className="site-footer mt-auto text-footer-foreground">
+    <footer className="site-footer mt-auto text-footer-foreground print:hidden">
       {/* Silueta de los Andes: marca el final de la página sin depender solo del color. */}
       <svg
         aria-hidden="true"
