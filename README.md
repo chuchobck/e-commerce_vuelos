@@ -333,7 +333,7 @@ Una reserva con solo infantes no ofrece equipaje (el infante viaja en brazos y n
 - **Varias maletas son varias peticiones:** la API acepta un pasajero y un itinerario por petición; cada una con su referencia (`PAY-OK-ABC`, `PAY-OK-ABC2`…) y su clave. Si una falla, se detiene y no se cobra el resto.
 - **Permiso (403):** muestra «Tu cuenta no tiene permiso para esta acción…», nunca «pago rechazado».
 - **Pago simulado:** la referencia `PAY-OK-…`, `PAY-PEND-…` o `PAY-REJ-…`; nunca datos de tarjeta. Los botones «Aprobar / Dejar pendiente / Rechazar» están dentro de `<MockOnly>`.
-- **QR en el cliente:** `qrcode-generator` (unos 50 kB, sin dependencias), cargado solo al abrir los pases (`lazy`); dibuja un SVG sin `innerHTML` con el texto `barcode` tal cual lo da la API.
+- **QR en el cliente:** `qrcode-generator` (22 kB, 8 kB comprimido, sin dependencias), cargado solo al abrir los pases (`lazy`); dibuja un SVG sin `innerHTML` con el texto `barcode` tal cual lo da la API.
 - **Impresión:** los pases usan variantes `print:` de Tailwind: se oculta el menú, las pestañas y los botones y cada pase no se parte entre páginas.
 - **Accesibilidad:** foco al encabezado al cambiar de ruta, diálogo de cancelación con el foco inicial en la opción segura, resultados anunciados con `aria-live` (éxito y proceso `polite`; rechazo y error `assertive`), contadores de equipaje con nombre accesible, sin elementos clicables que no sean enlaces o botones.
 
