@@ -94,6 +94,24 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - `npm run test:api` crea holds y reservas **solo contra el backend local**; nunca contra Render.
   Límites: 30 holds y 10 reservas por minuto por IP.
 
+## Postventa y Mis viajes (desde F6)
+
+- Todo cuelga de `/viajes` (`routes.trips()`, `routes.trip(id)`, …); `/mis-viajes*` solo redirige. Las acciones que se ofrecen salen de
+  `features/trips/bookingActions.ts` (estado, salida y `changeable`); una pantalla no decide por su cuenta.
+- La F6 se hizo **solo con el mock**: nada de ella está verificado contra la API real. Lo asumido lleva `// DISCREPANCIA:` y está en
+  `docs/DISCREPANCIAS-F6.md` («Pendiente de verificación real»); los pasos de comprobación, en la sección 5c del README. Al verificar un
+  endpoint, se mueve su fila a «Lo que aprendimos de la API real» (README, sección 6) y se corrige el código.
+- Toda escritura de postventa (check-in, equipaje, cambio de fecha, cancelación) devuelve `PostSaleOutcome`: hecho (cualquier 2xx que no
+  sea 202) o pendiente (202). Lleva `Idempotency-Key` de `shared/lib/attemptKeys.ts`: una por intento; el mismo contenido reenvía la
+  misma clave, otro pago u otra cantidad es clave nueva, y al terminar bien se olvida. Nunca se reintenta una escritura sola.
+- Un 422 de pago rechazado no pierde lo elegido: se conserva la selección y la referencia se cambia por una nueva. Un 403 de permiso
+  se explica con el mensaje de permisos (`es.errors.forbidden403`), nunca como pago rechazado.
+- Equipaje: una petición por pasajero e itinerario, cada una con su referencia (`referenceFor`) y su clave; si una falla, se detiene.
+- Un hook con efecto lee `useAuth().authorized` por `ref`: cambia de identidad en cada render del proveedor y repetiría la carga.
+- El QR se dibuja en el cliente (`qrcode-generator`, solo dentro de `shared/ui/qr-image.tsx`, cargado con `lazy` desde `qr-code.tsx`;
+  nunca importarlo desde un `index.ts` de barril). Siempre negro sobre blanco: un lector no entiende un QR invertido.
+- `NotYetConnectedError` queda como mecanismo para lo que falte conectar; desde F6 ninguna operación de `FlightsApi` lo lanza.
+
 ## Accesibilidad: WCAG 2.2 AA
 
 HTML semántico, un solo `h1` por página, "Saltar al contenido", foco siempre visible y nunca tapado,
