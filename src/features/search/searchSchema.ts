@@ -34,6 +34,9 @@ export const SearchFormSchema = z
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['destination'], message: v.sameAirport });
     } else if (data.origin && data.destination && !hasFlights(data.origin, data.destination)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['destination'], message: v.noRoute });
+    } else if (data.tripType === 'ROUND' && data.origin && data.destination && !hasFlights(data.destination, data.origin)) {
+      // Hay rutas de un solo sentido por los horarios de conexión (p. ej. CUE→GPS existe, GPS→CUE no).
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['destination'], message: v.noReturnRoute });
     }
     if (data.tripType === 'ROUND') {
       if (!data.returnDate) {

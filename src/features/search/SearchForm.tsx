@@ -1,25 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as Popover from '@radix-ui/react-popover';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
-import { ArrowLeftRight, ChevronDown, PlaneLanding, PlaneTakeoff, Search, Users } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Controller, useForm, type FieldErrors } from 'react-hook-form';
+import { ArrowLeftRight, CheckCircle2, ChevronDown, Info, MapPin, PlaneLanding, PlaneTakeoff, Search, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { routes } from '@/app/routes';
-import { AIRPORTS, destinationsFrom, findAirport } from '@/shared/api';
+import { AIRPORTS, cityOf, findAirport, hasFlights } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { lastFlightDate, parseDisplayDate, today } from '@/shared/lib/dates';
-import {
-  Button,
-  CompactField,
-  DatePicker,
-  ErrorSummary,
-  QuantityInput,
-  RadioGroup,
-  Select,
-  type SummaryError,
-} from '@/shared/ui';
+import { Button, CompactField, Combobox, DatePicker, FieldError, QuantityInput, RadioGroup, type ComboboxOption } from '@/shared/ui';
 import { formToQuery, queryToForm } from './searchQuery';
 import { MAX_PASSENGERS, SEARCH_DEFAULTS, SearchFormSchema, type SearchFormInput, type TripType } from './searchSchema';
 
@@ -38,19 +29,12 @@ const IDS = {
   cabin: 'search-passengers',
 } as const satisfies Record<keyof SearchFormInput, string>;
 
-const LABELS: Record<keyof SearchFormInput, string> = {
-  tripType: s.tripType,
+const LABELS: Record<'origin' | 'destination' | 'departDate' | 'returnDate', string> = {
   origin: s.origin,
   destination: s.destination,
   departDate: s.departDate,
   returnDate: s.returnDate,
-  adults: s.passengers,
-  children: s.passengers,
-  infants: s.passengers,
-  cabin: s.passengers,
 };
-
-const ORDER = Object.keys(IDS) as (keyof SearchFormInput)[];
 
 /** Contenedor de un grupo de segmentos con borde común (como Origen | Destino). */
 const groupClasses =
@@ -59,26 +43,25 @@ const groupClasses =
 export function SearchForm() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [summary, setSummary] = useState<SummaryError[]>([]);
-  const [attempt, setAttempt] = useState(0);
   const [announcement, setAnnouncement] = useState('');
   const [paxOpen, setPaxOpen] = useState(false);
-  const summaryRef = useRef<HTMLDivElement>(null);
 
   const {
     control,
     handleSubmit,
-    register,
     setValue,
     getValues,
     clearErrors,
+    trigger,
     watch,
     reset,
-    formState: { errors, isSubmitted },
+    setFocus,
+    formState: { errors, touchedFields, isSubmitted },
   } = useForm<SearchFormInput>({
     resolver: zodResolver(SearchFormSchema),
     defaultValues: SEARCH_DEFAULTS,
-    mode: 'onSubmit',
+    // Corrección en tiempo real: cada cambio se valida; los mensajes aparecen al salir del campo.
+    mode: 'onChange',
     reValidateMode: 'onChange',
     shouldFocusError: false,
   });
@@ -92,41 +75,46 @@ export function SearchForm() {
     if (onlyDestination) {
       const { destination } = queryToForm(q);
       if (!destination) return;
-      setValue('destination', destination, { shouldValidate: isSubmitted });
+      setValue('destination', destination, { shouldValidate: true });
       const city = findAirport(destination)?.city ?? destination;
       setAnnouncement(fmt(s.destinationPrefilled, { city }));
     } else {
       reset(queryToForm(q));
+      void trigger();
     }
-  }, [query, reset, setValue, isSubmitted]);
+  }, [query, reset, setValue, trigger]);
 
-  useEffect(() => {
-    if (attempt > 0) summaryRef.current?.focus();
-  }, [attempt]);
+  const values = watch();
+  const { tripType, adults, children, infants, cabin, departDate, origin, destination, returnDate } = values;
+  const parsed = useMemo(() => SearchFormSchema.safeParse(values), [values]);
+  const ready = parsed.success;
 
-  // El bloque de errores se actualiza mientras el usuario corrige.
-  const signature = ORDER.map((k) => errors[k]?.message ?? '').join('|');
-  useEffect(() => {
-    if (isSubmitted) setSummary(toSummary(errors));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, isSubmitted]);
+  // Qué falta por llenar (campos vacíos): se dice junto al botón mientras está desactivado.
+  const missing = [
+    ...(origin ? [] : [LABELS.origin]),
+    ...(destination ? [] : [LABELS.destination]),
+    ...(departDate ? [] : [LABELS.departDate]),
+    ...(tripType === 'ROUND' && !returnDate ? [LABELS.returnDate] : []),
+  ];
+  const hasOtherIssue = !ready && missing.length === 0;
 
-  const [tripType, adults, children, infants, cabin, departDate, origin] = watch([
-    'tripType',
-    'adults',
-    'children',
-    'infants',
-    'cabin',
-    'departDate',
-    'origin',
-  ]);
+  // Un error se muestra cuando el usuario ya pasó por el campo (o intentó enviar): no se regaña a mitad de palabra.
+  const shown = (key: 'origin' | 'destination' | 'departDate' | 'returnDate') =>
+    touchedFields[key] || isSubmitted ? errors[key]?.message : undefined;
 
-  // Catálogo estático (la API no lista aeropuertos). El destino solo ofrece lo que tiene vuelos desde el origen.
-  const originOptions = useMemo(() => AIRPORTS.map((a) => ({ value: a.code, label: `${a.city} (${a.code})` })), []);
-  const destinationOptions = useMemo(() => {
-    const reachable = origin ? destinationsFrom(origin) : null;
-    return originOptions.filter((o) => o.value !== origin && (!reachable || reachable.includes(o.value)));
-  }, [origin, originOptions]);
+  // Catálogo estático (la API no lista aeropuertos). Lo que no tiene vuelos se ve, pero explica por qué no se puede elegir.
+  const originOptions = useMemo<ComboboxOption[]>(() => airportOptions(), []);
+  const destinationOptions = useMemo<ComboboxOption[]>(
+    () =>
+      airportOptions().map((o) =>
+        origin && o.value === origin
+          ? { ...o, disabledReason: s.sameAsOrigin }
+          : origin && !hasFlights(origin, o.value)
+            ? { ...o, disabledReason: fmt(s.noFlightsFrom, { city: cityOf(origin) }) }
+            : o,
+      ),
+    [origin],
+  );
   const total = adults + children + infants;
   const canAddMore = total < MAX_PASSENGERS;
   const minReturn = parseDisplayDate(departDate) ?? today();
@@ -139,31 +127,40 @@ export function SearchForm() {
         : fmt(s.passengersValueMany, { count: total });
   const paxError = errors.adults?.message ?? errors.children?.message ?? errors.infants?.message;
 
-  const onValid = (values: SearchFormInput) => {
-    setSummary([]);
-    navigate(routes.results(formToQuery(values)));
+  const onValid = (data: SearchFormInput) => {
+    navigate(routes.results(formToQuery(data)));
   };
 
-  const onInvalid = (formErrors: FieldErrors<SearchFormInput>) => {
-    setSummary(toSummary(formErrors));
-    setAttempt((n) => n + 1);
+  // Enter con datos incompletos (el botón está desactivado): se muestran los errores y se lleva el foco al primero.
+  const onInvalid = () => {
+    void trigger().then(() => {
+      const first = (['origin', 'destination', 'departDate', 'returnDate'] as const).find((k) => k !== 'returnDate' || getValues('tripType') === 'ROUND');
+      const bad = (['origin', 'destination', 'departDate', 'returnDate'] as const).find((k) => !getValues(k));
+      setFocus(bad ?? first ?? 'origin');
+    });
   };
 
   const swap = () => {
-    const { origin, destination } = getValues();
-    setValue('origin', destination, { shouldValidate: isSubmitted });
-    setValue('destination', origin, { shouldValidate: isSubmitted });
+    const { origin: from, destination: to } = getValues();
+    setValue('origin', to, { shouldValidate: true });
+    setValue('destination', from, { shouldValidate: true });
     setAnnouncement(s.swapped);
   };
 
   const changeTrip = (value: TripType) => {
-    setValue('tripType', value);
+    setValue('tripType', value, { shouldValidate: true });
     if (value === 'ONE_WAY') {
       setValue('returnDate', '');
       clearErrors('returnDate');
     }
   };
 
+  const comboLabels = {
+    emptyText: (typed: string) => fmt(s.noMatch, { typed }),
+    listLabel: s.suggestions,
+    countText: (count: number) => (count === 1 ? s.suggestionsOne : fmt(s.suggestionsMany, { count })),
+    clearLabel: s.clear,
+  };
 
   return (
     <form noValidate aria-label={s.formLabel} onSubmit={handleSubmit(onValid, onInvalid)} className="flex flex-col gap-6">
@@ -201,109 +198,147 @@ export function SearchForm() {
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,2.5fr)_minmax(0,1.8fr)_minmax(0,1fr)_auto]">
         {/* Origen | Destino */}
-        <div className={cn(groupClasses, 'md:col-span-2 xl:col-span-1')}>
-          <CompactField
-            id={IDS.origin}
-            label={s.origin}
-            hint={s.originHint}
-            icon={<PlaneTakeoff className="size-6" />}
-            error={errors.origin?.message}
-            required
-            className="flex-1"
-          >
-            <Select
-              {...register('origin')}
-              variant="bare"
-              options={originOptions}
-              placeholder={s.chooseOrigin}
-            />
-          </CompactField>
-          <CompactField
-            id={IDS.destination}
-            label={s.destination}
-            hint={s.destinationHint}
-            icon={<PlaneLanding className="size-6" />}
-            error={errors.destination?.message}
-            required
-            offsetStart
-            className="flex-1"
-          >
-            <Select
-              {...register('destination')}
-              variant="bare"
-              options={destinationOptions}
-              placeholder={s.chooseDestination}
-            />
-          </CompactField>
-          <button
-            type="button"
-            onClick={swap}
-            aria-label={s.swap}
-            className={cn(
-              'absolute right-16 top-1/2 z-20 flex size-12 -translate-y-1/2 items-center justify-center rounded-full border-2 border-input bg-surface text-primary',
-              'hover:bg-primary-tint sm:left-1/2 sm:right-auto sm:-translate-x-1/2',
-            )}
-          >
-            <ArrowLeftRight aria-hidden="true" className="size-6 rotate-90 sm:rotate-0" />
-          </button>
-        </div>
-
-        {/* Salida | Regreso */}
-        <div className={groupClasses}>
-          <CompactField
-            id={IDS.departDate}
-            label={s.departDate}
-            hint={s.departHint}
-            error={errors.departDate?.message}
-            required
-            className="flex-1"
-          >
-            <Controller
-              control={control}
-              name="departDate"
-              render={({ field }) => (
-                <DatePicker
-                  ref={field.ref}
-                  name={field.name}
-                  value={field.value}
-                  onBlur={field.onBlur}
-                  onValueChange={field.onChange}
-                  variant="bare"
-                  calendarLabel={s.departCalendar}
-                  minDate={today()}
-                  maxDate={lastFlightDate()}
-                />
-              )}
-            />
-          </CompactField>
-          {tripType === 'ROUND' ? (
+        <div className="flex flex-col gap-2 md:col-span-2 xl:col-span-1">
+          <div className={groupClasses}>
             <CompactField
-              id={IDS.returnDate}
-              label={s.returnDate}
-              hint={s.returnHint}
-              error={errors.returnDate?.message}
+              id={IDS.origin}
+              label={s.origin}
+              hint={s.originHint}
+              icon={<PlaneTakeoff className="size-6" />}
+              error={shown('origin')}
               required
               className="flex-1"
             >
               <Controller
                 control={control}
-                name="returnDate"
+                name="origin"
+                render={({ field }) => (
+                  <Combobox
+                    ref={field.ref}
+                    name={field.name}
+                    variant="bare"
+                    options={originOptions}
+                    value={field.value}
+                    placeholder={s.chooseOrigin}
+                    onBlur={field.onBlur}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      // El destino depende del origen: se revisa de inmediato.
+                      if (getValues('destination')) void trigger('destination');
+                    }}
+                    {...comboLabels}
+                  />
+                )}
+              />
+            </CompactField>
+            <CompactField
+              id={IDS.destination}
+              label={s.destination}
+              hint={s.destinationHint}
+              icon={<PlaneLanding className="size-6" />}
+              error={shown('destination')}
+              required
+              offsetStart
+              className="flex-1"
+            >
+              <Controller
+                control={control}
+                name="destination"
+                render={({ field }) => (
+                  <Combobox
+                    ref={field.ref}
+                    name={field.name}
+                    variant="bare"
+                    options={destinationOptions}
+                    value={field.value}
+                    placeholder={s.chooseDestination}
+                    onBlur={field.onBlur}
+                    onValueChange={field.onChange}
+                    {...comboLabels}
+                  />
+                )}
+              />
+            </CompactField>
+            <button
+              type="button"
+              onClick={swap}
+              aria-label={s.swap}
+              className={cn(
+                'absolute right-16 top-1/2 z-20 flex size-12 -translate-y-1/2 items-center justify-center rounded-full border-2 border-input bg-surface text-primary',
+                'hover:bg-primary-tint sm:left-1/2 sm:right-auto sm:-translate-x-1/2',
+              )}
+            >
+              <ArrowLeftRight aria-hidden="true" className="size-6 rotate-90 sm:rotate-0" />
+            </button>
+          </div>
+          <FieldError id={`${IDS.origin}-error`} message={shown('origin')} />
+          <FieldError id={`${IDS.destination}-error`} message={shown('destination')} />
+        </div>
+
+        {/* Salida | Regreso */}
+        <div className="flex flex-col gap-2">
+          <div className={groupClasses}>
+            <CompactField
+              id={IDS.departDate}
+              label={s.departDate}
+              hint={s.departHint}
+              error={shown('departDate')}
+              required
+              className="flex-1"
+            >
+              <Controller
+                control={control}
+                name="departDate"
                 render={({ field }) => (
                   <DatePicker
                     ref={field.ref}
                     name={field.name}
                     value={field.value}
                     onBlur={field.onBlur}
-                    onValueChange={field.onChange}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      // El regreso no puede ser antes de la salida: se revisa de inmediato.
+                      if (getValues('returnDate')) void trigger('returnDate');
+                    }}
                     variant="bare"
-                    calendarLabel={s.returnCalendar}
-                    minDate={minReturn}
+                    calendarLabel={s.departCalendar}
+                    minDate={today()}
                     maxDate={lastFlightDate()}
                   />
                 )}
               />
             </CompactField>
-          ) : null}
+            {tripType === 'ROUND' ? (
+              <CompactField
+                id={IDS.returnDate}
+                label={s.returnDate}
+                hint={s.returnHint}
+                error={shown('returnDate')}
+                required
+                className="flex-1"
+              >
+                <Controller
+                  control={control}
+                  name="returnDate"
+                  render={({ field }) => (
+                    <DatePicker
+                      ref={field.ref}
+                      name={field.name}
+                      value={field.value}
+                      onBlur={field.onBlur}
+                      onValueChange={field.onChange}
+                      variant="bare"
+                      calendarLabel={s.returnCalendar}
+                      minDate={minReturn}
+                      maxDate={lastFlightDate()}
+                    />
+                  )}
+                />
+              </CompactField>
+            ) : null}
+          </div>
+          <FieldError id={`${IDS.departDate}-error`} message={shown('departDate')} />
+          <FieldError id={`${IDS.returnDate}-error`} message={shown('returnDate')} />
         </div>
 
         {/* Pasajeros y cabina en un panel desplegable */}
@@ -412,6 +447,8 @@ export function SearchForm() {
         <Button
           type="submit"
           size="lg"
+          disabled={!ready}
+          aria-describedby="search-status"
           className="h-[4.25rem] md:col-span-2 xl:col-span-1 xl:px-6"
         >
           <Search aria-hidden="true" />
@@ -420,19 +457,37 @@ export function SearchForm() {
         </Button>
       </div>
 
-      {/* Un solo bloque de errores: resume, enlaza a cada campo y describe cada control. */}
-      <ErrorSummary ref={summaryRef} errors={summary} inline />
+      {/* Estado del formulario siempre a la vista: qué falta o que ya se puede buscar. */}
+      <p id="search-status" role="status" className={cn('flex items-center gap-2 text-sm font-bold', ready ? 'text-success' : 'text-muted')}>
+        {ready ? (
+          <>
+            <CheckCircle2 aria-hidden="true" className="size-4 shrink-0" />
+            {s.ready}
+          </>
+        ) : (
+          <>
+            <Info aria-hidden="true" className="size-4 shrink-0" />
+            {missing.length > 0 ? fmt(s.missing, { fields: listFields(missing) }) : hasOtherIssue ? s.fixIssues : null}
+          </>
+        )}
+      </p>
     </form>
   );
 }
 
-function toSummary(errors: FieldErrors<SearchFormInput>): SummaryError[] {
-  const seen = new Set<string>();
-  return ORDER.flatMap((key) => {
-    const message = errors[key]?.message;
-    const id = IDS[key];
-    if (!message || seen.has(id)) return [];
-    seen.add(id);
-    return [{ fieldId: id, label: LABELS[key], message }];
-  });
+/** "origen, destino y fecha de salida" (en minúsculas, con "y" antes del último). */
+function listFields(labels: string[]): string {
+  const lower = labels.map((l) => l.toLowerCase());
+  return lower.length <= 1 ? (lower[0] ?? '') : `${lower.slice(0, -1).join(', ')} y ${lower[lower.length - 1]}`;
+}
+
+/** Opciones del buscador de ciudades: se encuentran por ciudad, apodo, código IATA, aeropuerto o región. */
+function airportOptions(): ComboboxOption[] {
+  return AIRPORTS.map((a) => ({
+    value: a.code,
+    label: `${a.city} (${a.code})`,
+    detail: a.name,
+    icon: <MapPin className="size-6" />,
+    keywords: [a.code, a.name, es.home.cities[a.code as keyof typeof es.home.cities] ?? a.city, es.home.worlds[a.region].name],
+  }));
 }
