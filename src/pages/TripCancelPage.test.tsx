@@ -44,7 +44,9 @@ function renderPage() {
 }
 
 async function openDialog() {
-  fireEvent.click(await screen.findByRole('button', { name: t.start }));
+  const start = await screen.findByRole('button', { name: t.start });
+  start.focus();
+  fireEvent.click(start);
   return screen.findByRole('alertdialog');
 }
 
@@ -89,6 +91,8 @@ describe('pantalla de cancelación', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: t.keepDialog }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(api.cancelBooking).not.toHaveBeenCalled();
+    // El foco vuelve al botón que abrió el diálogo, no se pierde en la página.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: t.start })));
   });
 
   it('200: la reserva queda cancelada, se avisa el reembolso y la petición lleva quoteId e Idempotency-Key (UUID)', async () => {

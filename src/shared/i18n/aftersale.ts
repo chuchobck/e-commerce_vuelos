@@ -286,7 +286,7 @@ export const aftersaleEs = {
     quoteExpires: 'Esta cotización vale hasta las {time}.',
     quoteExpired: 'La cotización venció. Pide una nueva para ver el reembolso al día.',
     renewQuote: 'Pedir cotización nueva',
-    reasonLabel: 'Motivo (opcional)',
+    reasonLabel: 'Motivo',
     reasonHint: 'Nos ayuda a mejorar. No cambia tu reembolso.',
     reasonMax: 'Escribe máximo 200 caracteres.',
     start: 'Cancelar esta reserva',

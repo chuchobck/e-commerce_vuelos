@@ -1,6 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import { forwardRef, useEffect, useState, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from 'react';
+import { forwardRef, useEffect, useLayoutEffect, useRef, useState, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from 'react';
 import { es } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { Button } from './button';
@@ -86,14 +86,30 @@ export function ConfirmDialog({
   acknowledge,
 }: ConfirmDialogProps) {
   const [understood, setUnderstood] = useState(false);
+  const opener = useRef<HTMLElement | null>(null);
   // Cada vez que se abre, la casilla empieza sin marcar.
   useEffect(() => {
     if (!open) setUnderstood(false);
   }, [open]);
+  // Este diálogo es controlado y no tiene DialogTrigger: Radix no sabe a quién devolverle el foco al cerrarlo (WCAG 2.4.3),
+  // así que se recuerda el elemento que lo tenía justo antes de abrirse.
+  useLayoutEffect(() => {
+    if (open) opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent role="alertdialog" hideClose>
+      <DialogContent
+        role="alertdialog"
+        hideClose
+        onCloseAutoFocus={(event) => {
+          // Si el elemento ya no está en la página (p. ej. el trámite terminó), Radix decide.
+          if (opener.current?.isConnected) {
+            event.preventDefault();
+            opener.current.focus();
+          }
+        }}
+      >
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
         {acknowledge ? <Checkbox label={acknowledge} checked={understood} onCheckedChange={(checked) => setUnderstood(checked === true)} /> : null}
