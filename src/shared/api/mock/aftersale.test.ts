@@ -15,7 +15,10 @@ async function freshApi() {
   const auth = { token: undefined as string | undefined };
   const api: MockFlightsApi = new MockFlightsApi(() => auth.token);
   auth.token = (await api.login({ email: 'demo@quinde.ec', password: 'quinde-demo-2026' })).accessToken;
-  return { api, auth };
+  // La base simulada ya está cargada tras ingresar: la misma instancia sirve para armar casos que la demo no trae.
+  const { loadDb } = await import('./store');
+  const db = () => loadDb(() => { throw new Error('la base simulada aún no se cargó'); });
+  return { api, auth, db };
 }
 
 async function failure(promise: Promise<unknown>) {
@@ -116,8 +119,10 @@ describe('check-in y pases de abordar', () => {
     expect(result.passengers[0]).toMatchObject({ passengerId: 'PAX1', status: 'CHECKED_IN' });
     const passes = await api.getBoardingPasses(id('QD7K2M'));
     expect(passes).toHaveLength(1);
-    expect(passes[0]).toMatchObject({ passengerId: 'PAX1', barcodeType: 'QR' });
-    expect(passes[0].barcode).toContain('QD7K2M');
+    // Como la API real: PDF417 en económica (AZTEC en las demás cabinas) y un texto con campos separados por barras.
+    expect(passes[0]).toMatchObject({ passengerId: 'PAX1', barcodeType: 'PDF417' });
+    expect(passes[0].barcode).toMatch(/^BP1\|QD7K2M\|\d{13}\|[A-Z0-9]+\|\d{8}\|[A-Z]{6}\|\d+[A-Z]\|1\|[0-9a-f]{12}$/);
+    expect(passes[0].boardingPosition).toMatch(/^\d{3}$/);
     expect(passes[0].seat).toBe(result.passengers[0].segments[0].seat);
     // Repetirlo (mismo intento) devuelve lo mismo.
     expect(await api.checkIn(id('QD7K2M'), key())).toEqual(result);
@@ -129,14 +134,35 @@ describe('check-in y pases de abordar', () => {
     expect((await failure(api.checkIn(id('QC9S4Z'), key()))).code).toBe('CHECK_IN_NOT_AVAILABLE');
   });
 
-  it('el infante hace check-in sin tramos ni pase propio', async () => {
+  it('la ventana es por vuelo: en una ida y vuelta, el check-in de la ida queda hecho (200 IN_PROGRESS) y el de la vuelta sigue sin abrir', async () => {
+    const { api, db } = await freshApi();
+    const stored = db().bookings.find((b) => b.dto.pnr === 'QD7K2M')!;
+    const outbound = stored.dto.itineraries![0];
+    const week = 7 * 86_400_000;
+    const shift = (at: string) => new Date(new Date(at).getTime() + week).toISOString();
+    stored.dto.itineraries!.push({
+      ...outbound,
+      itineraryId: 'itinerario-vuelta',
+      segments: outbound.segments.map((sg, i) => ({ ...sg, segmentId: `vuelta-${i}`, departure: { ...sg.departure, at: shift(sg.departure.at) }, arrival: { ...sg.arrival, at: shift(sg.arrival.at) } })),
+    });
+    const result = await api.checkIn(id('QD7K2M'), key());
+    expect(result.status).toBe('IN_PROGRESS');
+    const [passenger] = result.passengers;
+    expect(passenger.segments.map((sg) => sg.status)).toEqual(['CHECKED_IN', 'NOT_CHECKED_IN']);
+    // El estado del pasajero NO dice que la ida está lista: hay que leer los vuelos.
+    expect(passenger.status).toBe('NOT_CHECKED_IN');
+    // Solo hay pase de la ida.
+    expect((await api.getBoardingPasses(id('QD7K2M'))).map((p) => p.segmentId)).toEqual([outbound.segments[0].segmentId]);
+  });
+
+  it('el infante hace check-in con asiento nulo y sin pase propio', async () => {
     const { api, auth } = await freshApi();
     // QR2V6W sale en 3 días: se adelanta el reloj a 20 h antes de la salida.
     const booking = await api.getBooking(id('QR2V6W'));
     const departure = new Date(booking.outbound.itinerary.segments[0].departureTime).getTime();
     await setClock(api, auth, departure - 20 * 3_600_000);
     const result = await api.checkIn(id('QR2V6W'), key());
-    expect(result.passengers.find((p) => p.passengerId === 'PAX2')).toMatchObject({ status: 'CHECKED_IN', segments: [] });
+    expect(result.passengers.find((p) => p.passengerId === 'PAX2')).toMatchObject({ status: 'CHECKED_IN', segments: [{ seat: null, status: 'CHECKED_IN' }] });
     expect((await api.getBoardingPasses(id('QR2V6W'))).map((p) => p.passengerId)).toEqual(['PAX1']);
   });
 }, 20_000);
@@ -144,12 +170,13 @@ describe('check-in y pases de abordar', () => {
 describe('equipaje', () => {
   const baggage = (passengerId: string, itineraryId: string, paymentReference: string, quantity = 1) => ({ passengerId, itineraryId, quantity, paymentReference });
 
-  it('opciones solo para quien ocupa asiento, con precio, máximo y lo ya comprado', async () => {
+  it('una fila por pasajero e itinerario: el infante también, con máximo 0; los demás, el de su familia (CLASSIC 2, FLEX 3)', async () => {
     const { api } = await freshApi();
     const options = await api.getBaggageOptions(id('QR2V6W'));
-    expect(options.map((o) => o.passengerId)).toEqual(['PAX1']);
-    expect(options[0]).toMatchObject({ maxAllowed: 3, alreadyPurchased: 0 });
+    expect(options.map((o) => [o.passengerId, o.maxAllowed])).toEqual([['PAX1', 2], ['PAX2', 0]]);
+    expect(options[0]).toMatchObject({ alreadyPurchased: 0 });
     expect(options[0].price!.cents).toBeGreaterThan(0);
+    expect((await api.getBaggageOptions(id('QG4P9X')))[0].maxAllowed).toBe(3);
   });
 
   it('PAY-OK-: 200 con el total; el mismo intento (misma clave y cuerpo) no suma dos veces; otra clave con otro cuerpo, 422', async () => {
@@ -193,14 +220,20 @@ describe('equipaje', () => {
     const { api } = await freshApi();
     const [option] = await api.getBaggageOptions(id('QG4P9X'));
     expect((await failure(api.addBaggage(id('QG4P9X'), baggage(option.passengerId, option.itineraryId, pay('OK'), 4), key()))).code).toBe('BAGGAGE_LIMIT_EXCEEDED');
-    expect((await failure(api.addBaggage(id('QR2V6W'), baggage('PAX2', 'x', pay('OK')), key()))).status).toBe(422);
+    // Un infante no lleva maleta extra: su máximo es 0 (409), no un pasajero desconocido (422).
+    const [, infant] = await api.getBaggageOptions(id('QR2V6W'));
+    expect((await failure(api.addBaggage(id('QR2V6W'), baggage('PAX2', infant.itineraryId, pay('OK')), key()))).code).toBe('BAGGAGE_LIMIT_EXCEEDED');
+    expect((await failure(api.addBaggage(id('QR2V6W'), baggage('PAX9', infant.itineraryId, pay('OK')), key()))).status).toBe(422);
+    expect((await failure(api.addBaggage(id('QR2V6W'), baggage('PAX1', 'x', pay('OK')), key()))).status).toBe(422);
+    expect((await failure(api.addBaggage(id('QG4P9X'), baggage(option.passengerId, option.itineraryId, pay('OK'), 11), key()))).status).toBe(400);
     expect((await failure(api.addBaggage(id('QG4P9X'), baggage(option.passengerId, 'no-es-mio', pay('OK')), key()))).status).toBe(422);
     expect((await failure(api.addBaggage(id('QG4P9X'), baggage(option.passengerId, option.itineraryId, pay('OK'), 0), key()))).status).toBe(400);
   });
 
-  it('una reserva cancelada no admite equipaje (409 ALREADY_CANCELLED)', async () => {
+  it('una reserva cancelada no admite equipaje: 409 VALIDATION_FAILED (la API real no usa ALREADY_CANCELLED aquí)', async () => {
     const { api } = await freshApi();
-    expect((await failure(api.getBaggageOptions(id('QC9S4Z')))).code).toBe('ALREADY_CANCELLED');
+    const error = await failure(api.getBaggageOptions(id('QC9S4Z')));
+    expect([error.status, error.code]).toEqual([409, 'VALIDATION_FAILED']);
   });
 }, 30_000);
 
@@ -218,17 +251,27 @@ describe('cambio de fecha', () => {
     expect([error.status, error.code]).toEqual([409, 'FARE_NOT_CHANGEABLE']);
   });
 
-  it('alternativas con la diferencia de tarifa, impuestos, cargo y total (fare + tax + fee = total)', async () => {
+  it('alternativas con la diferencia de tarifa, impuestos, cargo y total: total = max(0, tarifa + impuestos) + cargo, nunca negativo', async () => {
     const { api } = await freshApi();
     const { options, date } = await search(api, 'QR2V6W');
     expect(options.length).toBeGreaterThan(0);
     for (const option of options) {
       expect(option.segments[0].departureTime.slice(0, 10)).toBe(date);
       const { fare, taxes, fee, total } = option.price;
-      expect(fare.cents + taxes.cents + fee.cents).toBe(total.cents);
-      expect(fee.cents).toBe(2500); // CLASSIC: 25 USD por pasajero con asiento
+      expect(total.cents).toBe(Math.max(0, fare.cents + taxes.cents) + fee.cents);
+      expect(total.cents).toBeGreaterThanOrEqual(0);
+      expect(fee.cents).toBeGreaterThan(0); // CLASSIC: el 20 % de la tarifa base de un adulto, por pasajero con asiento
       expect(new Date(option.expiresAt).getTime()).toBeGreaterThan(Date.now());
     }
+  });
+
+  it('FLEX no cobra cargo por cambio; el de CLASSIC es el mismo en todas las alternativas', async () => {
+    const { api } = await freshApi();
+    const flex = (await search(api, 'QG4P9X')).options;
+    expect(flex.length).toBeGreaterThan(0);
+    expect(flex.every((o) => o.price.fee.cents === 0)).toBe(true);
+    const classic = (await search(api, 'QR2V6W')).options;
+    expect(new Set(classic.map((o) => o.price.fee.cents)).size).toBe(1);
   });
 
   it('confirmar con pago aprobado: 200 con la reserva en la nueva fecha y el historial; sin pago, 422', async () => {
@@ -276,9 +319,15 @@ describe('cancelación', () => {
     const booking = await api.getBooking(id('QG4P9X'));
     expect(flex.refundable).toBe(true);
     expect(flex.refund.cents + flex.penalty.cents).toBe(booking.total.cents);
-    expect(flex.penalty.cents).toBe(Math.round(booking.total.cents * 0.1));
+    // La penalidad depende de la familia: FLEX 10 %, CLASSIC 35 %, BASIC 100 % (el reembolso se redondea hacia arriba).
+    expect(flex.refund.cents).toBe(Math.ceil(booking.total.cents * 0.9));
+    const classic = await api.getCancellationQuote(id('QR2V6W'));
+    expect(classic.refund.cents).toBe(Math.ceil((await api.getBooking(id('QR2V6W'))).total.cents * 0.65));
     const basic = await api.getCancellationQuote(id('QB5T1N'));
     expect(basic).toMatchObject({ refundable: false, refund: { cents: 0 } });
+    expect(basic.penalty.cents).toBe((await api.getBooking(id('QB5T1N'))).total.cents);
+    // La cotización vale 15 minutos.
+    expect(new Date(flex.expiresAt).getTime() - Date.now()).toBeGreaterThan(14 * 60_000);
   });
 
   it('cancelar con la cotización: 200, queda CANCELLED con historial; repetirlo con la misma clave es igual; otra vez, 409', async () => {
@@ -291,14 +340,26 @@ describe('cancelación', () => {
     expect(booking.status).toBe('CANCELLED');
     expect(booking.changes.at(-1)?.description).toContain('cancelled');
     expect((await failure(api.cancelBooking(id('QG4P9X'), { quoteId: quote.quoteId }, key()))).code).toBe('ALREADY_CANCELLED');
-    expect((await failure(api.getCancellationQuote(id('QG4P9X')))).code).toBe('ALREADY_CANCELLED');
+    // Pedir otra cotización de una reserva cancelada es un 409 genérico, no ALREADY_CANCELLED (solo sale al cancelar).
+    const again = await failure(api.getCancellationQuote(id('QG4P9X')));
+    expect([again.status, again.code]).toEqual([409, 'VALIDATION_FAILED']);
+  });
+
+  it('el motivo: de 1 a 500 caracteres, sin saltos de línea ni etiquetas HTML (400)', async () => {
+    const { api } = await freshApi();
+    const { quoteId } = await api.getCancellationQuote(id('QG4P9X'));
+    for (const reason of ['x'.repeat(501), '<b>hola</b>', 'dos\nlíneas', '   ']) {
+      expect((await failure(api.cancelBooking(id('QG4P9X'), { quoteId, reason }, key()))).status).toBe(400);
+    }
+    expect((await api.getBooking(id('QG4P9X'))).status).toBe('CONFIRMED');
+    expect((await api.cancelBooking(id('QG4P9X'), { quoteId, reason: 'x'.repeat(500) }, key())).status).toBe('done');
   });
 
   it('cotización ajena o inventada es 422 y una vencida, 409 QUOTE_EXPIRED', async () => {
     const { api, auth } = await freshApi();
     expect((await failure(api.cancelBooking(id('QG4P9X'), { quoteId: 'inventada' }, key()))).status).toBe(422);
     const quote = await api.getCancellationQuote(id('QG4P9X'));
-    await setClock(api, auth, Date.now() + 11 * 60_000);
+    await setClock(api, auth, Date.now() + 16 * 60_000);
     expect((await failure(api.cancelBooking(id('QG4P9X'), { quoteId: quote.quoteId }, key()))).code).toBe('QUOTE_EXPIRED');
   });
 

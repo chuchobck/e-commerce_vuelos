@@ -190,7 +190,7 @@ export function TripDateChangePage() {
 
         <div className="flex flex-wrap gap-4">
           <Button size="lg" onClick={submitConfirm} loading={state.confirming} loadingText={t.confirming}>
-            {direction > 0 ? fmt(t.confirmPay, { total: formatMoney(due) }) : direction < 0 ? fmt(t.confirmRefund, { total: formatMoney({ cents: -direction, currency: chosen.price.total.currency }) }) : t.confirm}
+            {direction > 0 ? fmt(t.confirmPay, { total: formatMoney(due) }) : t.confirm}
           </Button>
           <Button variant="secondary" disabled={state.confirming} onClick={flow.backToOptions}>
             {t.back}

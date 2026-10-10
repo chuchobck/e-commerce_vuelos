@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { absMoney, amountDue, needsPayment, newDateProblem, priceDirection, suggestedDate } from './dateChange';
+import { amountDue, cheaperThanCurrent, needsPayment, newDateProblem, priceDirection, suggestedDate } from './dateChange';
 
 const price = (cents: number) => ({ total: { cents, currency: 'USD' } });
 const itinerary = (departureTime: string) => ({ segments: [{ departureTime }] as never });
@@ -7,10 +7,18 @@ const itinerary = (departureTime: string) => ({ segments: [{ departureTime }] as
 const NOW = new Date(2026, 9, 9);
 
 describe('precio de un cambio de fecha', () => {
-  it('positivo se paga, negativo se devuelve, cero no cuesta', () => {
+  it('se paga o no cuesta: la API nunca devuelve un total negativo (max(0, tarifa + impuestos) + cargo)', () => {
     expect(priceDirection(price(2500))).toBe('pay');
-    expect(priceDirection(price(-1200))).toBe('refund');
     expect(priceDirection(price(0))).toBe('free');
+    // Defensa: aunque llegara un negativo, no se promete ningún reembolso.
+    expect(priceDirection(price(-1200))).toBe('free');
+  });
+
+  it('avisa cuando el nuevo vuelo cuesta menos (esa diferencia no se devuelve)', () => {
+    const money = (cents: number) => ({ cents, currency: 'USD' });
+    expect(cheaperThanCurrent({ fare: money(-1500), taxes: money(200) })).toBe(true);
+    expect(cheaperThanCurrent({ fare: money(1500), taxes: money(-200) })).toBe(false);
+    expect(cheaperThanCurrent({ fare: money(0), taxes: money(0) })).toBe(false);
   });
 
   it('solo hay que pagar (y pedir un pago) cuando el total es positivo', () => {
@@ -19,10 +27,6 @@ describe('precio de un cambio de fecha', () => {
     expect(needsPayment(price(-500))).toBe(false);
     expect(amountDue(price(2500))).toEqual({ cents: 2500, currency: 'USD' });
     expect(amountDue(price(-500))).toEqual({ cents: 0, currency: 'USD' });
-  });
-
-  it('el valor absoluto no pierde la moneda', () => {
-    expect(absMoney({ cents: -1200, currency: 'USD' })).toEqual({ cents: 1200, currency: 'USD' });
   });
 });
 

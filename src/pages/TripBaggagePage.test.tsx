@@ -72,6 +72,20 @@ describe('pantalla de equipaje extra', () => {
     expect(plus().getAttribute('aria-disabled')).toBe('true');
   });
 
+  it('la fila del infante (máximo 0) no se ofrece: no hay nada que elegir ahí', async () => {
+    api.getBaggageOptions.mockResolvedValue([OPTION, { ...OPTION, passengerId: 'PAX2', maxAllowed: 0 }]);
+    renderPage();
+    await screen.findByText(t.nothingSelected);
+    expect(screen.getByRole('heading', { name: fmt(t.passenger, { name: 'Ana Pérez' }) })).toBeTruthy();
+    expect(screen.queryByText(/PAX2/)).toBeNull();
+  });
+
+  it('si solo hay filas con máximo 0, explica que no hay equipaje para agregar', async () => {
+    api.getBaggageOptions.mockResolvedValue([{ ...OPTION, maxAllowed: 0 }]);
+    renderPage();
+    expect(await screen.findByText(t.noOptionsTitle)).toBeTruthy();
+  });
+
   it('sin maletas elegidas no se puede continuar', async () => {
     renderPage();
     await screen.findByText(t.nothingSelected);

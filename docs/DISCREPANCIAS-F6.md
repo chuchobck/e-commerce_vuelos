@@ -1,6 +1,6 @@
 # F6 «Mis viajes»: discrepancias y verificación pendiente
 
-Estado a 2026-10-09. **La F6 se construyó y probó solo contra el mock.** El backend local (`http://localhost:3010`) no
+Estado a 2026-10-09. **La F6 se construyó y probó solo contra el mock** (después se leyó el código del backend: sección 0). El backend local (`http://localhost:3010`) no
 respondió desde la sesión de trabajo (conexión rechazada, comprobado dos veces), así que **ningún endpoint de la F6 se ha
 verificado contra la API real**. Todo lo que sigue es lo que se espera según `contracts/vuelos-openapi.yaml` (GDS Flight
 Core API v1.5.0.0) y los tipos generados en `src/shared/api/generated/vuelos.ts`.
@@ -13,7 +13,82 @@ cuenta de administrador sembrada, y sin `./db/reset.sh`. No se toca el repositor
 
 ---
 
+## 0. Lectura del código del backend (2026-10-10): lo asumido frente a lo que hace
+
+Después de cerrar la F6 se leyó el código del backend (`chuchobck/backend_vuelos`, solo lectura, **sin ejecutarlo**) y el dueño probó
+compra, lista, detalle y pases contra el backend local. Lo que sigue sale de **leer el código y sus pruebas**, no de ejecutar la API: sirve para
+corregir lo que se sabe erróneo, pero cada fila sigue necesitando la verificación en marcha de la sección 1.
+Evidencia: archivo del backend entre paréntesis (`ops/` = `src/modules/vuelos/operaciones/`).
+
+| Tema | Lo que asumía la F6 | Lo que hace el backend (leído) | Qué se hizo |
+|---|---|---|---|
+| Pases antes del check-in | 409 `BOARDING_PASS_NOT_AVAILABLE` | **200 con lista vacía** (también con la reserva no confirmada) (`ops/pase-abordar/pase-abordar.service.ts`) | Corregido (confirmado también por el dueño): estado «aún no hay pases», sin botón de imprimir; el mock responde igual |
+| Tipo de código del pase | `QR` | Nunca QR: **PDF417 en económica, AZTEC en las demás**; el texto es `BP1\|PNR\|boleto\|vuelo\|aaaammdd\|ORIGDEST\|asiento\|orden\|firma` (`ops/pase-abordar/codigo-pase.ts`) | La pantalla dibuja siempre un QR con ese texto y lo dice («Código tipo PDF417, dibujado aquí como QR…»). **Un lector de aeropuerto puede no reconocerlo**: pendiente decidir si se agrega un generador de PDF417/AZTEC. El mock ya devuelve PDF417/AZTEC |
+| Ventana de check-in | Una sola, la de la primera salida | **Por vuelo** (48 h a 60 min antes de cada salida); solo con el vuelo `PROGRAMADO` o `DEMORADO` (`ops/checkin/checkin.service.ts`) | Corregido: hay check-in si algún vuelo está en ventana; si no, se dice cuándo abre el próximo (`shared/lib/checkinStatus.ts`) |
+| Resultado del check-in | `status` del pasajero | Es **200 `IN_PROGRESS`**, no un error, si un vuelo está en ventana y otro no. El `status` del pasajero es `NOT_CHECKED_IN`/`FAILED` si **falta cualquier vuelo**, aunque otro esté `CHECKED_IN`. El `status` global solo es `COMPLETED` o `IN_PROGRESS` | Corregido: se cuenta por `segments[].status` (`checkInProgress`); la pantalla distingue «todo listo» (va a pases), «listo para los vuelos abiertos» y «ninguno quedó» |
+| Check-in: errores | 409 y un 422 sin causa conocida | 409 `CHECK_IN_NOT_AVAILABLE` sin vuelo en ventana ni registrado, o con la reserva no confirmada (**nunca** `ALREADY_CANCELLED`); 422 `CHECK_IN_FAILED` (pasajero con asiento faltante o pasaporte que vence antes de la salida; rechaza toda la reserva y trae `invalidParams`) | El mensaje de `CHECK_IN_FAILED` ya existía. Repetir devuelve 200 con el estado actual |
+| Check-in: `Idempotency-Key` | La enviaba aunque no se declara | Se ignora (no se lee) | Sin cambios (no estorba) |
+| Infante en el check-in | Sin vuelos | Aparece con `seat: null` y `CHECKED_IN` en cada vuelo | Mock alineado; `checkInProgress` cuenta sus vuelos como los de los demás |
+| Opciones de equipaje | Solo pasajeros con asiento | **Una fila por pasajero e itinerario, el infante con `maxAllowed: 0`**; el máximo sale de la familia: BASIC 2, CLASSIC 2, FLEX 3, BUSINESS_FLEX 4 (`db/semilla_vuelos.sql`) | La pantalla oculta las filas con máximo 0; el mock devuelve las mismas |
+| Equipaje: respuestas | 422 sin confirmar | **202 trae cuerpo** (`{passengerId, itineraryId, totalBaggage}`); el **422 `PAYMENT_NOT_AUTHORIZED` sí existe** para `PAY-REJ-…` (también en cambio de fecha); referencia ya usada: 409; `quantity` de 1 a 10 (400); orden: reserva (404) → no confirmada (409) → itinerario ajeno (422) → vuelo salido (409 `FLIGHT_ALREADY_DEPARTED`) → pasajero ajeno (422) → máximo (409 `BAGGAGE_LIMIT_EXCEEDED`) → cobro (`ops/equipaje/equipaje.service.ts`) | Mock alineado. Comprar maletas son N peticiones (pasajeros × itinerarios) y el límite es **10/min por IP**: una compra grande puede dar 429 |
+| Referencia de pago | 4 a 50 letras o números | Además el DTO exige 8 a 64 caracteres `[A-Za-z0-9_.:-]`; `PAY-OK-ABC` (sufijo de 3) cae en 422 | Las referencias que genera la pantalla (`PAY-OK-` + 16) cumplen; la que se escribe a mano se valida con 4+ |
+| Cambio de fecha: precio | `totalToPay` negativo = reembolso | **Nunca es negativo**: `max(0, fareDifference + taxDifference) + changeFee`; si el nuevo vuelo cuesta menos, la diferencia no se devuelve; `fare + tax + fee ≠ total` en ese caso (`ops/cambio-fecha/cambio-fecha.service.ts`) | Corregido: se quitó el reembolso de la pantalla (`DateChangePrice`) y se avisa «esa diferencia no se devuelve» |
+| Cambio de fecha: cargo | 25 USD fijos en CLASSIC | `tarifa_cabecera.cargo_cambio`: **20 % de la tarifa base de un adulto, por pasajero con asiento**, en CLASSIC; FLEX y BUSINESS_FLEX 0; BASIC no cambiable | Mock alineado |
+| Cambio de fecha: errores | 410 oferta vencida | 410 `CHANGE_OFFER_EXPIRED` solo en la ventana entre vencer y la purga; después la oferta **no existe: 422 `VALIDATION_FAILED` con `invalidParams: changeOfferId`**; oferta usada o reserva no confirmada: 409 `VALIDATION_FAILED`; falta `payment` con total > 0: 422; con total 0 el pago se ignora; `FARE_NOT_CHANGEABLE` también sale en la búsqueda; **no existe `CUTOFF_PASSED`** | Corregido: `classifyPaymentError` y `errorMessage` tratan el 422 con `changeOfferId`/`quoteId` como «vencida» y el 409 genérico como «la reserva ya no permite esto»; el mock se alineó |
+| Cambio de fecha: resultado | Reserva en la nueva fecha | `itineraryId` **nuevo**, boletos viejos `VOIDED` y boletos nuevos `ISSUED` (**dos boletos por pasajero**); `grandTotal` suma cargo y diferencia; en el 202 el detalle sigue mostrando lo viejo hasta el siguiente ciclo del trabajo (cada 30 s). Los asientos se **reasignan** siempre (el texto de la pantalla es correcto) | `TicketList` muestra todos con su estado. Deducido del código, sin probar: las maletas ya compradas quedan atadas al itinerario viejo (`alreadyPurchased` vuelve a 0 en el nuevo) |
+| Cancelación: reembolso | 10 % de penalidad, «reembolsable» por tarifa | Penalidad **por familia: BASIC 100 %, CLASSIC 35 %, FLEX 10 %, BUSINESS_FLEX 0 %** (por itinerario); el reembolso suma tarifa + impuestos + maletas aprobadas (los cargos por cambio **no** se reembolsan) y se redondea hacia arriba; `penalty = total − refund`; `isRefundable = refund > 0` | Mock alineado (BASIC da `isRefundable: false` y no es un error) |
+| Cancelación: vigencia y errores | 10 min; `ALREADY_CANCELLED` en la cotización | Cotización de **15 min**, cada GET crea una nueva; la cotización de una reserva no confirmada (cancelada incluida) es **409 `VALIDATION_FAILED`**; `ALREADY_CANCELLED` solo al cancelar; vuelo salido: 409 `FLIGHT_ALREADY_DEPARTED`; no hay tope de horas antes de la salida | Mock alineado |
+| Cancelación: cuerpo | `reason` hasta 200 | **Hasta 500**, recortado, no vacío, **sin caracteres de control ni etiquetas HTML** (si no, 400); el 200 trae un `BookingDetail` `CANCELLED` y el 202 uno `CANCELLATION_PENDING` | Corregido: la pantalla admite 500 y no deja escribir `<`, `>` ni saltos de línea |
+| Errores con código | `BOOKING_NOT_CONFIRMED`, `CUTOFF_PASSED`, `ALREADY_CANCELLED` por todas partes | Casi todo error sin código propio es **`VALIDATION_FAILED`** y solo el estado HTTP lo distingue (`src/common/errores/codigo-error.ts`); `BOOKING_NOT_CONFIRMED` y `CUTOFF_PASSED` no se emiten | Corregido (ver arriba). Los mensajes por esos códigos quedan por si el contrato cambia |
+| 401 por token vencido | — | 401 con `code: VALIDATION_FAILED`, `title: Unauthorized`, `detail: The access token expired` (también «invalid» y «a bearer access token is required»); el token de acceso dura 15 min; **no hay un código propio para «vencido»** | El cliente ya renueva y reintenta una vez ante cualquier 401 (sección 6 del README); no hay que distinguir el motivo |
+| 403 por permiso | Sin código | `code: VALIDATION_FAILED`, `detail: Missing required scopes: flights:cancel` (lista los que faltan); se evalúa antes que la validación y el 404; el rol `cliente` tiene read, hold, book, cancel y webhooks, así que **un usuario normal no recibe 403 aquí** | El mensaje de permiso ya existía |
+| Cabeceras en el navegador | — | `Idempotent-Replayed` y `WWW-Authenticate` **no están expuestas por CORS**: el navegador no las puede leer (`src/config/seguridad.ts`) | El cliente no depende de ellas |
+| Límites 429 | — | check-in 20/min, baggage 10/min, date-change/search 20/min, date-change 10/min, cancel 10/min (por IP y ruta), resto 100/min global; con `Retry-After` | Ya se muestra «espera N segundos» |
+| Trabajo pendiente (202) | ~20 s | Un trabajo lo completa **cada 30 s** (`POSTSALE_JOB_INTERVAL_SECONDS`); `PAY-PEND-…` siempre termina aprobado en la pasada siguiente | Los textos dicen «unos segundos»; la verificación debe esperar hasta ~30 s |
+| Lista | Orden y `departureDate` | `fecha_creacion DESC, id DESC`; `departureDate` es la fecha local del **primer itinerario** (la ida); ocho estados (`PENDING`, `PENDING_PAYMENT`, `TICKET_ISSUING`, `CONFIRMED`, `FAILED`, `CHANGE_PENDING`, `CANCELLATION_PENDING`, `CANCELLED`); `grandTotal` trae `baseFare`, `taxes` y `total` y el total **incluye maletas y cargos**, así que `baseFare + taxes ≠ total` tras la postventa | Sin cambios: la pantalla usa `total` |
+
+### Cómo ver la reserva en la base de datos (solo lectura)
+
+Base `booking_db`, esquema **`vuelos`** (no `public`). Reemplaza `XXXXXX` por el código de reserva (PNR):
+
+```sql
+SET search_path TO vuelos;
+SELECT rc.pnr, rc.estado, u.correo, vt.total,
+       p.codigo_pasajero, p.tipo_pasajero, p.nombres, p.apellidos,
+       b.numero_boleto, b.estado AS estado_boleto, bd.numero_cupon,
+       vv.codigo_vuelo, mad.numero_fila || a.letra AS asiento,
+       ck.estado AS checkin, pa.tipo_codigo_barras, pa.codigo_barras
+FROM reserva_cabecera rc
+JOIN retencion_cabecera rt ON rt.id = rc.retencion_id
+LEFT JOIN usuario u ON u.id::text = rt.id_propietario
+JOIN vista_reserva_total vt ON vt.reserva_id = rc.id
+JOIN reserva_detalle_pasajero p ON p.reserva_id = rc.id
+LEFT JOIN boleto_cabecera b ON b.pasajero_id = p.id
+LEFT JOIN boleto_detalle bd ON bd.boleto_id = b.id
+LEFT JOIN vista_vuelo_programado vv ON vv.vuelo_programado_id = bd.vuelo_programado_id
+LEFT JOIN reserva_detalle_asiento ra ON ra.pasajero_id = p.id AND ra.vuelo_programado_id = bd.vuelo_programado_id AND ra.fecha_liberacion IS NULL
+LEFT JOIN asiento a ON a.id = ra.asiento_id
+LEFT JOIN mapa_asientos_detalle mad ON mad.id = a.mapa_asientos_detalle_id
+LEFT JOIN checkin ck ON ck.pasajero_id = p.id AND ck.vuelo_programado_id = bd.vuelo_programado_id AND ck.estado = 'REGISTRADO'
+LEFT JOIN pase_abordar pa ON pa.checkin_id = ck.id
+WHERE rc.pnr = 'XXXXXX'
+ORDER BY p.id, b.fecha_creacion, bd.numero_cupon;
+
+-- Pagos (compra, maletas y cambios) y maletas compradas de esa reserva:
+SELECT referencia_pago, concepto, estado, fecha_registro
+FROM reserva_detalle_pago WHERE reserva_id = (SELECT id FROM reserva_cabecera WHERE pnr = 'XXXXXX');
+SELECT p.codigo_pasajero, e.cantidad, e.precio_unitario, g.referencia_pago
+FROM reserva_detalle_equipaje e
+JOIN reserva_detalle_pasajero p ON p.id = e.pasajero_id
+JOIN reserva_detalle_pago g ON g.id = e.pago_id
+WHERE p.reserva_id = (SELECT id FROM reserva_cabecera WHERE pnr = 'XXXXXX');
+```
+
+---
+
 ## 1. Pendiente de verificación real
+
+> Donde esta sección contradiga a la 0 (que sale de leer el código del backend), manda la 0: aquí se conservó el pedido original de cada endpoint y lo que falta **comprobar en marcha**.
 
 Todas las rutas cuelgan de `{VITE_API_URL}` (`http://localhost:3010/flights/v1`) y exigen `Authorization: Bearer`.
 Dinero: texto decimal en la API (`"25.00"`), centavos enteros en el frontend (`shared/lib/money.ts`).

@@ -40,6 +40,16 @@ describe('mensajes de error por status (qué pasó y qué hacer)', () => {
     expect(errorMessage(err(400, { code: 'VALIDATION_FAILED', detail: technical }))).not.toContain('must not');
   });
 
+  it('el backend rotula como VALIDATION_FAILED casi todo: la postventa se distingue por estado y parámetro', () => {
+    // 409 genérico = reserva que ya no está confirmada, trámite en proceso u oferta ya usada.
+    expect(errorMessage(err(409, { code: 'VALIDATION_FAILED' }))).toBe(e.bookingStateChanged);
+    // Una oferta de cambio o cotización vencida hace rato se borra: 422 con su id.
+    expect(errorMessage(err(422, { code: 'VALIDATION_FAILED', fieldErrors: [{ field: 'changeOfferId', message: 'not found' }] }))).toBe(e.changeOfferExpired);
+    expect(errorMessage(err(422, { code: 'VALIDATION_FAILED', fieldErrors: [{ field: 'quoteId', message: 'not found' }] }))).toBe(e.quoteExpired);
+    // Otro 422 sigue siendo el genérico.
+    expect(errorMessage(err(422, { code: 'VALIDATION_FAILED', fieldErrors: [{ field: 'passengerId', message: 'x' }] }))).toBe(e.validation422);
+  });
+
   it('un error que no es de la API da el mensaje genérico', () => {
     expect(errorMessage(new Error('x'))).toBe(e.unknown);
   });

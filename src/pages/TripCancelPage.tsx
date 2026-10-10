@@ -12,7 +12,9 @@ import { formatMoney, formatTime } from '@/shared/lib/format';
 import { Alert, Button, Card, ConfirmDialog, ErrorState, Field, LoadingState, Input, TripSummary } from '@/shared/ui';
 
 const t = es.aftersale.cancel;
-const MAX_REASON = 200;
+/** Máximo de la API (500). Tampoco admite saltos de línea ni etiquetas HTML: esos signos simplemente no se escriben. */
+const MAX_REASON = 500;
+const cleanReason = (value: string) => value.replace(/[\p{Cc}<>]/gu, '');
 
 /**
  * Cancelación: 1) cotización (cuánto te devolvemos y la penalidad, en palabras simples), 2) confirmación explícita en un
@@ -27,20 +29,12 @@ export function TripCancelPage() {
   const { state, cancel, renew } = useCancellation(id, authorized, () => void trip.refresh());
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
-  const [reasonError, setReasonError] = useState<string | undefined>();
   const [refreshing, setRefreshing] = useState(false);
   const [checked, setChecked] = useState(false);
 
   const quote = state.quote.status === 'ready' ? state.quote.data : null;
 
-  const start = () => {
-    if (reason.length > MAX_REASON) {
-      setReasonError(t.reasonMax);
-      return;
-    }
-    setReasonError(undefined);
-    setOpen(true);
-  };
+  const start = () => setOpen(true);
 
   const confirm = async () => {
     await cancel(reason);
@@ -163,8 +157,8 @@ export function TripCancelPage() {
 
         {quote ? (
           <>
-            <Field id="cancel-reason" label={t.reasonLabel} hint={t.reasonHint} error={reasonError}>
-              <Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={MAX_REASON + 20} />
+            <Field id="cancel-reason" label={t.reasonLabel} hint={t.reasonHint}>
+              <Input value={reason} onChange={(e) => setReason(cleanReason(e.target.value))} maxLength={MAX_REASON} />
             </Field>
             <div className="flex flex-wrap gap-4">
               <Button variant="danger" size="lg" disabled={state.expired} onClick={start}>

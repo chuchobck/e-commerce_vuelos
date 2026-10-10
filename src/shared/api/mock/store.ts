@@ -35,8 +35,10 @@ export interface StoredBooking {
   ownerId: string;
   /** Pago pendiente: cuándo lo confirma el "proceso de emisión". */
   issueAfter?: string;
-  /** Check-in hecho (la API lo sabe por sus pases). */
+  /** Check-in hecho en algún vuelo (la API lo sabe por sus pases). */
   checkedIn: boolean;
+  /** Vuelos (segmentId) con check-in: la ventana de 48 h a 60 min es por vuelo, como en la API real. */
+  checkedInSegments?: string[];
   /** Postventa aceptada con 202: se aplica cuando madura, como el proceso asíncrono del GDS. */
   pending?: PendingAftersale;
   /** Solo demostración: la cancelación de esta reserva queda en proceso (202, CANCELLATION_PENDING). */

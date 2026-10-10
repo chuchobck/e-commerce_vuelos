@@ -17,6 +17,13 @@ describe('qué le pasó a un cobro', () => {
     expect(classifyPaymentError(err(409, 'QUOTE_EXPIRED'))).toBe('expired');
   });
 
+  it('una oferta o cotización ya borrada es 422 con su id: también hay que pedirla de nuevo', () => {
+    const missing = (field: string) => new ApiError({ status: 422, code: 'VALIDATION_FAILED', fieldErrors: [{ field, message: 'not found' }] });
+    expect(classifyPaymentError(missing('changeOfferId'))).toBe('expired');
+    expect(classifyPaymentError(missing('quoteId'))).toBe('expired');
+    expect(classifyPaymentError(missing('passengerId'))).toBe('other');
+  });
+
   it('403 es falta de permiso; cualquier otra cosa (incluso un error que no es de la API) es "other"', () => {
     expect(classifyPaymentError(err(403))).toBe('permission');
     expect(classifyPaymentError(err(403))).toBe('permission');

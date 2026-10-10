@@ -2,7 +2,7 @@
  * Postventa de una reserva: equipaje extra, cambio de fecha y cancelación (F6). La lógica es pura o va en hooks; las pantallas
  * (src/pages) arman estas piezas. Solo lo que se exporte aquí es público.
  */
-export { absMoney, amountDue, needsPayment, newDateProblem, priceDirection, suggestedDate, type NewDateProblem, type PriceDirection } from './dateChange';
+export { amountDue, cheaperThanCurrent, needsPayment, newDateProblem, priceDirection, suggestedDate, type NewDateProblem, type PriceDirection } from './dateChange';
 export { baggageTotal, lineKey, remainingFor, selectedLines, totalBags, type BaggageLine, type BaggageSelection } from './baggage';
 export { BaggageSelector } from './BaggageSelector';
 export { classifyPaymentError, type PaymentProblem } from './outcome';

@@ -7,7 +7,7 @@
  * Idempotency-Key: misma clave y mismo cuerpo repiten la respuesta; misma clave con otro cuerpo, 422.
  * Todo lo que el contrato no define queda marcado como DISCREPANCIA (docs/DISCREPANCIAS-F6.md).
  */
-import { parseMoney, toDecimalString, zeroMoney, type Money } from '@/shared/lib/money';
+import { parseMoney, toDecimalString, type Money } from '@/shared/lib/money';
 import { checkInWindow } from '@/shared/lib/checkin';
 import { stableHash } from '@/shared/lib/stableHash';
 import type {
@@ -34,13 +34,20 @@ import { mockSearch } from './generators';
 import { checkKey, firstFreeSeat, PAYMENT_FORMAT, PENDING_ISSUE_MS, problem, SIMULATED_PAYMENT } from './purchase';
 import type { MockDb, StoredBooking, StoredChangeOffer, StoredIdempotencyKey } from './store';
 
-/** Máximo de maletas extra por pasajero y itinerario (DISCREPANCIA: el contrato solo expone `maxAllowed`, no cómo se fija). */
-const MAX_EXTRA_BAGS = 3;
-/** Cargo por cambio de fecha, por pasajero que ocupa asiento, según la familia. Los valores son del mock. */
-const CHANGE_FEE_USD: Record<string, number> = { CLASSIC: 25, FLEX: 0, BUSINESS_FLEX: 0 };
+/**
+ * Reglas de la API real (leídas en el código del backend, no probadas en marcha), por familia tarifaria:
+ *  - maletas extra por pasajero e itinerario (`maxAllowed`): BASIC 2, CLASSIC 2, FLEX 3, BUSINESS_FLEX 4; un infante, 0;
+ *  - cargo por cambio: el 20 % de la tarifa base de un adulto por pasajero con asiento en CLASSIC, 0 en FLEX y BUSINESS_FLEX
+ *    (BASIC no permite cambios);
+ *  - penalidad de cancelación: BASIC 100 %, CLASSIC 35 %, FLEX 10 %, BUSINESS_FLEX 0 %.
+ */
+const MAX_BAGS_BY_FARE: Record<string, number> = { BASIC: 2, CLASSIC: 2, FLEX: 3, BUSINESS_FLEX: 4 };
+const CHANGE_FEE_RATE_BY_FARE: Record<string, number> = { CLASSIC: 0.2, FLEX: 0, BUSINESS_FLEX: 0 };
+const CANCEL_PENALTY_PERCENT_BY_FARE: Record<string, number> = { BASIC: 100, CLASSIC: 35, FLEX: 10, BUSINESS_FLEX: 0 };
+const MAX_BAGS_PER_REQUEST = 10;
 const CHANGE_OFFER_MINUTES = 15;
-const QUOTE_MINUTES = 10;
-const CANCEL_PENALTY_RATE = 0.1;
+const QUOTE_MINUTES = 15;
+const REASON_MAX = 500;
 const LIST_MAX = 50;
 const LIST_DEFAULT = 10;
 
@@ -49,19 +56,20 @@ const usd = (cents: number) => toDecimalString({ cents, currency: 'USD' });
 
 /* ------------------------------------------ utilidades ------------------------------------------ */
 
+/**
+ * Como la API real: una reserva que no está CONFIRMED (cancelada incluida) es 409 VALIDATION_FAILED. Los códigos
+ * BOOKING_NOT_CONFIRMED y CUTOFF_PASSED están en el contrato, pero el backend no los emite; ALREADY_CANCELLED solo sale al cancelar.
+ */
 function requireConfirmed(stored: StoredBooking) {
-  if (stored.dto.status === 'CANCELLED') throw problem(409, 'ALREADY_CANCELLED', 'The booking is already cancelled');
-  if (stored.dto.status !== 'CONFIRMED') throw problem(409, 'BOOKING_NOT_CONFIRMED', `The booking is ${stored.dto.status}, not CONFIRMED`);
+  if (stored.dto.status !== 'CONFIRMED') throw problem(409, 'VALIDATION_FAILED', `The booking is ${stored.dto.status}, not CONFIRMED`);
 }
 
-/** Maletas extra y vuelo de cada pasajero que ocupa asiento (los infantes viajan en brazos y no tienen maleta). */
+const familyOf = (itinerary: ItineraryDto) => itinerary.pricingOptions[0]?.fareBrand ?? '';
+
+const firstDeparture = (itinerary: ItineraryDto) => new Date(itinerary.segments[0].departure.at).getTime();
+
+/** Maletas extra y vuelo de cada pasajero que ocupa asiento (los infantes viajan en brazos y no llevan maleta extra). */
 const seated = (dto: BookingDetailDto) => (dto.passengers ?? []).filter((p) => p.passengerType !== 'INFANT');
-
-function firstSegmentDeparture(dto: BookingDetailDto): { at: string; origin: string } {
-  const segment = dto.itineraries?.[0]?.segments[0];
-  if (!segment) throw problem(409, 'VALIDATION_FAILED', 'The booking has no itineraries');
-  return { at: toAirportLocalIso(segment.departure.at, segment.departure.iataCode), origin: segment.departure.iataCode };
-}
 
 /** Repite el resultado de una petición ya hecha con esta clave; con otro cuerpo, 422. */
 function replayOf(db: MockDb, scope: StoredIdempotencyKey['scope'], ownerId: string, key: string, body: unknown): StoredIdempotencyKey | null {
@@ -139,63 +147,72 @@ export function ticketOf(stored: StoredBooking, ticketId: string): TicketDto {
 
 /* ------------------------------------------- check-in ------------------------------------------- */
 
-/**
- * POST /bookings/{id}/check-in. Solo reservas confirmadas y dentro de la ventana (48 h a 60 min antes de la salida
- * del primer vuelo). Hacerlo dos veces devuelve lo mismo (200). DISCREPANCIA: el contrato no dice a qué tramos
- * alcanza; aquí, a los del itinerario de ida.
- */
-export function checkIn(stored: StoredBooking, now: number): CheckInResponseDto {
-  const { dto } = stored;
-  if (dto.status === 'CANCELLED') throw problem(409, 'CHECK_IN_NOT_AVAILABLE', 'The booking is cancelled');
-  if (dto.status !== 'CONFIRMED') throw problem(409, 'CHECK_IN_NOT_AVAILABLE', 'The booking is not confirmed');
-  if (!stored.checkedIn) {
-    const window = checkInWindow(firstSegmentDeparture(dto).at, new Date(now));
-    if (window.status !== 'open') {
-      throw problem(409, 'CHECK_IN_NOT_AVAILABLE', window.status === 'closed' ? 'Check-in closed 60 minutes before departure' : 'Check-in opens 48 hours before departure');
-    }
-    stored.checkedIn = true;
-  }
-  const outbound = dto.itineraries?.[0]?.segments ?? [];
-  return {
-    bookingId: dto.bookingId,
-    status: 'COMPLETED',
-    checkedInPassengers: (dto.passengers ?? []).map((p) => ({
-      passengerId: p.passengerId,
-      status: 'CHECKED_IN',
-      segments:
-        p.passengerType === 'INFANT'
-          ? []
-          : outbound.map((s) => ({ segmentId: s.segmentId, seat: p.assignedSeats?.find((a) => a.segmentId === s.segmentId)?.seatNumber ?? null, status: 'CHECKED_IN' as const })),
-    })),
-  };
+/** Los vuelos de la reserva (todos los itinerarios vigentes), cada uno con su hora de salida local. */
+function flightsOf(dto: BookingDetailDto) {
+  return (dto.itineraries ?? []).flatMap((it) => it.segments.map((segment) => ({ segment, cabin: it.pricingOptions[0]?.cabinClass ?? 'ECONOMY', localDeparture: toAirportLocalIso(segment.departure.at, segment.departure.iataCode) })));
 }
 
 /**
- * GET /bookings/{id}/boarding-passes: un pase por pasajero y tramo de ida. Como la API real (pase-abordar.service.ts del
- * backend), antes del check-in o con la reserva ya no CONFIRMED responde 200 con la lista vacía, no con un error.
+ * POST /bookings/{id}/check-in, como la API real: la ventana (48 h a 60 min antes) es POR VUELO. Se registran los vuelos que
+ * están dentro de su ventana; los que aún no abren quedan NOT_CHECKED_IN y los que ya cerraron, FAILED, con 200 `IN_PROGRESS`
+ * (nunca un error). Solo es 409 CHECK_IN_NOT_AVAILABLE si la reserva no está confirmada o no hay ningún vuelo en ventana ni
+ * registrado. Repetirlo devuelve el estado actual (200). El infante aparece con asiento nulo.
+ */
+export function checkIn(stored: StoredBooking, now: number): CheckInResponseDto {
+  const { dto } = stored;
+  if (dto.status !== 'CONFIRMED') throw problem(409, 'CHECK_IN_NOT_AVAILABLE', `The booking is ${dto.status}, not CONFIRMED`);
+  const flights = flightsOf(dto);
+  const registered = (stored.checkedInSegments ??= []);
+  const windowOf = (localDeparture: string) => checkInWindow(localDeparture, new Date(now)).status;
+  const open = flights.filter((f) => windowOf(f.localDeparture) === 'open');
+  if (registered.length === 0 && open.length === 0) {
+    const closed = flights.every((f) => windowOf(f.localDeparture) === 'closed');
+    throw problem(409, 'CHECK_IN_NOT_AVAILABLE', closed ? 'Check-in closed 60 minutes before departure' : 'Check-in opens 48 hours before departure');
+  }
+  for (const f of open) if (!registered.includes(f.segment.segmentId)) registered.push(f.segment.segmentId);
+  stored.checkedIn = registered.length > 0;
+
+  const statusOf = (segmentId: string, localDeparture: string) => (registered.includes(segmentId) ? 'CHECKED_IN' : windowOf(localDeparture) === 'not-open' ? 'NOT_CHECKED_IN' : 'FAILED') as 'CHECKED_IN' | 'NOT_CHECKED_IN' | 'FAILED';
+  const passengers = (dto.passengers ?? []).map((p) => {
+    const segments = flights.map((f) => ({
+      segmentId: f.segment.segmentId,
+      seat: p.passengerType === 'INFANT' ? null : (p.assignedSeats?.find((a) => a.segmentId === f.segment.segmentId)?.seatNumber ?? null),
+      status: statusOf(f.segment.segmentId, f.localDeparture),
+    }));
+    const status = segments.every((s) => s.status === 'CHECKED_IN') ? 'CHECKED_IN' : segments.some((s) => s.status === 'FAILED') ? 'FAILED' : 'NOT_CHECKED_IN';
+    return { passengerId: p.passengerId, status: status as 'CHECKED_IN' | 'NOT_CHECKED_IN' | 'FAILED', segments };
+  });
+  const complete = flights.every((f) => registered.includes(f.segment.segmentId));
+  return { bookingId: dto.bookingId, status: complete ? 'COMPLETED' : 'IN_PROGRESS', checkedInPassengers: passengers };
+}
+
+/**
+ * GET /bookings/{id}/boarding-passes: un pase por pasajero con asiento y vuelo con check-in. Como la API real (pase-abordar.service.ts
+ * del backend): antes del check-in, o con la reserva ya no CONFIRMED, responde 200 con la lista vacía, no un error. Tampoco es un
+ * QR: es PDF417 en económica y AZTEC en las demás cabinas, con un texto de campos separados por barras (`BP1|PNR|boleto|…`).
  */
 export function boardingPasses(stored: StoredBooking): BoardingPassListDto {
   const { dto } = stored;
+  const registered = stored.checkedInSegments ?? [];
   if (!stored.checkedIn || dto.status !== 'CONFIRMED') return { bookingId: dto.bookingId, boardingPasses: [] };
-  const outbound = dto.itineraries?.[0]?.segments ?? [];
-  const group = dto.itineraries?.[0]?.pricingOptions[0]?.fareBrand;
-  const rank = group === 'BASIC' ? '3' : group === 'CLASSIC' ? '2' : '1';
-  let position = 0;
+  const brand = dto.itineraries?.[0]?.pricingOptions[0]?.fareBrand;
+  const group = brand === 'BASIC' ? '3' : brand === 'CLASSIC' ? '2' : '1';
+  const flights = flightsOf(dto).filter((f) => registered.includes(f.segment.segmentId));
+  const ticketOf = (passengerId: string) => (dto.tickets ?? []).find((t) => t.passengerId === passengerId && t.status === 'ISSUED')?.eTicketNumber ?? '';
   return {
     bookingId: dto.bookingId,
-    boardingPasses: seated(dto).flatMap((p) =>
-      outbound.map((s) => {
-        position += 1;
-        const seat = p.assignedSeats?.find((a) => a.segmentId === s.segmentId)?.seatNumber ?? '';
+    boardingPasses: seated(dto).flatMap((p, order) =>
+      flights.map(({ segment, cabin, localDeparture }) => {
+        const seat = p.assignedSeats?.find((a) => a.segmentId === segment.segmentId)?.seatNumber ?? '';
+        const row = /^\d+/.exec(seat)?.[0] ?? '0';
         return {
           passengerId: p.passengerId,
-          segmentId: s.segmentId,
+          segmentId: segment.segmentId,
           seat,
-          boardingGroup: rank,
-          boardingPosition: String(position).padStart(3, '0'),
-          // Texto de código del mock (parecido a un BCBP de IATA); la interfaz lo muestra tal cual.
-          barcode: `M1${p.lastName}/${p.firstName}`.toUpperCase().replace(/[^A-Z0-9/]/g, '').slice(0, 20) + ` E${dto.pnr} ${s.departure.iataCode}${s.arrival.iataCode}${s.marketingCarrier} ${s.flightNumber.replace(/\D/g, '')} ${seat}`,
-          barcodeType: 'QR' as const,
+          boardingGroup: group,
+          boardingPosition: row.padStart(3, '0'),
+          barcode: ['BP1', dto.pnr, ticketOf(p.passengerId), `${segment.marketingCarrier}${segment.flightNumber.replace(/\D/g, '')}`, localDeparture.slice(0, 10).replace(/-/g, ''), `${segment.departure.iataCode}${segment.arrival.iataCode}`, seat, String(order + 1), stableHash(`${dto.pnr}${p.passengerId}${segment.segmentId}`).slice(0, 12)].join('|'),
+          barcodeType: cabin === 'ECONOMY' ? ('PDF417' as const) : ('AZTEC' as const),
         };
       }),
     ),
@@ -212,16 +229,19 @@ function extraBagPrice(itinerary: ItineraryDto): { currency: string; total: stri
 const purchased = (dto: BookingDetailDto, passengerId: string, itineraryId: string) =>
   (dto.passengers ?? []).find((p) => p.passengerId === passengerId)?.extraBaggage?.find((b) => b.itineraryId === itineraryId)?.quantity ?? 0;
 
-/** GET /bookings/{id}/baggage-options: una opción por pasajero que ocupa asiento y por itinerario. */
+/** El máximo de maletas extra de un pasajero en un itinerario: lo fija la familia; un infante no lleva (0). */
+const maxBags = (type: string, itinerary: ItineraryDto) => (type === 'INFANT' ? 0 : (MAX_BAGS_BY_FARE[familyOf(itinerary)] ?? 2));
+
+/** GET /bookings/{id}/baggage-options: una fila por pasajero (también el infante, con máximo 0) y por itinerario. */
 export function baggageOptions(stored: StoredBooking): BaggageOptionDto[] {
   requireConfirmed(stored);
   const { dto } = stored;
-  return seated(dto).flatMap((p) =>
+  return (dto.passengers ?? []).flatMap((p) =>
     (dto.itineraries ?? []).map((it) => ({
       passengerId: p.passengerId,
       itineraryId: it.itineraryId,
       price: extraBagPrice(it),
-      maxAllowed: MAX_EXTRA_BAGS,
+      maxAllowed: maxBags(p.passengerType, it),
       alreadyPurchased: purchased(dto, p.passengerId, it.itineraryId),
     })),
   );
@@ -239,8 +259,10 @@ function applyBaggage(dto: BookingDetailDto, passengerId: string, itineraryId: s
 }
 
 /**
- * POST /bookings/{id}/baggage. 200 con el total de maletas; PAY-PEND- → 202 (se aplica a los 20 s); PAY-REJ- → 422;
- * pasar el máximo → 409 BAGGAGE_LIMIT_EXCEEDED.
+ * POST /bookings/{id}/baggage. Mismo orden de comprobaciones que la API real: reserva confirmada (409), itinerario de la
+ * reserva (422), vuelo que no salió (409 FLIGHT_ALREADY_DEPARTED), pasajero de la reserva (422), máximo de la familia (409
+ * BAGGAGE_LIMIT_EXCEEDED) y por último el cobro. 200 con el total de maletas; PAY-PEND- → 202 con el mismo cuerpo (se aplica
+ * a los 20 s); PAY-REJ- → 422. La cantidad va de 1 a 10 (si no, 400).
  */
 export function addBaggage(
   db: MockDb,
@@ -257,16 +279,19 @@ export function addBaggage(
       ? { outcome: 'pending' }
       : { outcome: 'done', data: { passengerId: body.passengerId, itineraryId: body.itineraryId, totalBaggage: purchased(stored.dto, body.passengerId, body.itineraryId) } };
   }
+  if (!Number.isInteger(body.quantity) || body.quantity < 1 || body.quantity > MAX_BAGS_PER_REQUEST) {
+    throw problem(400, 'VALIDATION_FAILED', `quantity: must be between 1 and ${MAX_BAGS_PER_REQUEST}`, 'quantity', `must be between 1 and ${MAX_BAGS_PER_REQUEST}`);
+  }
   requireConfirmed(stored);
   const { dto } = stored;
-  const passenger = seated(dto).find((p) => p.passengerId === body.passengerId);
-  if (!passenger) throw problem(422, 'VALIDATION_FAILED', 'passengerId: is not a passenger with a seat of this booking', 'passengerId', 'not a passenger with a seat');
-  if (!(dto.itineraries ?? []).some((it) => it.itineraryId === body.itineraryId)) {
-    throw problem(422, 'VALIDATION_FAILED', 'itineraryId: is not an itinerary of this booking', 'itineraryId', 'not an itinerary of this booking');
-  }
-  if (!Number.isInteger(body.quantity) || body.quantity < 1) throw problem(400, 'VALIDATION_FAILED', 'quantity: must not be less than 1', 'quantity', 'must not be less than 1');
-  if (purchased(dto, body.passengerId, body.itineraryId) + body.quantity > MAX_EXTRA_BAGS) {
-    throw problem(409, 'BAGGAGE_LIMIT_EXCEEDED', `A passenger can carry at most ${MAX_EXTRA_BAGS} extra bags`);
+  const itinerary = (dto.itineraries ?? []).find((it) => it.itineraryId === body.itineraryId);
+  if (!itinerary) throw problem(422, 'VALIDATION_FAILED', 'itineraryId: is not an itinerary of this booking', 'itineraryId', 'not an itinerary of this booking');
+  if (firstDeparture(itinerary) <= now) throw problem(409, 'FLIGHT_ALREADY_DEPARTED', 'The flight has already departed');
+  const passenger = (dto.passengers ?? []).find((p) => p.passengerId === body.passengerId);
+  if (!passenger) throw problem(422, 'VALIDATION_FAILED', 'passengerId: is not a passenger of this booking', 'passengerId', 'not a passenger of this booking');
+  const allowed = maxBags(passenger.passengerType, itinerary);
+  if (purchased(dto, body.passengerId, body.itineraryId) + body.quantity > allowed) {
+    throw problem(409, 'BAGGAGE_LIMIT_EXCEEDED', `A passenger can carry at most ${allowed} extra bags on this fare`);
   }
   const outcome = charge(db, body.payment, 'payment');
   if (outcome === 'PEND') {
@@ -322,8 +347,10 @@ function passengerCounts(dto: BookingDetailDto): Record<string, number> {
 
 /**
  * POST /bookings/{id}/date-change/search. Solo si la familia permite cambios (409 FARE_NOT_CHANGEABLE) y el vuelo no
- * salió (409 FLIGHT_ALREADY_DEPARTED) ni sale en menos de 2 horas (409 CUTOFF_PASSED). Devuelve hasta 4 vuelos de la nueva
- * fecha, con la diferencia de precio (fareDifference + taxDifference + changeFee = totalToPay; negativo = reembolso).
+ * salió (409 FLIGHT_ALREADY_DEPARTED); no hay tope de horas antes de la salida (CUTOFF_PASSED no existe en el backend).
+ * Devuelve hasta 4 vuelos de la nueva fecha con la diferencia de precio, como la API real:
+ * `totalToPay = max(0, fareDifference + taxDifference) + changeFee`. Nunca es negativo: si el nuevo vuelo cuesta menos, la
+ * diferencia no se devuelve.
  */
 export function searchDateChange(db: MockDb, stored: StoredBooking, ownerId: string, body: DateChangeSearchRequestDto, now: number): DateChangeOptionDto[] {
   requireConfirmed(stored);
@@ -338,7 +365,6 @@ export function searchDateChange(db: MockDb, stored: StoredBooking, ownerId: str
   if (!option?.fareRules.isChangeable) throw problem(409, 'FARE_NOT_CHANGEABLE', `The fare ${option?.fareBrand ?? ''} does not allow date changes`);
   const departure = new Date(current.segments[0].departure.at).getTime();
   if (departure <= now) throw problem(409, 'FLIGHT_ALREADY_DEPARTED', 'The flight has already departed');
-  if (departure - now < 2 * 3_600_000) throw problem(409, 'CUTOFF_PASSED', 'Date changes close 2 hours before departure');
 
   const counts = passengerCounts(dto);
   const first = current.segments[0];
@@ -353,6 +379,8 @@ export function searchDateChange(db: MockDb, stored: StoredBooking, ownerId: str
   );
   const paid = paidCents(current, option.fareBrand, option.cabinClass, counts);
   const payingSeats = seated(dto).length;
+  // El cargo por cambio es un porcentaje de la tarifa base de UN adulto en el itinerario original.
+  const adultBase = paidCents(current, option.fareBrand, option.cabinClass, { ADULT: 1, YOUTH: 0, CHILD: 0, INFANT: 0 })?.[0] ?? 0;
   db.changeOffers = db.changeOffers.filter((o) => new Date(o.expiresAt).getTime() > now);
 
   return results.offers
@@ -364,8 +392,8 @@ export function searchDateChange(db: MockDb, stored: StoredBooking, ownerId: str
       const [paidBase, paidTaxes] = paid ?? next;
       const fareDiff = next[0] - paidBase;
       const taxDiff = next[1] - paidTaxes;
-      const fee = (CHANGE_FEE_USD[option.fareBrand] ?? 0) * 100 * payingSeats;
-      const total = fareDiff + taxDiff + fee;
+      const fee = Math.round(adultBase * (CHANGE_FEE_RATE_BY_FARE[option.fareBrand] ?? 0)) * payingSeats;
+      const total = Math.max(0, fareDiff + taxDiff) + fee;
       const offer: StoredChangeOffer = {
         id: crypto.randomUUID(),
         bookingId: dto.bookingId,
@@ -414,12 +442,14 @@ function applyDateChange(db: MockDb, stored: StoredBooking, offer: StoredChangeO
   dto.updatedAt = iso(now);
   dto.changes = [...(dto.changes ?? []), { changedAt: iso(now), description: `Date changed: ${old.segments[0].flightNumber} → ${offer.itinerary.segments[0].flightNumber}` }];
   stored.checkedIn = false;
+  stored.checkedInSegments = [];
   db.changeOffers = db.changeOffers.filter((o) => o.id !== offer.id);
 }
 
 /**
  * POST /bookings/{id}/date-change. 200 con la reserva actualizada; con PAY-PEND- 202 (CHANGE_PENDING, se aplica a los 20 s);
- * oferta vencida 410 CHANGE_OFFER_EXPIRED; si hay algo que pagar, la referencia es obligatoria.
+ * oferta vencida 410 CHANGE_OFFER_EXPIRED; si hay algo que pagar, la referencia es obligatoria (422); con total 0 el pago no se
+ * exige y, si se manda, se ignora (ni se registra ni se cobra), como la API real.
  */
 export function confirmDateChange(
   db: MockDb,
@@ -437,8 +467,7 @@ export function confirmDateChange(
   if (!offer) throw problem(422, 'VALIDATION_FAILED', 'changeOfferId: is not an offer of this booking', 'changeOfferId', 'not an offer of this booking');
   if (new Date(offer.expiresAt).getTime() <= now) throw new ApiError({ status: 410, code: 'CHANGE_OFFER_EXPIRED', detail: 'The change offer has expired' });
   let outcome: 'OK' | 'PEND' = 'OK';
-  // Sin nada que pagar (o con reembolso) no hace falta pago; si lo mandan, igual se valida.
-  if (offer.totalCents > 0 || body.payment) outcome = charge(db, body.payment, 'payment');
+  if (offer.totalCents > 0) outcome = charge(db, body.payment, 'payment');
   if (outcome === 'PEND') {
     stored.dto.status = 'CHANGE_PENDING';
     stored.pending = { kind: 'date-change', applyAfter: iso(now + PENDING_ISSUE_MS), offerId: offer.id };
@@ -453,16 +482,21 @@ export function confirmDateChange(
 /* ------------------------------------------ cancelación ------------------------------------------ */
 
 /**
- * GET /bookings/{id}/cancellation-quote. Con tarifa reembolsable se devuelve el total menos el 10 % de penalidad;
- * sin ella, nada de reembolso y la penalidad es el total (DISCREPANCIA: las reglas de reembolso son del mock).
+ * GET /bookings/{id}/cancellation-quote, como la API real: solo una reserva CONFIRMED (409 si no, cancelada incluida) cuyos
+ * vuelos no han salido (409 FLIGHT_ALREADY_DEPARTED). La penalidad depende de la familia (BASIC 100 %, CLASSIC 35 %, FLEX
+ * 10 %, BUSINESS_FLEX 0 %; con varios itinerarios, el promedio), el reembolso se redondea hacia arriba, `penalty = total − refund`
+ * e `isRefundable = refund > 0`. La cotización vale 15 minutos y cada consulta crea una nueva.
  */
 export function cancellationQuote(db: MockDb, stored: StoredBooking, ownerId: string, now: number): CancellationQuoteDto {
   requireConfirmed(stored);
   const { dto } = stored;
+  if ((dto.itineraries ?? []).some((it) => firstDeparture(it) <= now)) throw problem(409, 'FLIGHT_ALREADY_DEPARTED', 'The flight has already departed');
   const total = parseMoney(dto.grandTotal.total, dto.grandTotal.currency);
-  const refundable = dto.itineraries?.every((it) => it.pricingOptions[0]?.fareRules.isRefundable) ?? false;
-  const penalty: Money = refundable ? { cents: Math.round(total.cents * CANCEL_PENALTY_RATE), currency: total.currency } : total;
-  const refund: Money = refundable ? { cents: total.cents - penalty.cents, currency: total.currency } : zeroMoney(total.currency);
+  const percents = (dto.itineraries ?? []).map((it) => CANCEL_PENALTY_PERCENT_BY_FARE[familyOf(it)] ?? 100);
+  const penaltyPercent = percents.length ? Math.round(percents.reduce((sum, p) => sum + p, 0) / percents.length) : 100;
+  const refund: Money = { cents: Math.ceil((total.cents * (100 - penaltyPercent)) / 100), currency: total.currency };
+  const penalty: Money = { cents: total.cents - refund.cents, currency: total.currency };
+  const refundable = refund.cents > 0;
   const quote = {
     id: crypto.randomUUID(),
     bookingId: dto.bookingId,
@@ -478,17 +512,30 @@ export function cancellationQuote(db: MockDb, stored: StoredBooking, ownerId: st
   return { quoteId: quote.id, isRefundable: refundable, refundAmount: quote.refund, penaltyAmount: quote.penalty, currency: quote.currency, expiresAt: quote.expiresAt };
 }
 
-/** POST /bookings/{id}/cancel. 200 cancelada; 202 en proceso (solo la reserva de demostración con `slowCancel`); 409 si ya estaba cancelada o la cotización venció. */
+/** `reason` como en la API real: de 1 a 500 caracteres, sin caracteres de control (saltos de línea incluidos) ni etiquetas HTML. */
+function checkReason(reason: string | undefined) {
+  if (reason === undefined) return;
+  const text = reason.trim();
+  const bad = text.length === 0 ? 'must not be empty' : text.length > REASON_MAX ? `must be at most ${REASON_MAX} characters` : /\p{Cc}|<[a-zA-Z!/?]/u.test(text) ? 'must not contain control characters or HTML' : null;
+  if (bad) throw problem(400, 'VALIDATION_FAILED', `reason: ${bad}`, 'reason', bad);
+}
+
+/**
+ * POST /bookings/{id}/cancel. Orden de la API real: `reason` (400), repetición de la clave, cotización de esta reserva (422),
+ * reserva ya cancelada o con la cancelación en proceso (409 ALREADY_CANCELLED), no confirmada (409), cotización vencida (409
+ * QUOTE_EXPIRED). 200 cancelada; 202 en proceso (solo la reserva de demostración con `slowCancel`).
+ */
 export function cancelBooking(db: MockDb, stored: StoredBooking, ownerId: string, body: CancelBookingRequestDto, key: string, now: number): 'done' | 'pending' {
   checkKey(key);
+  checkReason(body.reason);
   const replayed = replayOf(db, 'cancel', ownerId, key, body);
   if (replayed) return replayed.outcome ?? 'done';
-  if (stored.dto.status === 'CANCELLED') throw problem(409, 'ALREADY_CANCELLED', 'The booking is already cancelled');
-  requireConfirmed(stored);
   const quote = db.quotes.find((q) => q.id === body.quoteId && q.bookingId === stored.dto.bookingId && q.ownerId === ownerId);
   if (!quote) throw problem(422, 'VALIDATION_FAILED', 'quoteId: is not a quote of this booking', 'quoteId', 'not a quote of this booking');
+  if (stored.dto.status === 'CANCELLED' || stored.dto.status === 'CANCELLATION_PENDING') throw problem(409, 'ALREADY_CANCELLED', 'The booking is already cancelled');
+  requireConfirmed(stored);
   if (new Date(quote.expiresAt).getTime() <= now) throw problem(409, 'QUOTE_EXPIRED', 'The cancellation quote has expired');
-  db.quotes = db.quotes.filter((q) => q.id !== quote.id);
+  // La cotización aceptada se conserva (como en la API real): repetir la cancelación da 409 ALREADY_CANCELLED, no 422.
   const { dto } = stored;
   if (stored.slowCancel) {
     dto.status = 'CANCELLATION_PENDING';

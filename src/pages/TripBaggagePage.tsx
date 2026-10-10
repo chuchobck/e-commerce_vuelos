@@ -42,7 +42,8 @@ export function TripBaggagePage() {
   const trip = useBooking(id, authorized);
   const options = useAsync(() => authorized(() => flightsApi.getBaggageOptions(id)), [id]);
   const booking = trip.booking;
-  const list = useMemo(() => (options.status === 'success' ? options.data : []), [options.status, options.data]);
+  // La API también manda una fila para el infante con máximo 0 (no lleva maleta extra): no hay nada que elegir ahí.
+  const list = useMemo(() => (options.status === 'success' ? options.data.filter((o) => o.maxAllowed > 0) : []), [options.status, options.data]);
 
   const [step, setStep] = useState<Step>('select');
   const [selection, setSelection] = useState<BaggageSelection>({});
