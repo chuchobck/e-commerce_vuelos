@@ -44,8 +44,14 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - Límite de la API: 20 búsquedas por minuto por IP. No disparar búsquedas en ráfaga (usar caché).
 - Rutas: nunca como texto suelto. Patrones en `paths`, enlaces con `routes.*` (`routes.trip(id)`),
   todo en `src/app/routes.ts`. Rutas con sesión van bajo `RequireAuth` en `routeTable.tsx`.
-- `/compra/*` no exige sesión: el ingreso ocurre dentro del paso 2. La selección del paso 1 vive
-  en `sessionStorage` (`features/checkout/selection.ts`) y el hold se crea en el paso 2 con sesión.
+- `/compra/*` exige sesión (`RequireAuth`): sin ella se va a `/ingresar?volver=/compra/datos`, donde
+  `PendingTrip` muestra el vuelo guardado, y se vuelve sin perder nada. El paso 2 no tiene formularios de
+  cuenta. La selección del paso 1 vive en `sessionStorage` (`features/checkout/selection.ts`) y el hold se
+  crea en el paso 2.
+- Buscador: origen y destino son `Combobox` (sugerencias al escribir, sin tildes); el botón de buscar está
+  desactivado hasta que los datos sean válidos y se explica qué falta. Sin vuelos nunca hay un callejón
+  sin salida: `NoFlights` ofrece fechas cercanas (máx. 6 búsquedas, memorizadas), otra cabina y otros destinos.
+  Ida y vuelta se eligen en dos pestañas (`LegTabs`).
 - Textos: todos en `src/shared/i18n/es.ts` (español de Ecuador). Colores: solo tokens.
 - Pistas de prueba del mock ("Para probar…", cuenta demo): siempre dentro de `<MockOnly>`.
 - Un componente por archivo. Al quitar o reemplazar algo, borrar todo lo que quede sin uso
@@ -81,8 +87,7 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - Tarjetas: solo en `shared/payments` y en el formulario; nunca en almacenamiento, logs ni hacia la
   API de vuelos (solo viaja `paymentReference`). Las tarjetas de prueba solo con el mock o en desarrollo.
 - Pantallas de la compra (F4b): `CheckoutLayout` (dos columnas) + `CheckoutAside` (temporizador, resumen,
-  cancelar). El panel nunca es una barra fija sobre los campos. La cuenta incrustada recibe `LoginForm` y
-  `RegisterForm` desde la página (un módulo de `features` no importa de otro). Las reglas de pasajero viven en
+  cancelar). El panel nunca es una barra fija sobre los campos. Las reglas de pasajero viven en
   `passengers.ts` y siguen el DTO del backend; la nacionalidad reservable es `BOOKABLE_COUNTRIES` (hoy, Ecuador).
 - Asientos (F5): el selector es opcional y va plegado en el paso 2 (no suma clics). La página lo compone
   con `PassengersForm` (`seats`); la elección es `passengerId → segmentId → asiento` y viaja como

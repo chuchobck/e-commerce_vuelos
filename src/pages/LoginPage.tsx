@@ -1,7 +1,8 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { RETURN_TO_PARAM, routes, safeReturnTo } from '@/app/routes';
+import { CHECKOUT_BASE, RETURN_TO_PARAM, routes, safeReturnTo } from '@/app/routes';
 import { LoginForm, useAuth } from '@/features/auth';
+import { PendingTrip } from '@/features/checkout';
 import { es, fmt } from '@/shared/i18n';
 import { Alert, Card, toast } from '@/shared/ui';
 
@@ -17,6 +18,7 @@ export function LoginPage() {
 
   return (
     <Page title={a.loginTitle} heading={a.loginHeading} lead={a.loginLead} width="narrow">
+      {returnTo?.startsWith(CHECKOUT_BASE) ? <PendingTrip /> : null}
       {user ? (
         <Alert variant="success" title={fmt(a.alreadyIn, { email: user.email })}>
           <Link to={next}>{returnTo ? es.common.continue : a.goTrips}</Link>

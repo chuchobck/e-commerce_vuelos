@@ -56,9 +56,9 @@ describe('tabla de rutas', () => {
     }
   });
 
-  it('la compra no exige sesión: el ingreso ocurre dentro del paso 2', () => {
+  it('la compra exige sesión: sin ella se va a /ingresar y se vuelve a la compra', () => {
     for (const href of [routes.checkoutDetails(), routes.checkoutPayment(), routes.checkoutConfirmation('x')]) {
-      expect(guarded(href)).toBe(false);
+      expect(guarded(href)).toBe(true);
     }
   });
 

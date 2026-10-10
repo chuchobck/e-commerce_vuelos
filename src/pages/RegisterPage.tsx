@@ -1,7 +1,8 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { RETURN_TO_PARAM, routes, safeReturnTo } from '@/app/routes';
+import { CHECKOUT_BASE, RETURN_TO_PARAM, routes, safeReturnTo } from '@/app/routes';
 import { RegisterForm } from '@/features/auth';
+import { PendingTrip } from '@/features/checkout';
 import { es, fmt } from '@/shared/i18n';
 import { Card, toast } from '@/shared/ui';
 
@@ -14,6 +15,7 @@ export function RegisterPage() {
 
   return (
     <Page title={a.registerTitle} heading={a.registerHeading} lead={a.registerLead} width="narrow">
+      {returnTo?.startsWith(CHECKOUT_BASE) ? <PendingTrip /> : null}
       <Card>
         <RegisterForm
           onSuccess={(u) => {

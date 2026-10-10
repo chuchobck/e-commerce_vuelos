@@ -3,9 +3,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
-import { LoginForm, RegisterForm, useAuth } from '@/features/auth';
+import { useAuth } from '@/features/auth';
 import {
-  AccountBlock,
+  BuyingAs,
   checkout,
   CheckoutAside,
   CheckoutLayout,
@@ -23,8 +23,8 @@ const p = es.purchase;
 const title = fmt(p.stepTitle, { current: 2, name: p.detailsTitle });
 
 /**
- * Paso 2: cuenta y pasajeros. Sin sesión, ingresar o crear la cuenta ocurre aquí mismo (la
- * selección se conserva); con sesión se aparta el precio una sola vez y se piden los datos.
+ * Paso 2: pasajeros (y asientos). La ruta exige sesión: sin ella, `RequireAuth` lleva a Ingresar con
+ * `?volver=` y la selección se conserva en sessionStorage. Con sesión se aparta el precio una sola vez.
  */
 export function CheckoutDetailsPage() {
   const { status, user, authorized } = useAuth();
@@ -83,14 +83,8 @@ export function CheckoutDetailsPage() {
     >
       <CheckoutSteps current={1} />
       <CheckoutLayout aside={<CheckoutAside selection={selection} state={state} passengers={checkout.passengersDraft()} onCancel={cancel} />}>
-        {/* Mientras se restaura la sesión no se muestra nada: ni las opciones ni "Compras como" parpadean. */}
-        {status === 'restoring' ? null : (
-          <AccountBlock
-            email={user?.email}
-            loginForm={<LoginForm idPrefix="checkout-login" onSuccess={(u) => toast({ title: fmt(es.auth.welcome, { email: u.email }), variant: 'success' })} />}
-            registerForm={<RegisterForm idPrefix="checkout-register" onSuccess={(u) => toast({ title: fmt(es.auth.registered, { email: u.email }), variant: 'success' })} />}
-          />
-        )}
+        {/* La ruta exige sesión (RequireAuth): quien llega aquí ya ingresó. */}
+        {user ? <BuyingAs email={user.email} /> : null}
         {status === 'authenticated' ? <HoldNotice state={state} onSearchAgain={searchAgain} onRetryHold={start} /> : null}
 
         {editing && status === 'authenticated' ? (

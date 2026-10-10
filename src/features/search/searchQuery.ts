@@ -80,3 +80,17 @@ export function queryToSearch(q: URLSearchParams): SearchParams | null {
     cabin: f.cabin,
   };
 }
+
+/** Inverso de `queryToSearch`: la URL de resultados para unos parámetros de búsqueda (p. ej. con otras fechas). */
+export function searchToQuery(params: SearchParams): string {
+  const q = new URLSearchParams();
+  q.set(KEYS.origin, params.origin);
+  q.set(KEYS.destination, params.destination);
+  q.set(KEYS.departDate, params.departDate);
+  if (params.returnDate) q.set(KEYS.returnDate, params.returnDate);
+  q.set(KEYS.adults, String(params.passengers.adults));
+  q.set(KEYS.children, String(params.passengers.children));
+  q.set(KEYS.infants, String(params.passengers.infants));
+  q.set(KEYS.cabin, params.cabin);
+  return q.toString();
+}

@@ -34,7 +34,7 @@ export function legacyRoutes(): RouteObject[] {
 
 /**
  * Tabla de rutas de la aplicación (README, sección 4). Cada ruta lleva como `id` su clave en `paths`.
- * `/compra/*` no exige sesión a propósito: el ingreso ocurre dentro del paso 2.
+ * `/compra/*` exige sesión: quien no ha ingresado va a /ingresar y vuelve a la compra con su selección intacta.
  */
 export function buildRoutes({ dev }: { dev: boolean }): RouteObject[] {
   // `import.meta.env.DEV` va primero para que la compilación de producción descarte el catálogo.
@@ -58,12 +58,12 @@ export function buildRoutes({ dev }: { dev: boolean }): RouteObject[] {
         { id: 'home', path: paths.home, element: <HomePage /> },
         { id: 'results', path: paths.results, element: <ResultsPage /> },
         { id: 'offers', path: paths.offers, element: <OffersPage /> },
-        { id: 'checkoutDetails', path: paths.checkoutDetails, element: <CheckoutDetailsPage /> },
-        { id: 'checkoutPayment', path: paths.checkoutPayment, element: <CheckoutPaymentPage /> },
-        { id: 'checkoutConfirmation', path: paths.checkoutConfirmation, element: <CheckoutConfirmationPage /> },
         {
           element: <RequireAuth />,
           children: [
+            { id: 'checkoutDetails', path: paths.checkoutDetails, element: <CheckoutDetailsPage /> },
+            { id: 'checkoutPayment', path: paths.checkoutPayment, element: <CheckoutPaymentPage /> },
+            { id: 'checkoutConfirmation', path: paths.checkoutConfirmation, element: <CheckoutConfirmationPage /> },
             { id: 'trips', path: paths.trips, element: <TripsPage /> },
             { id: 'trip', path: paths.trip, element: <TripPage /> },
             { id: 'tripTickets', path: paths.tripTickets, element: <TripTicketsPage /> },
