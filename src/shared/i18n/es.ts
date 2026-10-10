@@ -130,14 +130,20 @@ export const es = {
       airport: 'Revisa el origen y el destino.',
       other: 'Revisa los datos de la búsqueda.',
     },
-    summaryTitle: 'Revisa {count} campo(s) antes de continuar:',
-    summaryTitleOne: 'Revisa 1 campo antes de continuar:',
+  },
+
+  /** Estado de un formulario junto a su botón: qué falta, qué corregir o que ya está listo. */
+  forms: {
+    ready: 'Todo listo para continuar.',
+    missing: 'Falta completar: {fields}.',
+    invalid: 'Revisa: {fields}.',
+    more: 'y {count} más',
   },
 
   validation: {
-    required: 'Este campo es obligatorio. Escribe o elige un valor.',
-    requiredSelect: 'Elige una opción de la lista.',
-    nameInvalid: 'Empieza con una letra y usa solo letras, tildes, espacios, apóstrofe (\'), punto o guion (-).',
+    required: 'Completa este dato para continuar.',
+    requiredSelect: 'Elige una opción.',
+    nameInvalid: 'Escribe solo letras y espacios.',
     nameLength: 'Escribe máximo 60 caracteres.',
     cedulaLength: 'La cédula tiene 10 dígitos. Revisa que no falte ninguno.',
     cedulaInvalid: 'Esta cédula no es válida. Revisa los dígitos en tu documento.',
@@ -173,7 +179,7 @@ export const es = {
     passwordLength: 'La contraseña debe tener al menos 12 caracteres. Puede ser una frase fácil de recordar.',
     passwordMax: 'La contraseña puede tener máximo 128 caracteres.',
     termsRequired: 'Debes aceptar los términos y condiciones para crear la cuenta.',
-    flightNumber: 'Escribe el número de vuelo como el código de la aerolínea y el número, por ejemplo LA1400.',
+    flightNumber: 'Son 2 letras de la aerolínea y el número del vuelo, por ejemplo LA1400.',
   },
 
   search: {
@@ -444,6 +450,8 @@ export const es = {
   checkoutForms: {
     passengerTitle: '{type} {number}',
     passengerShort: 'Pasajero {number}',
+    otherData: 'los datos de los pasajeros',
+    cardReady: 'Datos de la tarjeta completos. Ya puedes pagar.',
     countryUnavailable: '{country} (aún no disponible)',
     infantWho: 'Viaja en brazos de',
     infantHint: 'Cada adulto puede llevar a un solo infante.',
@@ -616,6 +624,7 @@ export const es = {
     heading: 'Estado de vuelo',
     lead: 'Consulta si tu vuelo sale a tiempo.',
     flightNumber: 'Número de vuelo',
+    ready: 'Todo listo para consultar el vuelo.',
     flightNumberHint: 'Dos caracteres de la aerolínea y el número, por ejemplo LA1400. Está en tu pase de abordar.',
     date: 'Fecha del vuelo',
     submit: 'Consultar estado',

@@ -163,6 +163,21 @@
     }
   }
 
+  /*
+   * Las opciones de una lista desplegable nativa se dibujan en una ventana del sistema: sin fondo propio salen blancas
+   * (control transparente) con el texto claro del modo oscuro, y no se leen. Se fijan con los tokens del tema.
+   */
+  select,
+  select option,
+  select optgroup {
+    background-color: rgb(var(--color-surface));
+    color: rgb(var(--color-foreground));
+  }
+
+  select option:disabled {
+    color: rgb(var(--color-muted));
+  }
+
   body {
     @apply bg-background font-sans text-base text-foreground antialiased;
     line-height: 1.5;

@@ -597,7 +597,7 @@ Hay rutas de un solo sentido por los horarios de conexión (por ejemplo CUE→GP
 | Campo | Regla |
 |---|---|
 | Numéricos | Solo dígitos al teclear y al pegar, con longitud máxima |
-| Nombres y apellidos | Como el backend: empieza con letra; letras (con tildes), espacios, apóstrofe, punto y guion; hasta 60 caracteres |
+| Nombres y apellidos | En pantalla, solo letras (con tildes y ñ) y espacios: los números y signos no entran al teclear ni al pegar. Es un subconjunto de la regla del backend (empieza con letra; letras, espacios, apóstrofe, punto y guion; hasta 60), así que nunca se rechaza lo que la pantalla deja pasar |
 | Cédula | 10 dígitos con verificación de módulo 10 |
 | Pasaporte (y documento extranjero) | 5 a 20 letras o dígitos, sin espacios ni guiones (se quitan); el pasaporte vence después del último vuelo |
 | Correo | Como el backend: se recorta, NFC y minúsculas; máximo 254 caracteres, con dominio y TLD, sin IP, nombre visible, caracteres de control, invisibles ni etiquetas HTML |
@@ -609,7 +609,15 @@ Hay rutas de un solo sentido por los horarios de conexión (por ejemplo CUE→GP
 | Búsqueda | Origen distinto de destino y con vuelos entre ambos, fechas no pasadas y dentro de la ventana de la semilla, máximo 9 pasajeros, infantes ≤ adultos |
 | Número de vuelo | Como la API: aerolínea (2 caracteres) y número sin ceros a la izquierda, por ejemplo `LA1400` |
 
-Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió. Si el contrato define un límite, se usa exactamente ese.
+Se valida **en vivo y con tono tranquilo**, sin borrar lo que el usuario escribió y **sin resumen de errores** (se quitó la caja roja «Revisa N campos» de todos los formularios):
+
+- **Lo que no se puede escribir, no se escribe.** Los nombres y el titular de la tarjeta solo admiten letras y espacios; el número de vuelo se pasa a mayúsculas y sin signos; las fechas `dd/mm/aaaa` no dejan escribir un mes mayor a 12, un día mayor a 31, un día que el mes no tiene (31/04) ni un año fuera de 1900–2199 (un primer dígito que solo puede ser el segundo, como el «5» de un día, completa el cero: «05»). Nunca aparece un error por eso.
+- **El error de un campo sale al salir de él** (no a mitad de palabra), junto al campo, con icono y texto normal (sin negrita ni cajas), y **se va solo al corregirlo**.
+- **El botón de enviar se activa cuando no falta nada** (pasajeros, pago con tarjeta, estado de vuelo, búsqueda) y junto a él `FormStatus` dice «Falta completar: …» o «Revisa: …» (nombra tres y resume el resto: «y 2 más») o «Todo listo». Así el usuario sabe qué le falta sin tener que equivocarse. Las excepciones son ingreso y registro, que dejan el botón activo (un gestor de contraseñas puede rellenar los campos sin avisar al formulario) y corrigen en vivo igual.
+- **Campos alineados:** etiqueta → control → error → ayuda (la ayuda va debajo del control), de modo que dos campos vecinos quedan a la misma altura aunque una ayuda ocupe más líneas.
+- Las listas desplegables nativas se dibujan con los tokens del tema (`select option` en `index.css`): en modo oscuro las opciones se leen.
+
+Si el contrato define un límite, se usa exactamente ese.
 
 ---
 

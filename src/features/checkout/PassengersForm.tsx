@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowRight } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Controller, useForm, useWatch, type FieldErrors, type Resolver } from 'react-hook-form';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Controller, useForm, useWatch, type Resolver } from 'react-hook-form';
 import type { BookingPassenger, FieldError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { countries, isBookableCountry } from '@/shared/lib/countries';
 import { maskDateInput } from '@/shared/lib/dates';
-import { onlyDigits } from '@/shared/lib/validators';
-import { Button, Checkbox, ErrorSummary, Field, Input, Select, type SummaryError } from '@/shared/ui';
+import { onlyDigits, onlyLetters } from '@/shared/lib/validators';
+import { Button, Checkbox, Field, FormStatus, Input, Select } from '@/shared/ui';
 import {
   initialPassengerValues,
   isEcuadorianId,
@@ -38,25 +38,41 @@ const FIELDS = [
   ['documentType', 'doctype', f.documentType],
   ['documentNumber', 'doc', f.documentNumber],
   ['nationality', 'nat', f.nationality],
-  ['documentExpiryDate', 'exp', f.documentExpiry],
-  ['birthDate', 'birth', f.birthDate],
   ['gender', 'gender', f.gender],
+  ['birthDate', 'birth', f.birthDate],
+  ['documentExpiryDate', 'exp', f.documentExpiry],
   ['adultIndex', 'adult', f.infantWho],
   ['email', 'email', f.email],
   ['phone', 'phone', f.phone],
 ] as const;
 
-function summaryOf(errors: FieldErrors<PassengersFormValues>, count: number): SummaryError[] {
-  const out: SummaryError[] = [];
-  for (let i = 0; i < count; i++) {
-    const own = errors.passengers?.[i];
-    if (!own) continue;
-    for (const [name, suffix, label] of FIELDS) {
-      const message = own[name]?.message;
-      if (typeof message === 'string') out.push({ fieldId: `pax${i}-${suffix}`, label: `${fmt(f.passengerShort, { number: i + 1 })} · ${label}`, message });
+/** Un campo sin nada escrito (o sin opción elegida). */
+const isEmpty = (value: unknown) => value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+
+/**
+ * Qué falta y qué hay que revisar, a partir de las mismas reglas con las que se valida (zod). Con un solo pasajero se
+ * nombra el campo ("fecha de nacimiento"); con varios se agrega de quién ("fecha de nacimiento (adulto 2)").
+ */
+function pendingFields(issues: readonly { path: readonly (string | number)[] }[], values: PassengersFormValues, types: readonly PassengersFormValues['passengers'][number]['type'][]) {
+  const missing: string[] = [];
+  const invalid: string[] = [];
+  const seen = new Set<string>();
+  for (const { path } of issues) {
+    const [root, index, name] = path;
+    const field = FIELDS.find(([key]) => key === name);
+    if (root !== 'passengers' || typeof index !== 'number' || !field) {
+      if (!seen.has('other')) invalid.push(f.otherData);
+      seen.add('other');
+      continue;
     }
+    const key = `${index}.${field[0]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const who = types.length > 1 ? ` (${TYPE_LABEL[types[index]].toLowerCase()} ${types.slice(0, index + 1).filter((t) => t === types[index]).length})` : '';
+    const label = `${field[2].toLowerCase()}${who}`;
+    (isEmpty(values.passengers?.[index]?.[field[0]]) ? missing : invalid).push(label);
   }
-  return out;
+  return { missing, invalid };
 }
 
 /**
@@ -86,16 +102,16 @@ interface PassengersFormProps {
 }
 
 /**
- * Un bloque (fieldset) por pasajero con los campos de PassengerItem del contrato. Valida al salir
- * del campo y al enviar, sin borrar lo escrito: errores bajo cada campo, resumen al inicio y foco al
- * primer campo con error. El correo de la cuenta precarga el contacto del primer pasajero.
+ * Un bloque (fieldset) por pasajero con los campos de PassengerItem del contrato. Valida en tiempo real sin borrar lo
+ * escrito: el error de un campo aparece al salir de él y se va solo al corregirlo; los nombres no admiten números ni signos
+ * y la fecha no deja escribir un mes 13. «Continuar» se activa cuando no falta nada y el estado junto al botón dice qué
+ * falta (no hay resumen de errores). El correo de la cuenta precarga el contacto del primer pasajero.
  */
 export function PassengersForm({ selection, seats, draft, accountEmail, rejected, onDraft, onDone }: PassengersFormProps) {
   const types = useMemo(() => passengerTypes(selection.passengers), [selection.passengers]);
   const schema = useMemo(() => passengersSchema(tripDates(selection)), [selection]);
   const resolver = useMemo<Resolver<PassengersFormValues>>(() => (values, context, options) => zodResolver(schema)(withSharedContact(values), context, options), [schema]);
   const list = useMemo(() => countries(), []);
-  const [attempts, setAttempts] = useState(0);
   const submitted = useRef(false);
 
   const {
@@ -142,7 +158,10 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
     }
   }, [rejected, setError]);
 
-  const summary = attempts > 0 ? summaryOf(errors, types.length) : [];
+  // Qué falta, en vivo: el botón de continuar se activa cuando ya no queda nada pendiente.
+  const parsed = schema.safeParse(withSharedContact(values));
+  const pending = parsed.success ? { missing: [], invalid: [] } : pendingFields(parsed.error.issues, values, types);
+  const ready = parsed.success;
   const adults = types.flatMap((t, i) => (t === 'ADULT' ? [i] : []));
   // Lo que lleva cada pasajero en cada tramo (para el bloque de asientos y la línea de cada pasajero).
   const draftPassengers = toBookingPassengers(values, seats?.toAssigned);
@@ -156,17 +175,13 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
       noValidate
       aria-label={es.purchase.passengersTitle}
       onSubmit={(e) =>
-        void handleSubmit(
-          (v) => {
-            submitted.current = true;
-            onDone(toBookingPassengers(v, seats?.toAssigned));
-          },
-          () => setAttempts((n) => n + 1),
-        )(e)
+        void handleSubmit((v) => {
+          submitted.current = true;
+          onDone(toBookingPassengers(v, seats?.toAssigned));
+        })(e)
       }
       className="flex flex-col gap-6"
     >
-      <ErrorSummary errors={summary} />
       {types.map((type, i) => {
         const id = (suffix: string) => `pax${i}-${suffix}`;
         const own = errors.passengers?.[i];
@@ -176,12 +191,12 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
         return (
           <fieldset key={id('set')} className="flex flex-col gap-4 rounded border-2 border-border bg-surface p-6 shadow-card">
             <legend className="px-2 text-xl font-bold">{fmt(f.passengerTitle, { type: TYPE_LABEL[type], number: ordinal(i) })}</legend>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid items-start gap-4 sm:grid-cols-2">
               <Field id={id('first')} label={f.firstName} error={own?.firstName?.message} required>
-                <Input autoComplete={i === 0 ? 'given-name' : 'off'} maxLength={60} {...register(`passengers.${i}.firstName`)} />
+                <Input autoComplete={i === 0 ? 'given-name' : 'off'} maxLength={60} {...register(`passengers.${i}.firstName`, { onChange: (e) => setValue(`passengers.${i}.firstName`, onlyLetters(e.target.value)) })} />
               </Field>
               <Field id={id('last')} label={f.lastName} error={own?.lastName?.message} required>
-                <Input autoComplete={i === 0 ? 'family-name' : 'off'} maxLength={60} {...register(`passengers.${i}.lastName`)} />
+                <Input autoComplete={i === 0 ? 'family-name' : 'off'} maxLength={60} {...register(`passengers.${i}.lastName`, { onChange: (e) => setValue(`passengers.${i}.lastName`, onlyLetters(e.target.value)) })} />
               </Field>
               <Field id={id('doctype')} label={f.documentType} required>
                 <Select
@@ -211,24 +226,6 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
                   })}
                 />
               </Field>
-              {passport ? (
-                <Field id={id('exp')} label={f.documentExpiry} hint={f.dateHint} error={own?.documentExpiryDate?.message} required>
-                  <Input
-                    inputMode="numeric"
-                    autoComplete="off"
-                    maxLength={10}
-                    {...register(`passengers.${i}.documentExpiryDate`, { onChange: (e) => setValue(`passengers.${i}.documentExpiryDate`, maskDateInput(e.target.value)) })}
-                  />
-                </Field>
-              ) : null}
-              <Field id={id('birth')} label={f.birthDate} hint={`${f.dateHint} ${es.checkoutForms.birthRule[type]}`} error={own?.birthDate?.message} required>
-                <Input
-                  inputMode="numeric"
-                  autoComplete={i === 0 ? 'bday' : 'off'}
-                  maxLength={10}
-                  {...register(`passengers.${i}.birthDate`, { onChange: (e) => setValue(`passengers.${i}.birthDate`, maskDateInput(e.target.value)) })}
-                />
-              </Field>
               <Field id={id('gender')} label={f.gender} error={own?.gender?.message} required>
                 <Select
                   placeholder={f.genderChoose}
@@ -240,6 +237,24 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
                   {...register(`passengers.${i}.gender`)}
                 />
               </Field>
+              <Field id={id('birth')} label={f.birthDate} hint={`${f.dateHint} ${es.checkoutForms.birthRule[type]}`} error={own?.birthDate?.message} required>
+                <Input
+                  inputMode="numeric"
+                  autoComplete={i === 0 ? 'bday' : 'off'}
+                  maxLength={10}
+                  {...register(`passengers.${i}.birthDate`, { onChange: (e) => setValue(`passengers.${i}.birthDate`, maskDateInput(e.target.value)) })}
+                />
+              </Field>
+              {passport ? (
+                <Field id={id('exp')} label={f.documentExpiry} hint={f.dateHint} error={own?.documentExpiryDate?.message} required>
+                  <Input
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={10}
+                    {...register(`passengers.${i}.documentExpiryDate`, { onChange: (e) => setValue(`passengers.${i}.documentExpiryDate`, maskDateInput(e.target.value)) })}
+                  />
+                </Field>
+              ) : null}
               {type === 'INFANT' ? (
                 <Field id={id('adult')} label={f.infantWho} hint={f.infantHint} error={own?.adultIndex?.message} required className="sm:col-span-2">
                   <Select
@@ -252,7 +267,7 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
             </div>
 
             {showContact ? (
-              <div className="grid gap-4 border-t-2 border-border pt-4 sm:grid-cols-2">
+              <div className="grid items-start gap-4 border-t-2 border-border pt-4 sm:grid-cols-2">
                 <p className="font-bold sm:col-span-2">{i === 0 && types.length > 1 ? f.contactMain : f.contactTitle}</p>
                 <Field id={id('email')} label={f.email} error={own?.email?.message} required>
                   <Input type="email" autoComplete={i === 0 ? 'email' : 'off'} inputMode="email" spellCheck={false} autoCapitalize="none" {...register(`passengers.${i}.email`)} />
@@ -307,8 +322,9 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
         </SeatsBlock>
       ) : null}
 
-      <div className="flex justify-end">
-        <Button type="submit" size="lg">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <FormStatus id="passengers-status" ready={ready} missing={pending.missing} invalid={pending.invalid} className="min-w-0 flex-1 basis-60" />
+        <Button type="submit" size="lg" disabled={!ready} aria-describedby="passengers-status">
           {f.saveAndContinue}
           <ArrowRight aria-hidden="true" />
         </Button>

@@ -63,13 +63,54 @@ export function ageOn(birth: Date, reference: Date): number {
   return differenceInYears(reference, birth);
 }
 
+/** Días máximos de un mes (febrero con 29: el año aún puede no estar escrito). */
+const MAX_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
 /**
- * Inserta las barras automáticamente mientras el usuario escribe una fecha.
- * Nunca borra lo escrito: solo elimina caracteres que no son dígitos.
+ * Decide qué dígitos entran en cada posición de "ddmmaaaa" para que no se pueda escribir una fecha imposible:
+ * día 01–31, mes 01–12, el día dentro de los que tiene el mes y un año 1900–2199. Un primer dígito que solo puede ser
+ * el segundo ("5" de día, "4" de mes) completa el cero solo ("05"). Devuelve lo que se agrega, o `null` si el dígito no entra.
+ */
+function acceptDigit(out: string, digit: string): string | null {
+  const d = Number(digit);
+  switch (out.length) {
+    case 0:
+      return d <= 3 ? digit : `0${digit}`;
+    case 1: {
+      const day = Number(out + digit);
+      return day >= 1 && day <= 31 ? digit : null;
+    }
+    case 2: {
+      const append = d <= 1 ? digit : `0${digit}`;
+      // Con el mes completo ("04"), el día escrito debe existir en ese mes.
+      return append.length === 2 && Number(out.slice(0, 2)) > MAX_DAYS[Number(append) - 1] ? null : append;
+    }
+    case 3: {
+      const month = Number(out[2] + digit);
+      if (month < 1 || month > 12) return null;
+      return Number(out.slice(0, 2)) > MAX_DAYS[month - 1] ? null : digit;
+    }
+    case 4:
+      return d === 1 || d === 2 ? digit : null;
+    case 5:
+      return (out[4] === '1' && d === 9) || (out[4] === '2' && d <= 1) ? digit : null;
+    default:
+      return digit;
+  }
+}
+
+/**
+ * Inserta las barras mientras el usuario escribe una fecha y solo deja pasar dígitos que forman una fecha posible
+ * (no hay mes 13 ni día 32: simplemente no se escriben). Nunca muestra un error por eso y nunca borra lo ya escrito.
  */
 export function maskDateInput(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  let out = '';
+  for (const digit of raw.replace(/\D/g, '')) {
+    if (out.length >= 8) break;
+    const accepted = acceptDigit(out, digit);
+    if (accepted !== null) out += accepted;
+  }
+  if (out.length <= 2) return out;
+  if (out.length <= 4) return `${out.slice(0, 2)}/${out.slice(2)}`;
+  return `${out.slice(0, 2)}/${out.slice(2, 4)}/${out.slice(4)}`;
 }

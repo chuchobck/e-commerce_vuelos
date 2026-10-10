@@ -10,6 +10,7 @@ import { AIRPORTS, cityOf, findAirport, hasFlights } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { lastFlightDate, parseDisplayDate, today } from '@/shared/lib/dates';
+import { joinList } from '@/shared/lib/joinList';
 import { Button, CompactField, Combobox, DatePicker, FieldError, QuantityInput, RadioGroup, type ComboboxOption } from '@/shared/ui';
 import { formToQuery, queryToForm } from './searchQuery';
 import { MAX_PASSENGERS, SEARCH_DEFAULTS, SearchFormSchema, type SearchFormInput, type TripType } from './searchSchema';
@@ -467,18 +468,12 @@ export function SearchForm() {
         ) : (
           <>
             <Info aria-hidden="true" className="size-4 shrink-0" />
-            {missing.length > 0 ? fmt(s.missing, { fields: listFields(missing) }) : hasOtherIssue ? s.fixIssues : null}
+            {missing.length > 0 ? fmt(s.missing, { fields: joinList(missing.map((l) => l.toLowerCase())) }) : hasOtherIssue ? s.fixIssues : null}
           </>
         )}
       </p>
     </form>
   );
-}
-
-/** "origen, destino y fecha de salida" (en minúsculas, con "y" antes del último). */
-function listFields(labels: string[]): string {
-  const lower = labels.map((l) => l.toLowerCase());
-  return lower.length <= 1 ? (lower[0] ?? '') : `${lower.slice(0, -1).join(', ')} y ${lower[lower.length - 1]}`;
 }
 
 /** Opciones del buscador de ciudades: se encuentran por ciudad, apodo, código IATA, aeropuerto o región. */

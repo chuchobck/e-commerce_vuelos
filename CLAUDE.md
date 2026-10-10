@@ -129,7 +129,11 @@ el mismo dato. Las excepciones a jsx-a11y se justifican en línea, nunca se apag
 
 zod en todos los formularios con las reglas de la sección 7 del README (cédula módulo 10, pasaporte,
 nombres, correo, teléfono +593, fechas por tipo de pasajero, tarjeta con Luhn, búsqueda).
-Se valida al salir del campo y al enviar, sin borrar lo escrito. Si el contrato define un límite, se usa ese.
+Se valida en vivo, sin borrar lo escrito: el error sale al salir del campo, junto a él, con tono tranquilo, y se va al corregirlo.
+**No hay resumen de errores** (cajas rojas «Revisa N campos»): el botón de enviar se activa cuando no falta nada y `FormStatus`
+(`shared/ui/form-status.tsx`) dice qué falta. Lo que no puede ser válido no se deja escribir (`onlyLetters`, `sanitizeFlightNumber`,
+`maskDateInput` con mes ≤ 12 y día ≤ 31 en `shared/lib`). `Field` ordena etiqueta → control → error → ayuda para que los campos
+queden alineados. Si el contrato define un límite, se usa ese.
 
 ## Reglas de la API que no se negocian
 

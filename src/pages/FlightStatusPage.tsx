@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PlaneTakeoff, Search } from 'lucide-react';
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { Page } from '@/app/layout/Page';
 import { FlightStatusCard, FlightStatusSchema, type FlightStatusInput } from '@/features/flight-status';
 import { flightsApi, isApiError, type FlightStatus } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { displayToIso, toDisplayDate, today } from '@/shared/lib/dates';
-import { useErrorSummary } from '@/shared/lib/useErrorSummary';
+import { sanitizeFlightNumber } from '@/shared/lib/validators';
 import {
   Alert,
   Button,
@@ -15,8 +15,8 @@ import {
   DatePicker,
   EmptyState,
   ErrorState,
-  ErrorSummary,
   Field,
+  FormStatus,
   Input,
   LoadingState,
   MockOnly,
@@ -24,10 +24,7 @@ import {
 
 const t = es.status;
 
-const FIELDS = {
-  flightNumber: { id: 'status-flight', label: t.flightNumber },
-  date: { id: 'status-date', label: t.date },
-};
+const IDS = { flightNumber: 'status-flight', date: 'status-date', status: 'status-form' };
 
 type State = { status: 'idle' } | { status: 'loading' } | { status: 'error'; error: unknown } | { status: 'success'; data: FlightStatus };
 
@@ -37,16 +34,25 @@ export function FlightStatusPage() {
     control,
     register,
     handleSubmit,
-    formState: { errors, isSubmitted },
+    setValue,
+    formState: { errors },
   } = useForm<FlightStatusInput>({
     resolver: zodResolver(FlightStatusSchema),
     defaultValues: { flightNumber: '', date: toDisplayDate(today()) },
-    shouldFocusError: false,
+    // El error de un campo aparece al salir de él y se actualiza al escribir; nunca hay un resumen de errores.
+    mode: 'onTouched',
   });
-  const { summary, summaryRef, onInvalid, clear } = useErrorSummary<FlightStatusInput>(FIELDS, errors, isSubmitted);
+  const values = useWatch({ control });
+  const ready = FlightStatusSchema.safeParse(values).success;
+  const flightFilled = !!values.flightNumber?.trim();
+  const dateFilled = !!values.date?.trim();
+  const missing = [...(flightFilled ? [] : [t.flightNumber.toLowerCase()]), ...(dateFilled ? [] : [t.date.toLowerCase()])];
+  const invalid = [
+    ...(flightFilled && !FlightStatusSchema.shape.flightNumber.safeParse(values.flightNumber).success ? [t.flightNumber.toLowerCase()] : []),
+    ...(dateFilled && !FlightStatusSchema.shape.date.safeParse(values.date).success ? [t.date.toLowerCase()] : []),
+  ];
 
   const onValid = async (values: FlightStatusInput) => {
-    clear();
     setState({ status: 'loading' });
     try {
       const data = await flightsApi.getFlightStatus(values.flightNumber, displayToIso(values.date));
@@ -59,8 +65,7 @@ export function FlightStatusPage() {
   return (
     <Page title={t.pageTitle} heading={t.heading} lead={t.lead} width="narrow">
       <Card>
-        <form noValidate onSubmit={handleSubmit(onValid, onInvalid)} className="flex flex-col gap-6">
-          <ErrorSummary ref={summaryRef} errors={summary} />
+        <form noValidate onSubmit={handleSubmit(onValid)} className="flex flex-col gap-6">
           <MockOnly>
             <Alert variant="info">
               <p>{t.demoHint}</p>
@@ -68,16 +73,23 @@ export function FlightStatusPage() {
           </MockOnly>
           <div className="grid items-start gap-4 sm:grid-cols-2">
             <Field
-              id={FIELDS.flightNumber.id}
+              id={IDS.flightNumber}
               label={t.flightNumber}
               hint={t.flightNumberHint}
               error={errors.flightNumber?.message}
               required
             >
-              <Input {...register('flightNumber')} autoComplete="off" spellCheck={false} maxLength={6} className="uppercase" />
+              <Input
+                {...register('flightNumber', { onChange: (e) => setValue('flightNumber', sanitizeFlightNumber(e.target.value)) })}
+                autoComplete="off"
+                spellCheck={false}
+                autoCapitalize="characters"
+                maxLength={6}
+                className="uppercase"
+              />
             </Field>
             <Field
-              id={FIELDS.date.id}
+              id={IDS.date}
               label={t.date}
               hint={fmt(es.common.dateFormatHint, { example: '15/10/2026' })}
               error={errors.date?.message}
@@ -99,10 +111,13 @@ export function FlightStatusPage() {
               />
             </Field>
           </div>
-          <Button type="submit" size="lg" loading={state.status === 'loading'} loadingText={t.submitting}>
-            <Search aria-hidden="true" />
-            {t.submit}
-          </Button>
+          <div className="flex flex-wrap items-center gap-4">
+            <Button type="submit" size="lg" disabled={!ready} loading={state.status === 'loading'} loadingText={t.submitting} aria-describedby={IDS.status}>
+              <Search aria-hidden="true" />
+              {t.submit}
+            </Button>
+            <FormStatus id={IDS.status} ready={ready} missing={missing} invalid={invalid} readyText={t.ready} className="min-w-0 flex-1 basis-48" />
+          </div>
         </form>
       </Card>
 

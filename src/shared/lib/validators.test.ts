@@ -11,6 +11,8 @@ import {
   isValidExpiryFormat,
   isValidLuhn,
   onlyDigits,
+  onlyLetters,
+  sanitizeFlightNumber,
 } from './validators';
 
 describe('isValidCedula (módulo 10)', () => {
@@ -125,5 +127,58 @@ describe('utilidades de entrada', () => {
     expect(maskDateInput('15102026')).toBe('15/10/2026');
     expect(maskDateInput('151')).toBe('15/1');
     expect(maskDateInput('15/10/20269')).toBe('15/10/2026');
+  });
+
+  describe('maskDateInput no deja escribir una fecha imposible', () => {
+    it('el mes llega hasta 12: el 13 no entra y un mes que solo puede ser el segundo dígito completa el cero', () => {
+      expect(maskDateInput('1513')).toBe('15/1'); // "3" no puede seguir a "1"
+      expect(maskDateInput('1520')).toBe('15/02'); // "2" solo puede ser febrero
+      expect(maskDateInput('159')).toBe('15/09');
+      expect(maskDateInput('150')).toBe('15/0');
+      expect(maskDateInput('1500')).toBe('15/0'); // no existe el mes 00
+      for (const month of ['10', '11', '12']) expect(maskDateInput(`15${month}`)).toBe(`15/${month}`);
+    });
+    it('el día llega hasta 31 y no hay día 00; un primer dígito mayor a 3 completa el cero', () => {
+      expect(maskDateInput('4')).toBe('04');
+      expect(maskDateInput('32')).toBe('3');
+      expect(maskDateInput('00')).toBe('0');
+      expect(maskDateInput('31')).toBe('31');
+      expect(maskDateInput('9')).toBe('09');
+    });
+    it('el día debe existir en el mes elegido', () => {
+      expect(maskDateInput('3104')).toBe('31/0'); // abril tiene 30 días
+      expect(maskDateInput('3004')).toBe('30/04');
+      expect(maskDateInput('3002')).toBe('30/0'); // febrero llega a 29
+      expect(maskDateInput('2902')).toBe('29/02');
+      expect(maskDateInput('319')).toBe('31'); // septiembre (09) tiene 30 días: el 9 no entra
+    });
+    it('el año va de 1900 a 2199', () => {
+      expect(maskDateInput('150519')).toBe('15/05/19');
+      expect(maskDateInput('15053')).toBe('15/05');
+      expect(maskDateInput('150518')).toBe('15/05/1');
+      expect(maskDateInput('150521')).toBe('15/05/21');
+      expect(maskDateInput('150522')).toBe('15/05/2');
+      expect(maskDateInput('15051990')).toBe('15/05/1990');
+    });
+    it('una fecha completa y válida pasa tal cual, también pegada con otros separadores', () => {
+      expect(maskDateInput('09/10/2026')).toBe('09/10/2026');
+      expect(maskDateInput('15-10-2026')).toBe('15/10/2026');
+      expect(maskDateInput('')).toBe('');
+    });
+  });
+
+  it('onlyLetters deja solo letras (con tildes y ñ) y espacios: sin números ni signos', () => {
+    expect(onlyLetters('María José')).toBe('María José');
+    expect(onlyLetters('Pe1dro 2')).toBe('Pedro ');
+    expect(onlyLetters("O'Neil-Smith.")).toBe('ONeilSmith');
+    expect(onlyLetters('  Ana   Lucía ')).toBe('Ana Lucía ');
+    expect(onlyLetters('Ñandú Über')).toBe('Ñandú Über');
+    expect(onlyLetters('1234 !?')).toBe('');
+  });
+
+  it('sanitizeFlightNumber pone mayúsculas y quita espacios y signos', () => {
+    expect(sanitizeFlightNumber('la 1400')).toBe('LA1400');
+    expect(sanitizeFlightNumber('la-14.00x')).toBe('LA1400');
+    expect(sanitizeFlightNumber('LA1400123')).toBe('LA1400');
   });
 });
