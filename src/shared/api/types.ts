@@ -8,10 +8,21 @@
  *    ("2026-10-09T06:00:00-05:00") para mostrar la hora local sin cálculos en los componentes.
  *  - Fechas sin hora: "yyyy-MM-dd" (fecha local del aeropuerto de salida).
  *
- * Hold y reserva derivan del contrato (F4a). Check-in y pases siguen siendo del mock hasta F6.
+ * Hold y reserva derivan del contrato (F4a); la postventa (F6) también: lista, boletos, check-in, pases, equipaje,
+ * cambio de fecha y cancelación.
  */
 import type { Money } from '@/shared/lib/money';
-import type { BookingDetailDto, CabinClass, FlightStatusCode, HoldStatusDto, PassengerItemDto, SeatMapDto, TicketDto } from './contract';
+import type {
+  BoardingPassDto,
+  BookingDetailDto,
+  CabinClass,
+  CheckInResponseDto,
+  FlightStatusCode,
+  HoldStatusDto,
+  PassengerItemDto,
+  SeatMapDto,
+  TicketDto,
+} from './contract';
 
 export type { CabinClass, FlightStatusCode } from './contract';
 export type { Money } from '@/shared/lib/money';
@@ -191,6 +202,7 @@ export interface CreateBookingRequest {
 
 export type BookingStatus = BookingDetailDto['status'];
 export type TicketStatus = TicketDto['status'];
+export type TicketSegmentStatus = NonNullable<TicketDto['segments']>[number]['status'];
 
 /** Familia vendida: la API la devuelve sin precios por tipo (README, sección 6). */
 export type BookedFare = Omit<Fare, 'seatsLeft' | 'pricePerAdult' | 'total'>;
@@ -203,6 +215,8 @@ export interface BookedLeg {
 
 export interface BookedPassenger extends Omit<BookingPassenger, 'seats'> {
   seats: { segmentId: string; seatNumber: string }[];
+  /** Maletas extra ya compradas, por itinerario (PassengerItem.extraBaggage). */
+  extraBaggage: { itineraryId: string; quantity: number }[];
 }
 
 export interface BookedTicket {
@@ -212,6 +226,10 @@ export interface BookedTicket {
   number: string | null;
   status: TicketStatus;
   issuedAt: string | null;
+  /** Estado de cada tramo del boleto (cupón). */
+  segments: { segmentId: string; status: TicketSegmentStatus; coupon: string | null }[];
+  /** Por qué falló la emisión (nunca se muestra tal cual: es un texto técnico). */
+  failureReason: string | null;
 }
 
 /** Reserva (BookingDetail del contrato). */
@@ -229,29 +247,130 @@ export interface Booking {
   changes: { at: string; description: string }[];
 }
 
-/** El check-in se hace por bookingId y solo lo puede hacer el dueño de la reserva (con sesión). */
-export interface CheckInRequest {
-  bookingId: string;
-}
+/* -------------------------------------------------------------------------------------------- */
+/* Postventa (F6): derivan del contrato (BookingListResponse, Ticket, CheckInResponse, …).        */
+/* -------------------------------------------------------------------------------------------- */
 
-export interface BoardingPass {
+/** Resultado de una escritura de postventa: hecha (200/201) o aceptada y en proceso (202). */
+export type PostSaleOutcome<T> = { status: 'done'; data: T } | { status: 'pending' };
+
+/** Una reserva en la lista (BookingListResponse.items): solo el resumen que da la API. */
+export interface BookingSummary {
   id: string;
-  bookingCode: string;
-  passengerName: string;
-  flightNumber: string;
+  code: string;
+  /** `null` si la API manda un estado que este frontend no conoce (el contrato lo deja como texto libre). */
+  status: BookingStatus | null;
   origin: IataCode;
   destination: IataCode;
-  departureTime: string;
-  boardingTime: string;
-  gate: string;
-  seat: string;
-  group: string;
-  barcode: string;
+  /** yyyy-MM-dd (fecha local del aeropuerto de salida). */
+  departureDate: string;
+  total: Money;
 }
 
+export interface BookingPage {
+  items: BookingSummary[];
+  /** Cursor de la página siguiente; `null` si no hay más. */
+  nextCursor: string | null;
+}
+
+export interface ListBookingsParams {
+  cursor?: string;
+  limit?: number;
+}
+
+export type CheckInStatus = CheckInResponseDto['status'];
+export type CheckInItemStatus = CheckInResponseDto['checkedInPassengers'][number]['status'];
+
+/** Respuesta de POST /bookings/{id}/check-in. */
 export interface CheckInResult {
-  booking: Booking;
-  boardingPasses: BoardingPass[];
+  bookingId: string;
+  status: CheckInStatus;
+  passengers: {
+    passengerId: string;
+    status: CheckInItemStatus;
+    segments: { segmentId: string; seat: string | null; status: CheckInItemStatus }[];
+  }[];
+}
+
+export type BarcodeType = BoardingPassDto['barcodeType'];
+
+/** Pase de abordar tal como lo da la API: no trae puerta ni hora de embarque. */
+export interface BoardingPass {
+  passengerId: string;
+  segmentId: string;
+  seat: string;
+  boardingGroup: string | null;
+  boardingPosition: string | null;
+  /** Texto del código tal cual; el formato lo decide la API. */
+  barcode: string;
+  barcodeType: BarcodeType;
+}
+
+export interface BaggageOption {
+  passengerId: string;
+  itineraryId: string;
+  /** Precio de cada maleta extra; `null` si la API no lo da. */
+  price: Money | null;
+  /** Máximo de maletas extra que se pueden tener en total. */
+  maxAllowed: number;
+  alreadyPurchased: number;
+}
+
+export interface AddBaggageRequest {
+  passengerId: string;
+  itineraryId: string;
+  quantity: number;
+  /** Referencia de la Payment API (simulada por prefijo). Nunca datos de tarjeta. */
+  paymentReference: string;
+}
+
+export interface BaggageAdded {
+  passengerId: string;
+  itineraryId: string;
+  /** Maletas extra que tiene ahora el pasajero en ese itinerario. */
+  totalBaggage: number | null;
+}
+
+export interface DateChangeQuery {
+  itineraryId: string;
+  /** yyyy-MM-dd. */
+  newDepartureDate: string;
+}
+
+/** Diferencia de precio de un cambio de fecha: positivo se paga, negativo se reembolsa. */
+export interface DateChangePrice {
+  fare: Money;
+  taxes: Money;
+  fee: Money;
+  total: Money;
+}
+
+export interface DateChangeOption {
+  /** changeOfferId: lo pide la confirmación. */
+  id: string;
+  expiresAt: string;
+  segments: Segment[];
+  price: DateChangePrice;
+}
+
+export interface DateChangeRequest {
+  changeOfferId: string;
+  /** Solo si hay algo que pagar. */
+  paymentReference?: string;
+  seats?: { segmentId: string; seatNumber: string }[];
+}
+
+export interface CancellationQuote {
+  quoteId: string;
+  refundable: boolean;
+  refund: Money;
+  penalty: Money;
+  expiresAt: string;
+}
+
+export interface CancelRequest {
+  quoteId: string;
+  reason?: string;
 }
 
 /**

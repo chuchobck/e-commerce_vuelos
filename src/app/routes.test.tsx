@@ -30,6 +30,7 @@ describe('tabla de rutas', () => {
     checkoutConfirmation: routes.checkoutConfirmation('bkg_1'),
     trips: routes.trips(),
     trip: routes.trip('bkg_1'),
+    tripTickets: routes.tripTickets('bkg_1'),
     tripCheckIn: routes.tripCheckIn('bkg_1'),
     tripPasses: routes.tripPasses('bkg_1'),
     tripBaggage: routes.tripBaggage('bkg_1'),
@@ -71,16 +72,20 @@ describe('tabla de rutas', () => {
   });
 
   it('codifica los ids en los enlaces', () => {
-    expect(routes.trip('a/b')).toBe('/mis-viajes/a%2Fb');
-    expect(routes.tripCheckIn('bkg_1')).toBe('/mis-viajes/bkg_1/check-in');
+    expect(routes.trip('a/b')).toBe('/viajes/a%2Fb');
+    expect(routes.tripCheckIn('bkg_1')).toBe('/viajes/bkg_1/check-in');
   });
 });
 
 describe('redirecciones de rutas viejas', () => {
   it.each([
-    ['/mis-reservas', '/mis-viajes'],
-    ['/reserva/QD7K2M', '/mis-viajes/QD7K2M'],
-    ['/check-in', '/mis-viajes'],
+    ['/mis-reservas', '/viajes'],
+    ['/mis-viajes', '/viajes'],
+    ['/mis-viajes/bkg_1', '/viajes/bkg_1'],
+    ['/mis-viajes/bkg_1/check-in', '/viajes/bkg_1/check-in'],
+    ['/mis-viajes/bkg_1/cancelar', '/viajes/bkg_1/cancelar'],
+    ['/reserva/QD7K2M', '/viajes/QD7K2M'],
+    ['/check-in', '/viajes'],
     ['/compra', '/compra/datos'],
   ])('%s → %s', async (from, to) => {
     expect(routeIdFor(from)?.startsWith('legacy:')).toBe(true);
@@ -94,14 +99,26 @@ describe('redirecciones de rutas viejas', () => {
   });
 
   it('cubre todas las rutas viejas declaradas', () => {
-    expect(legacyRedirects.map((r) => r.from).sort()).toEqual(['/check-in', '/compra', '/mis-reservas', '/reserva/:id']);
+    expect(legacyRedirects.map((r) => r.from).sort()).toEqual([
+      '/check-in',
+      '/compra',
+      '/mis-reservas',
+      '/mis-viajes',
+      '/mis-viajes/:id',
+      '/mis-viajes/:id/cambiar-fecha',
+      '/mis-viajes/:id/cancelar',
+      '/mis-viajes/:id/check-in',
+      '/mis-viajes/:id/equipaje',
+      '/mis-viajes/:id/pases',
+      '/reserva/:id',
+    ]);
   });
 });
 
 describe('safeReturnTo', () => {
   it('acepta rutas internas con query y ancla', () => {
     expect(safeReturnTo('/compra/datos')).toBe('/compra/datos');
-    expect(safeReturnTo('/mis-viajes/bkg_1?x=1#y')).toBe('/mis-viajes/bkg_1?x=1#y');
+    expect(safeReturnTo('/viajes/bkg_1?x=1#y')).toBe('/viajes/bkg_1?x=1#y');
   });
 
   it.each([null, '', 'https://evil.com', '//evil.com', '/\\evil.com', 'mis-viajes', '/ingresar', '/registrarse?volver=/x'])(

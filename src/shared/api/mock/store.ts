@@ -1,4 +1,4 @@
-import type { BookingDetailDto, HoldRequestDto, MoneyDto } from '../contract';
+import type { BookingDetailDto, HoldRequestDto, ItineraryDto, MoneyDto } from '../contract';
 import type { HoldStatus, User } from '../types';
 
 /** Base de datos simulada persistida en localStorage (solo para el mock). */
@@ -35,17 +35,56 @@ export interface StoredBooking {
   ownerId: string;
   /** Pago pendiente: cuándo lo confirma el "proceso de emisión". */
   issueAfter?: string;
-  /** Check-in hecho (solo el mock: la API lo sabe por sus pases; se conecta en F6). */
+  /** Check-in hecho en algún vuelo (la API lo sabe por sus pases). */
   checkedIn: boolean;
+  /** Vuelos (segmentId) con check-in: la ventana de 48 h a 60 min es por vuelo, como en la API real. */
+  checkedInSegments?: string[];
+  /** Postventa aceptada con 202: se aplica cuando madura, como el proceso asíncrono del GDS. */
+  pending?: PendingAftersale;
+  /** Solo demostración: la cancelación de esta reserva queda en proceso (202, CANCELLATION_PENDING). */
+  slowCancel?: boolean;
+}
+
+export type PendingAftersale =
+  | { kind: 'baggage'; applyAfter: string; passengerId: string; itineraryId: string; quantity: number }
+  | { kind: 'date-change'; applyAfter: string; offerId: string }
+  | { kind: 'cancel'; applyAfter: string };
+
+/** Oferta de cambio de fecha (POST date-change/search): vence a los 15 minutos. */
+export interface StoredChangeOffer {
+  id: string;
+  bookingId: string;
+  ownerId: string;
+  /** Itinerario de la reserva que se reemplaza. */
+  replacesItineraryId: string;
+  /** Itinerario nuevo, con la familia vendida. */
+  itinerary: ItineraryDto;
+  expiresAt: string;
+  /** Total a pagar (negativo = reembolso), en centavos. */
+  totalCents: number;
+}
+
+/** Cotización de cancelación: vence a los 10 minutos. */
+export interface StoredQuote {
+  id: string;
+  bookingId: string;
+  ownerId: string;
+  refund: string;
+  penalty: string;
+  currency: string;
+  refundable: boolean;
+  expiresAt: string;
 }
 
 /** Idempotency-Key usada: por usuario y operación, con la huella del cuerpo. */
 export interface StoredIdempotencyKey {
-  scope: 'hold' | 'booking';
+  scope: 'hold' | 'booking' | 'baggage' | 'date-change' | 'cancel';
   ownerId: string;
   key: string;
   bodyHash: string;
   resultId: string;
+  /** Postventa: lo que respondió la primera vez, para repetirlo. */
+  outcome?: 'done' | 'pending';
 }
 
 export interface MockDb {
@@ -59,10 +98,12 @@ export interface MockDb {
   idempotency: StoredIdempotencyKey[];
   /** Referencias de pago ya usadas (la API rechaza reusarlas con 409). */
   paymentReferences: string[];
+  changeOffers: StoredChangeOffer[];
+  quotes: StoredQuote[];
 }
 
 const KEY = 'quinde.mock.db';
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 
 let memory: MockDb | null = null;
 

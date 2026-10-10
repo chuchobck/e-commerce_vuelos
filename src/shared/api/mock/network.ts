@@ -2,11 +2,12 @@ import { apiConfig } from '../config';
 import { ApiError, type ApiErrorCode } from '../errors';
 
 /** Estados de error que el mock puede simular para diseñar los estados de la interfaz. */
-export type SimulatedStatus = 409 | 422 | 429 | 503;
+export type SimulatedStatus = 403 | 409 | 422 | 429 | 503;
 
 const FORCE_KEY = 'quinde.mock.forceError';
 
 const CODES: Record<SimulatedStatus, ApiErrorCode> = {
+  403: 'VALIDATION_FAILED',
   409: 'CONFLICT',
   422: 'VALIDATION_FAILED',
   429: 'RATE_LIMIT_EXCEEDED',
@@ -67,6 +68,13 @@ export const MOCK_OPERATIONS = [
   'getSeatMap',
   'createBooking',
   'listBookings',
+  'getTickets',
+  'getTicket',
+  'getBaggageOptions',
+  'addBaggage',
+  'searchDateChange',
+  'confirmDateChange',
+  'getCancellationQuote',
   'getBooking',
   'cancelBooking',
   'checkIn',
@@ -79,7 +87,7 @@ export const MOCK_OPERATIONS = [
   'me',
 ] as const;
 
-export const SIMULATED_STATUSES: SimulatedStatus[] = [409, 422, 429, 503];
+export const SIMULATED_STATUSES: SimulatedStatus[] = [403, 409, 422, 429, 503];
 
 /** Error forzado actual, p. ej. "search:503" o "*:409"; null si no hay. */
 export function getForcedError(): string | null {

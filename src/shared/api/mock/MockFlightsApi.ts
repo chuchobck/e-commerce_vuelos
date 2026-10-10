@@ -1,30 +1,51 @@
-import { es } from '@/shared/i18n';
-import { checkInWindow } from '@/shared/lib/checkin';
 import { isValidEmail, normalizeEmail, normalizePassword, passwordLengthIssue } from '@/shared/lib/credentials';
 import type { FlightsApi } from '../FlightsApi';
 import { ApiError } from '../errors';
 import {
+  mapBaggageAdded,
+  mapBaggageOptions,
+  mapBoardingPasses,
   mapBooking,
+  mapBookingList,
+  mapCancellationQuote,
+  mapCheckIn,
+  mapDateChangeOptions,
   mapFlightStatus,
   mapHoldCreated,
   mapHoldStatus,
   mapSearchResponse,
-  toAirportLocalIso,
+  mapTicket,
+  mapTicketList,
+  toAddBaggageRequest,
   toBookingRequest,
+  toCancelRequest,
+  toDateChangeRequest,
+  toDateChangeSearchRequest,
   toHoldRequest,
   toSearchRequest,
 } from '../mapping';
 import type {
+  AddBaggageRequest,
   AuthTokens,
+  BaggageAdded,
+  BaggageOption,
   BoardingPass,
+  BookedTicket,
   Booking,
-  CheckInRequest,
+  BookingPage,
+  CancelRequest,
+  CancellationQuote,
   CheckInResult,
   CreateBookingRequest,
   CreateHoldRequest,
   Credentials,
+  DateChangeOption,
+  DateChangeQuery,
+  DateChangeRequest,
   FlightStatus,
   Hold,
+  ListBookingsParams,
+  PostSaleOutcome,
   SearchParams,
   SearchResult,
   SeatMap,
@@ -41,9 +62,9 @@ import {
   userIdFromAccessToken,
 } from './auth';
 import { mockFlightStatus, mockSearch } from './generators';
+import * as aftersale from './aftersale';
 import * as purchase from './purchase';
 import { simulate } from './network';
-import { seeded } from './random';
 import { refreshSeed, seedDb } from './seed';
 import { hashPassword, loadDb, saveDb, type MockDb, type StoredBooking, type StoredUser } from './store';
 
@@ -52,7 +73,6 @@ function publicUser({ passwordHash: _hash, active: _active, ...user }: StoredUse
 }
 
 const notFound = (detail: string) => new ApiError({ status: 404, code: 'VALIDATION_FAILED', detail });
-const conflict = (detail: string) => new ApiError({ status: 409, code: 'CONFLICT', detail });
 
 /**
  * Implementación simulada de FlightsApi. Sin backend: todo vive en memoria y localStorage.
@@ -138,7 +158,7 @@ export class MockFlightsApi implements FlightsApi {
     const user = this.requireUser();
     const found = db.bookings.find((b) => b.dto.bookingId === bookingId && b.ownerId === user.id);
     if (!found) throw notFound('Booking not found');
-    return purchase.settleBooking(found, Date.now());
+    return aftersale.settlePending(db, purchase.settleBooking(found, Date.now()), Date.now());
   }
 
   async getBooking(bookingId: string): Promise<Booking> {
@@ -148,72 +168,93 @@ export class MockFlightsApi implements FlightsApi {
     return mapBooking(structuredClone(dto));
   }
 
-  async listBookings(): Promise<Booking[]> {
+  /* Postventa (F6): mismas reglas, respuestas y errores que la API (./aftersale.ts), con la forma del contrato. */
+
+  async listBookings(params: ListBookingsParams = {}): Promise<BookingPage> {
     await simulate('listBookings', [503]);
     const user = this.requireUser();
-    let mine: StoredBooking[] = [];
-    this.commit((db) => (mine = db.bookings.filter((b) => b.ownerId === user.id).map((b) => purchase.settleBooking(b, Date.now()))));
-    const departure = (b: Booking) => new Date(b.outbound.itinerary.segments[0].departureTime).getTime();
-    return mine.map((b) => mapBooking(structuredClone(b.dto))).sort((a, b) => departure(a) - departure(b));
-  }
-
-  async cancelBooking(bookingId: string): Promise<Booking> {
-    await simulate('cancelBooking', [409, 503]);
-    let dto!: StoredBooking['dto'];
+    let dto!: ReturnType<typeof aftersale.listBookings>;
     this.commit((db) => {
-      const found = this.ownedBooking(db, bookingId);
-      if (found.dto.status === 'CANCELLED') throw new ApiError({ status: 409, code: 'ALREADY_CANCELLED', detail: 'Already cancelled' });
-      found.dto.status = 'CANCELLED';
-      dto = found.dto;
+      // Se resuelven las reservas con pago o proceso pendiente que ya maduraron antes de resumirlas.
+      db.bookings.filter((b) => b.ownerId === user.id).forEach((b) => aftersale.settlePending(db, purchase.settleBooking(b, Date.now()), Date.now()));
+      dto = aftersale.listBookings(db, user.id, params);
     });
-    return mapBooking(structuredClone(dto));
+    return mapBookingList(dto);
   }
 
-  private buildBoardingPasses(booking: Booking): BoardingPass[] {
-    const seg = booking.outbound.itinerary.segments[0];
-    const rand = seeded(`${booking.code}-gate`);
-    const gate = String(1 + Math.floor(rand() * 14));
-    const boardingTime = toAirportLocalIso(new Date(new Date(seg.departureTime).getTime() - 40 * 60_000).toISOString(), seg.origin);
-    const group = booking.outbound.fare.brand === 'BASIC' ? '3' : booking.outbound.fare.brand === 'CLASSIC' ? '2' : '1';
-    return booking.passengers
-      .filter((p) => p.type !== 'INFANT')
-      .map((p, i) => ({
-        id: `bp_${booking.code}_${p.id}`,
-        bookingCode: booking.code,
-        passengerName: `${p.firstName} ${p.lastName}`,
-        flightNumber: seg.flightNumber,
-        origin: seg.origin,
-        destination: seg.destination,
-        departureTime: seg.departureTime,
-        boardingTime,
-        gate,
-        seat: p.seats.find((s) => s.segmentId === seg.id)?.seatNumber ?? `${14 + i}C`,
-        group,
-        barcode: `M1${p.lastName.toUpperCase().replace(/s/g, '')}/${booking.code}${seg.flightNumber}`,
-      }));
+  async getTickets(bookingId: string): Promise<BookedTicket[]> {
+    await simulate('getTickets', [503]);
+    let dto!: ReturnType<typeof aftersale.ticketsOf>;
+    this.commit((db) => (dto = aftersale.ticketsOf(this.ownedBooking(db, bookingId))));
+    return mapTicketList(structuredClone(dto));
   }
 
-  async checkIn(request: CheckInRequest): Promise<CheckInResult> {
+  async getTicket(bookingId: string, ticketId: string): Promise<BookedTicket> {
+    await simulate('getTicket', [503]);
+    let dto!: ReturnType<typeof aftersale.ticketOf>;
+    this.commit((db) => (dto = aftersale.ticketOf(this.ownedBooking(db, bookingId), ticketId)));
+    return mapTicket(structuredClone(dto));
+  }
+
+  async checkIn(bookingId: string, _idempotencyKey: string): Promise<CheckInResult> {
     await simulate('checkIn', [409, 503]);
-    let stored!: StoredBooking;
-    this.commit((db) => {
-      stored = this.ownedBooking(db, request.bookingId);
-      if (stored.dto.status !== 'CONFIRMED') throw conflict('Booking not confirmed');
-      const booking = mapBooking(stored.dto);
-      if (checkInWindow(booking.outbound.itinerary.segments[0].departureTime).status !== 'open') {
-        throw new ApiError({ status: 409, code: 'CHECK_IN_NOT_AVAILABLE', detail: es.checkin.notOpenError });
-      }
-      stored.checkedIn = true;
-    });
-    const booking = mapBooking(structuredClone(stored.dto));
-    return { booking, boardingPasses: this.buildBoardingPasses(booking) };
+    let dto!: ReturnType<typeof aftersale.checkIn>;
+    this.commit((db) => (dto = aftersale.checkIn(this.ownedBooking(db, bookingId), Date.now())));
+    return mapCheckIn(dto);
   }
 
   async getBoardingPasses(bookingId: string): Promise<BoardingPass[]> {
     await simulate('getBoardingPasses', [503]);
-    const stored = this.ownedBooking(this.db, bookingId);
-    if (!stored.checkedIn) throw new ApiError({ status: 409, code: 'BOARDING_PASS_NOT_AVAILABLE', detail: 'Not checked in' });
-    return this.buildBoardingPasses(mapBooking(structuredClone(stored.dto)));
+    let dto!: ReturnType<typeof aftersale.boardingPasses>;
+    this.commit((db) => (dto = aftersale.boardingPasses(this.ownedBooking(db, bookingId))));
+    return mapBoardingPasses(dto);
+  }
+
+  async getBaggageOptions(bookingId: string): Promise<BaggageOption[]> {
+    await simulate('getBaggageOptions', [503]);
+    let dto!: ReturnType<typeof aftersale.baggageOptions>;
+    this.commit((db) => (dto = aftersale.baggageOptions(this.ownedBooking(db, bookingId))));
+    return mapBaggageOptions(dto);
+  }
+
+  async addBaggage(bookingId: string, request: AddBaggageRequest, idempotencyKey: string): Promise<PostSaleOutcome<BaggageAdded>> {
+    await simulate('addBaggage', [409, 422, 503]);
+    const user = this.requireUser();
+    let result!: ReturnType<typeof aftersale.addBaggage>;
+    this.commit((db) => (result = aftersale.addBaggage(db, this.ownedBooking(db, bookingId), user.id, toAddBaggageRequest(request), idempotencyKey, Date.now())));
+    return result.outcome === 'pending' ? { status: 'pending' } : { status: 'done', data: mapBaggageAdded(result.data, request) };
+  }
+
+  async searchDateChange(bookingId: string, changes: DateChangeQuery[]): Promise<DateChangeOption[]> {
+    await simulate('searchDateChange', [409, 503]);
+    const user = this.requireUser();
+    let dto!: ReturnType<typeof aftersale.searchDateChange>;
+    this.commit((db) => (dto = aftersale.searchDateChange(db, this.ownedBooking(db, bookingId), user.id, toDateChangeSearchRequest(changes), Date.now())));
+    return mapDateChangeOptions(dto, 'USD');
+  }
+
+  async confirmDateChange(bookingId: string, request: DateChangeRequest, idempotencyKey: string): Promise<PostSaleOutcome<Booking | null>> {
+    await simulate('confirmDateChange', [409, 422, 503]);
+    const user = this.requireUser();
+    let result!: ReturnType<typeof aftersale.confirmDateChange>;
+    this.commit((db) => (result = aftersale.confirmDateChange(db, this.ownedBooking(db, bookingId), user.id, toDateChangeRequest(request), idempotencyKey, Date.now())));
+    return result.outcome === 'pending' ? { status: 'pending' } : { status: 'done', data: mapBooking(structuredClone(result.data)) };
+  }
+
+  async getCancellationQuote(bookingId: string): Promise<CancellationQuote> {
+    await simulate('getCancellationQuote', [503]);
+    const user = this.requireUser();
+    let dto!: ReturnType<typeof aftersale.cancellationQuote>;
+    this.commit((db) => (dto = aftersale.cancellationQuote(db, this.ownedBooking(db, bookingId), user.id, Date.now())));
+    return mapCancellationQuote(dto);
+  }
+
+  async cancelBooking(bookingId: string, request: CancelRequest, idempotencyKey: string): Promise<PostSaleOutcome<void>> {
+    await simulate('cancelBooking', [409, 503]);
+    const user = this.requireUser();
+    let outcome!: ReturnType<typeof aftersale.cancelBooking>;
+    this.commit((db) => (outcome = aftersale.cancelBooking(db, this.ownedBooking(db, bookingId), user.id, toCancelRequest(request), idempotencyKey, Date.now())));
+    return outcome === 'pending' ? { status: 'pending' } : { status: 'done', data: undefined };
   }
 
   /* Cuenta: mismas reglas, respuestas y errores que /auth/* de la API. */

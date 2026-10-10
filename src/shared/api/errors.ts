@@ -78,11 +78,41 @@ export function errorMessage(error: unknown): string {
       return e.network;
     case 'CHECK_IN_NOT_AVAILABLE':
       return e.checkInNotAvailable;
+    case 'CHECK_IN_FAILED':
+      return e.checkInFailed;
+    case 'BOARDING_PASS_NOT_AVAILABLE':
+      return e.boardingPassNotAvailable;
     case 'OFFER_NO_LONGER_AVAILABLE':
       return e.offerGone;
+    case 'BAGGAGE_LIMIT_EXCEEDED':
+      return e.baggageLimit;
+    case 'FARE_NOT_CHANGEABLE':
+      return e.fareNotChangeable;
+    case 'CHANGE_OFFER_EXPIRED':
+      return e.changeOfferExpired;
+    case 'QUOTE_EXPIRED':
+      return e.quoteExpired;
+    case 'ALREADY_CANCELLED':
+      return e.alreadyCancelled;
+    case 'CUTOFF_PASSED':
+      return e.cutoffPassed;
+    case 'FLIGHT_ALREADY_DEPARTED':
+      return e.flightDeparted;
+    case 'PAYMENT_NOT_AUTHORIZED':
+      return e.paymentNotAuthorized;
+    case 'PAYMENT_REFERENCE_INVALID':
+      return e.paymentReferenceInvalid;
+    case 'BOOKING_NOT_CONFIRMED':
+      return e.bookingNotConfirmed;
     default:
       break;
   }
+  // El backend rotula como VALIDATION_FAILED casi todo error sin código propio (leído en su código): se distingue por el
+  // estado y por el parámetro. Una oferta de cambio o una cotización vencida hace rato ya no existe (422 con su id); un 409
+  // genérico en la postventa es una reserva que ya no está confirmada, un trámite en proceso o una oferta ya usada.
+  if (error.status === 422 && error.fieldErrors.some(({ field }) => field === 'changeOfferId')) return e.changeOfferExpired;
+  if (error.status === 422 && error.fieldErrors.some(({ field }) => field === 'quoteId')) return e.quoteExpired;
+  if (error.status === 409 && error.code === 'VALIDATION_FAILED') return e.bookingStateChanged;
   if (error.status === 429) return error.retryAfter ? fmt(e.rateLimited, { seconds: error.retryAfter }) : e.rateLimitedNoTime;
   if (error.status === 0) return e.network;
   if (error.status === 400) return e.badRequest400;

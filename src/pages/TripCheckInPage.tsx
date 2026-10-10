@@ -1,35 +1,38 @@
-import { ArrowLeft, CalendarCheck } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, CalendarCheck, QrCode } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
-import { BoardingPassCard, checkInStatus } from '@/features/checkin';
-import { TripFallback } from '@/features/trips';
-import { flightsApi, type CheckInResult } from '@/shared/api';
+import { useAuth } from '@/features/auth';
+import { CheckInPassengers, checkInProgress, useCheckIn } from '@/features/checkin';
+import { TripFallback, useBooking } from '@/features/trips';
+import { errorMessage, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { useAsync } from '@/shared/lib/useAsync';
-import { Alert, Button, Card, ErrorState, LoadingState, TripSummary } from '@/shared/ui';
+import { checkInAvailability } from '@/shared/lib/checkinStatus';
+import { Alert, Button, Card, toast, TripSummary } from '@/shared/ui';
 
-const c = es.checkin;
+const c = es.aftersale.checkin;
 
-type State = { status: 'idle' } | { status: 'loading' } | { status: 'error'; error: unknown } | { status: 'success'; data: CheckInResult };
-
-/** Check-in de un viaje propio: se hace por bookingId y para todos los pasajeros de la reserva. */
+/**
+ * Check-in de un viaje propio: se hace por bookingId y para todos los pasajeros de la reserva. Confirmar pasajeros →
+ * POST con Idempotency-Key → éxito y directo a "Pases de abordar". Si la API dice que no corresponde (fuera de ventana),
+ * se explica cuándo abre y cierra con la regla de 48 h a 60 min (la API no manda la ventana en el error).
+ */
 export function TripCheckInPage() {
   const { id = '' } = useParams();
   const { authorized } = useAuth();
-  const trip = useAsync(() => flightsApi.getBooking(id), [id]);
-  const [state, setState] = useState<State>({ status: 'idle' });
-  const booking = trip.status === 'success' ? trip.data : null;
+  const navigate = useNavigate();
+  const trip = useBooking(id, authorized);
+  const { state, submit } = useCheckIn(id, authorized);
+  const booking = trip.booking;
 
-  const checkIn = async (bookingId: string) => {
-    setState({ status: 'loading' });
-    try {
-      const data = await authorized(() => flightsApi.checkIn({ bookingId }));
-      setState({ status: 'success', data });
-    } catch (error) {
-      setState({ status: 'error', error });
+  const confirm = async () => {
+    const result = await submit();
+    if (!result) return;
+    const { checked, pending } = checkInProgress(result);
+    // Todo registrado: directo a los pases. Si falta algún vuelo (la vuelta aún no abre) o ninguno quedó, se queda aquí y se explica.
+    if (checked > 0 && pending === 0) {
+      toast({ title: c.successTitle, variant: 'success' });
+      navigate(routes.tripPasses(id), { replace: true });
     }
   };
 
@@ -44,65 +47,71 @@ export function TripCheckInPage() {
 
   let content;
   if (!booking) {
-    content = <TripFallback state={trip} onRetry={() => void trip.execute()} />;
-  } else if (state.status === 'success') {
-    content = (
-      <section aria-labelledby="checkin-passes" className="flex flex-col gap-4">
-        <Alert variant="success" live="polite" title={c.successTitle}>
-          <p>{c.successText}</p>
-        </Alert>
-        <h2 id="checkin-passes" className="text-2xl">
-          {c.passesTitle}
-        </h2>
-        <ul className="flex flex-col gap-4">
-          {state.data.boardingPasses.map((bp) => (
-            <li key={bp.id}>
-              <BoardingPassCard pass={bp} />
-            </li>
-          ))}
-        </ul>
-        <div>{backToTrip}</div>
-      </section>
-    );
+    content = <TripFallback state={trip} onRetry={() => void trip.refresh()} />;
   } else {
-    const { available, reason } = checkInStatus(booking);
+    const availability = checkInAvailability(booking);
+    const windowError = state.status === 'error' && isApiError(state.error) && (state.error.status === 409 || state.error.status === 422);
     content = (
       <>
         <Card className="flex flex-col gap-6">
           <TripSummary outbound={booking.outbound} inbound={booking.inbound} />
-          {!available ? (
-            <Alert variant="info">
-              <p>{reason}</p>
+          <p className="text-sm text-muted">{availability.windowText}</p>
+        </Card>
+
+        {!availability.available ? (
+          <Alert variant="info" live="polite">
+            <p>{availability.reason}</p>
+          </Alert>
+        ) : (
+          <>
+            <CheckInPassengers booking={booking} />
+            <div>
+              <Button size="lg" loading={state.status === 'loading'} loadingText={c.submitting} onClick={() => void confirm()}>
+                <CalendarCheck aria-hidden="true" />
+                {c.confirm}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {state.status === 'error' ? (
+          <Alert variant="error" live="assertive" title={windowError ? c.serverWindowTitle : es.states.errorTitle}>
+            <p>{errorMessage(state.error)}</p>
+            {windowError ? <p>{availability.windowText}</p> : null}
+          </Alert>
+        ) : null}
+
+        {state.status === 'done' && checkInProgress(state.result).pending > 0 ? (
+          checkInProgress(state.result).checked > 0 ? (
+            <Alert
+              variant="success"
+              live="polite"
+              title={c.partialTitle}
+              action={
+                <Button asChild variant="secondary">
+                  <Link to={routes.tripPasses(id)}>
+                    <QrCode aria-hidden="true" />
+                    {c.seePasses}
+                  </Link>
+                </Button>
+              }
+            >
+              <p>{c.partialText}</p>
             </Alert>
           ) : (
-            <>
-              <p className="text-muted">{c.passengersText}</p>
-              <Button
-                size="lg"
-                loading={state.status === 'loading'}
-                loadingText={c.submitting}
-                onClick={() => void checkIn(booking.id)}
-              >
-                <CalendarCheck aria-hidden="true" />
-                {c.submit}
-              </Button>
-            </>
-          )}
-        </Card>
-        {state.status === 'loading' ? <LoadingState label={c.submitting} /> : null}
-        {state.status === 'error' ? <ErrorState error={state.error} onRetry={() => void checkIn(booking.id)} /> : null}
+            <Alert variant="warning" live="assertive" title={c.noneTitle}>
+              <p>{c.noneText}</p>
+            </Alert>
+          )
+        ) : null}
+
         <div>{backToTrip}</div>
       </>
     );
   }
 
   return (
-    <Page
-      title={booking ? `${c.pageTitle} ${booking.code}` : c.pageTitle}
-      heading={booking ? fmt(c.heading, { code: booking.code }) : c.pageTitle}
-      lead={c.lead}
-      width="narrow"
-    >
+    <Page title={booking ? `${c.pageTitle} ${booking.code}` : c.pageTitle} heading={booking ? fmt(c.heading, { code: booking.code }) : c.pageTitle} lead={c.lead} width="narrow">
       {content}
     </Page>
   );

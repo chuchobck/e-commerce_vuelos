@@ -14,19 +14,19 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 
 ---
 
-## 1. Estado actual (2026-10-07, cierre de F5)
+## 1. Estado actual (2026-10-09, F6 hecha en mock y pendiente de verificación real)
 
-- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 5. 242 archivos en `src`, unas 21.400 líneas de TypeScript (sin contar los tipos generados).
-- 446 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
+- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 5; la F6 está en la rama `fase-6-viajes` (PR abierto, sin fusionar). 298 archivos en `src`, unas 27.400 líneas de TypeScript (sin contar los tipos generados).
+- 621 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
 - **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, "Escápate", estado de vuelo, la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas) **y la compra** (hold, reserva, pago simulado y confirmación); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
 - Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para `/auth/*`, `contracts/backend-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
 - **Sesión** (sección 6, "Modelo de seguridad de la sesión"): access token solo en memoria, renovación única entre pestañas, cierre de sesión que se propaga a las demás pestañas, restauración al recargar sin parpadeo.
 - **Compra (F4a y F4b, sección 5):** máquina de estados pura (`features/checkout/machine.ts`), hold una sola vez por selección, tiempo del servidor, claves de idempotencia por intención, pago simulado reemplazable (`shared/payments`), seguimiento de reservas en proceso y, desde F4b, las pantallas finales: cuenta incrustada, un bloque por pasajero, panel lateral con temporizador y resumen, tarjeta simulada y confirmación con el código de reserva copiable.
 - **Nacionalidad:** la lista de países sale en español, pero la API solo conoce **Ecuador** (su tabla `pais` solo trae `EC`; otro código da 422). Los demás países se ven como "(aún no disponible)" hasta que el backend los cargue (`BOOKABLE_COUNTRIES` en `shared/lib/countries.ts`).
-- Mis viajes y la postventa siguen en el mock (usan ya la reserva con la forma del contrato); con la API real muestran "se conecta en una fase posterior" (F6).
+- **Mis viajes y la postventa (F6, sección 5c) están hechos con el mock y NO se han verificado contra la API real** (el backend local no respondió durante la fase). El cliente real (`RealFlightsApi`) ya está escrito con las formas del contrato y probado contra un cliente HTTP falso; lo que falta es recorrerlo contra el backend con los pasos de «Verificación F6 contra API real» (sección 5c). Lo asumido y lo pendiente está en `docs/DISCREPANCIAS-F6.md`.
 - Navegación (sección 4): menú por momento del viajero, rutas centralizadas en `src/app/routes.ts`, rutas protegidas con `RequireAuth` (espera a que la sesión se restaure y conserva `?volver=`).
 - Camino feliz con sesión: **3 clics** desde "Elegir tarifa" hasta la confirmación (Elegir, Continuar al pago, Pagar), más escribir los datos del pasajero y de la tarjeta. Sin sesión se suman los de la cuenta.
-- Mis viajes: lista, detalle con estado del vuelo, check-in por viaje (ventana 48 h / 60 min) y cancelación (mock). Pases, equipaje y cambio de fecha son pantallas de espera (F6).
+- Mis viajes (`/viajes`): lista con pestañas y paginación, detalle con acciones según el estado y el estado del vuelo en vivo, boletos, check-in (ventana 48 h / 60 min), pases de abordar con QR e impresión, equipaje extra, cambio de fecha y cancelación con cotización. Las escrituras llevan `Idempotency-Key` por intento y distinguen 200/201 (hecho), 202 (en proceso, se puede actualizar) y 422 (pago rechazado: se reintenta con otro pago sin perder lo elegido).
 - Ofertas es una pantalla inicial (F7). Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
 - **Asientos (F5, secciones 5b y 6):** el selector (`features/seats`) está dentro del paso 2 como un bloque **opcional y plegado** ("Asignaremos tus asientos automáticamente. Elegir asientos (opcional)"): sin abrirlo no se pide ningún mapa y el camino sigue en 3 clics. Elige un asiento por pasajero en **cada tramo** (ida, vuelta y escalas) y viaja como `assignedSeats`; el panel lateral, la revisión del pago y la confirmación muestran los asientos de cada pasajero. Verificado con la API real (sección 6, "Lo que aprendimos de asientos").
 
@@ -66,7 +66,7 @@ Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
 
 - **`VITE_API_URL`** elige el modo, sin mezclas:
   - **Vacía → mock completo.** Todo funciona sin backend y se ven las pistas "Para probar".
-  - **Con valor → API real.** Búsqueda, mapa de asientos, estado de vuelo, cuenta y compra van a la API; Mis viajes y la postventa muestran "se conecta en una fase posterior" hasta F6. Las pistas "Para probar" (incluida la cuenta demo del mock) no se ven; las tarjetas de prueba del pago simulado se ven con el mock o en desarrollo.
+  - **Con valor → API real.** Todo va a la API, incluidos Mis viajes y la postventa de F6 (escritos con las formas del contrato pero **aún sin verificar contra el backend**: pasos en la sección 5c). Las pistas "Para probar" (incluida la cuenta demo del mock) no se ven; las tarjetas de prueba del pago simulado se ven con el mock o en desarrollo.
 - **`VITE_LAST_FLIGHT_DATE`**: último día con salidas de la semilla del backend (la semilla genera 90 días desde su carga y esa ventana es fija). El buscador no deja elegir fechas posteriores; vacía = hoy + 89 días.
 - **`VITE_MOCK_ERROR_RATE`**: frecuencia de errores simulados. Solo afecta al mock; sirve para diseñar los estados de error.
 
@@ -130,10 +130,10 @@ Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `np
 | `auth` | Sesión (`SessionManager`: tokens, renovación, pestañas, restauración), `AuthProvider`/`useAuth`, formularios de ingreso y registro (`RequireAuth` vive en `app/`) | Hecho (mock y API real) |
 | `checkout` | Compra en 3 pasos: selección, máquina de estados (`machine.ts` + `flow.ts`), claves de idempotencia, hold con tiempo del servidor, pasajeros, pago, seguimiento de la reserva | Hecho (mock y API real) |
 | `seats` | Selector de asientos (mapa en forma de avión, lista alternativa, filtros, recomendación, conflictos 409/422) | Hecho (mock y API real); dentro del paso 2 como bloque opcional (sección 5b) |
-| `trips` | Mis viajes y detalle del viaje | Parcial (mock) |
-| `checkin` | Check-in dentro del viaje y pases de abordar | Parcial (check-in por viaje; pases en F6) |
-| `aftersale` | Equipaje, cambio de fecha, cancelación | Parcial (cancelación en la página del viaje) |
-| `flight-status` | Estado de vuelo (público y dentro del viaje) | Hecho (mock y API real) |
+| `trips` | Mis viajes: lista (filtros, paginación), detalle, acciones según el estado, boletos | Hecho en mock; sin verificar con la API real (F6) |
+| `checkin` | Check-in dentro del viaje y pases de abordar con QR | Hecho en mock; sin verificar con la API real (F6) |
+| `aftersale` | Equipaje, cambio de fecha, cancelación con cotización, pago simulado de postventa, 200/202/422 | Hecho en mock; sin verificar con la API real (F6) |
+| `flight-status` | Estado de vuelo (público y dentro del viaje, con insignia de retraso) | Hecho (mock y API real) |
 | `offers` | Ofertas por destino | Planificado (carpeta creada) |
 
 ---
@@ -146,7 +146,7 @@ Criterio: se ordena por el **momento del viajero**.
 - Después de comprar (con sesión): todo lo del viaje.
 - En cualquier momento (público): estado de un vuelo y ayuda.
 
-Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo**. A la derecha: Ayuda, tema claro/oscuro y el menú del usuario (Mis viajes, Mi perfil, Cerrar sesión).
+Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo** (Mis viajes lleva a `/viajes`). A la derecha: Ayuda, tema claro/oscuro y el menú del usuario (Mis viajes, Mi perfil, Cerrar sesión).
 
 | Ruta | Página | Acceso | API | Estado |
 |---|---|---|---|---|
@@ -156,13 +156,14 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo**. A la de
 | `/compra/datos` | Cuenta y pasajeros (paso 2) | Sesión dentro del paso | `/auth/*`, `POST`/`GET`/`DELETE /offers/hold`, `GET /offers/{id}/seatmap` | Hecho (mock y API real); asientos opcionales por tramo |
 | `/compra/pago` | Pago (paso 3) | Sesión dentro del paso | `POST /bookings`, `GET /offers/hold/{id}` | Hecho (mock y API real) |
 | `/compra/confirmacion/:id` | Confirmada, en proceso o fallida | Sesión | `GET /bookings/{id}` | Hecho (mock y API real) |
-| `/mis-viajes` | Lista de viajes | Sesión | `GET /bookings` | Hecho (mock) |
-| `/mis-viajes/:id` | Detalle del viaje (centro de postventa) | Sesión | detalle, boletos, estado | Hecho (mock), con estado del vuelo |
-| `/mis-viajes/:id/check-in` | Check-in | Sesión | `POST .../check-in` | Hecho (mock) |
-| `/mis-viajes/:id/pases` | Pases de abordar | Sesión | `GET .../boarding-passes` | Pantalla de espera (F6) |
-| `/mis-viajes/:id/equipaje` | Agregar equipaje | Sesión | `baggage-options`, `baggage` | Pantalla de espera (F6) |
-| `/mis-viajes/:id/cambiar-fecha` | Cambio de fecha | Sesión | `date-change` | Pantalla de espera (F6) |
-| `/mis-viajes/:id/cancelar` | Cancelación | Sesión | `cancellation-quote`, `cancel` | Parcial (sin cotización) |
+| `/viajes` | Lista de viajes (Próximos, Pasados, Cancelados) | Sesión | `GET /bookings` | Hecho en mock; sin verificar con la API real |
+| `/viajes/:id` | Detalle del viaje (centro de postventa) | Sesión | `GET /bookings/{id}`, `GET .../tickets`, `GET /flights/{n}/status` | Hecho en mock; sin verificar con la API real |
+| `/viajes/:id/boletos` | Boletos electrónicos | Sesión | `GET .../tickets`, `GET .../tickets/{ticketId}` | Hecho en mock; sin verificar con la API real |
+| `/viajes/:id/check-in` | Check-in | Sesión | `POST .../check-in` | Hecho en mock; sin verificar con la API real |
+| `/viajes/:id/pases` | Pases de abordar con QR | Sesión | `GET .../boarding-passes` | Hecho en mock; sin verificar con la API real |
+| `/viajes/:id/equipaje` | Agregar equipaje | Sesión | `GET .../baggage-options`, `POST .../baggage` | Hecho en mock; sin verificar con la API real |
+| `/viajes/:id/cambiar-fecha` | Cambio de fecha | Sesión | `POST .../date-change/search`, `POST .../date-change` | Hecho en mock; sin verificar con la API real |
+| `/viajes/:id/cancelar` | Cancelación | Sesión | `GET .../cancellation-quote`, `POST .../cancel` | Hecho en mock; sin verificar con la API real |
 | `/estado-vuelo` | Estado de un vuelo | Público | `GET /flights/{n}/status` | Hecho (mock y API real) |
 | `/ingresar`, `/registrarse` | Cuenta (vuelven a `?volver=`) | Público | `POST /auth/login`, `POST /auth/register` | Hecho (mock y API real) |
 | `/perfil` | Mis datos (solo lectura) y cerrar sesión | Sesión | `GET /auth/me`, `POST /auth/logout` | Hecho (mock y API real) |
@@ -170,9 +171,9 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo**. A la de
 | `/componentes` | Catálogo interno | Solo desarrollo (404 en producción) | Ninguna | Hecho |
 | `/componentes/asientos` | Demo del selector de asientos (1 adulto, familia con niño y bebé, escala, ATR) | Solo desarrollo (404 en producción) | `GET /offers/{id}/seatmap` | Hecho (F5) |
 
-Rutas viejas que redirigen: `/mis-reservas` → `/mis-viajes`, `/reserva/:id` → `/mis-viajes/:id`, `/check-in` → `/mis-viajes`, `/compra` → `/compra/datos`.
+Rutas viejas que redirigen: `/mis-viajes` y `/mis-viajes/*` → `/viajes` y `/viajes/*` (hasta F5 se llamaban así), `/mis-reservas` → `/viajes`, `/reserva/:id` → `/viajes/:id`, `/check-in` → `/viajes`, `/compra` → `/compra/datos`.
 
-Por qué el check-in no es una sección del menú: en la API el check-in se hace por `bookingId` y solo el dueño de la reserva puede hacerlo. No existe búsqueda por código de reserva y apellido, así que un check-in sin cuenta no puede funcionar. Vive dentro de cada viaje. Pendiente (F6): que el inicio muestre un aviso cuando un viaje entra en la ventana de check-in.
+Por qué el check-in no es una sección del menú: en la API el check-in se hace por `bookingId` y solo el dueño de la reserva puede hacerlo. No existe búsqueda por código de reserva y apellido, así que un check-in sin cuenta no puede funcionar. Vive dentro de cada viaje. Pendiente: que el inicio muestre un aviso cuando un viaje entra en la ventana de check-in.
 
 ---
 
@@ -289,6 +290,90 @@ const [seats, setSeats] = useState<SeatAssignments>({});        // {} = todo aut
 - `src/features/seats/model/*.test.ts`: generación del mapa (A320, A319, ATR72), selección, filtros, recomendación, revisión contra mapa nuevo y compatibilidad con `assignedSeats`.
 - `src/features/seats/components/SeatSelector.test.tsx`: teclado, `aria-label`, selección y avance, zoom, lista, estados de carga/vacío/error, refresco al volver a la pestaña, 409 y 422.
 - `e2e/seats-demo.mjs`: recorrido con Playwright sobre la demo (mock) a 320, 768 y 1280 px, con capturas. No es parte de `npm run test` ni agrega dependencias (ver el encabezado del archivo).
+
+---
+
+## 5c. Mis viajes y postventa (F6)
+
+> **Estado:** hecha y probada con el mock. **No se ha verificado ninguna llamada contra la API real** (el backend local no respondió
+> durante la fase). Lo que se asume y lo que falta comprobar está en `docs/DISCREPANCIAS-F6.md`, en «Pendiente de verificación real».
+
+Todo cuelga de `/viajes` (sesión obligatoria, bajo `RequireAuth`). Las pantallas solo arman piezas; la lógica vive en `features/trips`,
+`features/checkin`, `features/aftersale` y `features/flight-status`, y todo pasa por `FlightsApi`.
+
+### Qué hace cada pantalla
+
+| Ruta | Qué hace | Cómo maneja los estados |
+|---|---|---|
+| `/viajes` | Lista paginada por cursor («Cargar más viajes», 10 por página) con Próximos, Pasados y Cancelados y su cantidad | Próximos: el más cercano primero. Si falla «Cargar más», lo ya cargado sigue a la vista. Sin reservas: invita a buscar vuelos |
+| `/viajes/:id` | Resumen, estado del vuelo en vivo (con aviso de retraso), pasajeros, boletos y los trámites | Un trámite que no se puede usar se ve desactivado y dice por qué (el check-in dice cuándo abre) |
+| `/viajes/:id/boletos` | Boletos electrónicos por pasajero y sus tramos (cupones) | Un infante tiene su boleto pero no pase propio |
+| `/viajes/:id/check-in` | Check-in de todos los pasajeros | Ventana de 48 h a 60 min antes de la salida; `Idempotency-Key` por intento; lleva a los pases |
+| `/viajes/:id/pases` | Pase por pasajero y tramo con QR, asiento, grupo y posición; «Imprimir / Guardar PDF» | Antes del check-in explica que aún no hay pases y lleva al check-in. El QR es SVG negro sobre blanco, también en modo oscuro |
+| `/viajes/:id/equipaje` | Cantidades por pasajero e itinerario, total en vivo, revisión y pago simulado | 200 «Equipaje agregado»; 202 «Pago en proceso» con «Actualizar ahora»; 422 «El pago fue rechazado» y se conserva lo elegido |
+| `/viajes/:id/cambiar-fecha` | Nueva fecha → alternativas con la diferencia de tarifa → antes y después + pago si hay algo que pagar | 200 hecho; 202 `CHANGE_PENDING`; 422 se conserva la elección; 410 oferta vencida vuelve a la búsqueda |
+| `/viajes/:id/cancelar` | Cotización (total, penalidad, reembolso) → diálogo con «Entiendo que esta acción no se puede deshacer» | 200 cancelada; 202 `CANCELLATION_PENDING`; cotización vencida pide otra; la reserva pasa a Cancelados |
+
+### Qué trámites se ofrecen (`features/trips/bookingActions.ts`)
+
+| Estado de la reserva | Check-in | Pases | Equipaje | Cambio de fecha | Cancelar |
+|---|---|---|---|---|---|
+| `CONFIRMED` antes de la salida | Solo dentro de la ventana | Sí | Sí | Sí, si todas las tarifas son cambiables (Basic no) | Sí |
+| `CONFIRMED` con el vuelo ya salido | No | Sí | No | No | No |
+| `PENDING`, `PENDING_PAYMENT`, `TICKET_ISSUING` | No (confirmar primero) | No | No | No | No |
+| `CHANGE_PENDING`, `CANCELLATION_PENDING` | No (trámite en proceso) | No | No | No | No |
+| `CANCELLED`, `FAILED` | Ninguno se ofrece | | | | |
+
+Una reserva con solo infantes no ofrece equipaje (el infante viaja en brazos y no ocupa asiento).
+
+### Reglas que no se negocian
+
+- **`Idempotency-Key`:** un UUID por intento del usuario (`shared/lib/attemptKeys.ts`). El mismo contenido (reintento tras un error de red, 202, doble clic) reenvía la **misma** clave; si cambia el pago o la cantidad, la clave es **nueva**; al terminar bien se olvida. Solo se guarda la huella del contenido, en `sessionStorage`. Nunca se reintenta una escritura sola.
+- **200/201, 202 y 422:** `PostSaleOutcome` = hecho | pendiente. Cualquier 2xx distinto de 202 es «hecho». El 422 de pago rechazado deja la selección intacta y cambia la referencia por una nueva (es otro pago: otra clave).
+- **Varias maletas son varias peticiones:** la API acepta un pasajero y un itinerario por petición; cada una con su referencia (`PAY-OK-ABC`, `PAY-OK-ABC2`…) y su clave. Si una falla, se detiene y no se cobra el resto.
+- **Permiso (403):** muestra «Tu cuenta no tiene permiso para esta acción…», nunca «pago rechazado».
+- **Pago simulado:** la referencia `PAY-OK-…`, `PAY-PEND-…` o `PAY-REJ-…`; nunca datos de tarjeta. Los botones «Aprobar / Dejar pendiente / Rechazar» están dentro de `<MockOnly>`.
+- **QR en el cliente:** `qrcode-generator` (22 kB, 8 kB comprimido, sin dependencias), cargado solo al abrir los pases (`lazy`); dibuja un SVG sin `innerHTML` con el texto `barcode` tal cual lo da la API.
+- **Impresión:** los pases usan variantes `print:` de Tailwind: se oculta el menú, las pestañas y los botones y cada pase no se parte entre páginas.
+- **Accesibilidad:** foco al encabezado al cambiar de ruta, diálogo de cancelación con el foco inicial en la opción segura, resultados anunciados con `aria-live` (éxito y proceso `polite`; rechazo y error `assertive`), contadores de equipaje con nombre accesible, sin elementos clicables que no sean enlaces o botones.
+
+### Cómo probar con el mock (`VITE_API_URL` vacía)
+
+Ingresa con la cuenta demo (`demo@quinde.ec`, la contraseña está en las pistas «Para probar» de `/ingresar`). Las reservas de demostración se regeneran cada día:
+
+| Código | Qué sirve para probar |
+|---|---|
+| `QD7K2M` | Dentro de la ventana de check-in (si hay un vuelo UIO → GYE en las próximas horas): check-in 200 y luego pases |
+| `QG4P9X` | A 21 días, Flex: fuera de ventana (el check-in está desactivado con su motivo), cambio de fecha y cancelación con reembolso |
+| `QR2V6W` | A 3 días, Classic, con un infante y un vuelo **retrasado 45 minutos** (insignia y aviso) |
+| `QW8M3K` | A 11 días, Flex: su cancelación responde **202** y queda «en proceso» |
+| `QB5T1N` | Basic: el cambio de fecha no está disponible y la cancelación no devuelve dinero |
+| `QP1A5B` | Ya viajó (pestaña Pasados): solo los pases siguen disponibles |
+| `QC9S4Z` | Cancelada (pestaña Cancelados) |
+
+En equipaje y cambio de fecha, los botones «Para probar» ponen una referencia `PAY-OK-` (200), `PAY-PEND-` (202; a los 20 s el siguiente «Actualizar» ya lo ve terminado) o `PAY-REJ-` (422).
+Las reglas del mock siguen lo que **dice el código del backend** (leído, no ejecutado; ver `docs/DISCREPANCIAS-F6.md`, sección 0): maletas extra por familia (Basic 2, Classic 2, Flex 3, Business Flex 4; el infante, 0), cargo por cambio Classic = 20 % de la tarifa base de un adulto por pasajero con asiento (Flex 0; Basic no cambia), total del cambio = `max(0, tarifa + impuestos) + cargo` (nunca devuelve dinero), oferta de cambio y cotización de 15 min, penalidad de cancelación Basic 100 % / Classic 35 % / Flex 10 % / Business Flex 0 %, check-in por vuelo, pases PDF417 (económica) o AZTEC y un trabajo pendiente que se resuelve a los 20 s (el real, cada 30 s).
+Los errores aleatorios del mock se apagan con `VITE_MOCK_ERROR_RATE=0`.
+
+### Verificación F6 contra API real
+
+Pasos exactos para recorrer la F6 contra el backend **local**. Nunca contra Render, nunca con la cuenta de administrador sembrada, nunca con `./db/reset.sh`.
+
+1. **Preparar.** Con el backend corriendo en `http://localhost:3010` y `CORS_ORIGINS=http://localhost:5173`, crea `.env.local` (no se sube a git) con `VITE_API_URL=http://localhost:3010/flights/v1` y arranca `npm run dev`. En la consola del navegador no debe haber errores de CORS. No pegues tokens ni contraseñas en capturas, chats ni registros.
+2. **Cuenta y una reserva.** Regístrate con una cuenta de prueba nueva y compra un vuelo con `PAY-OK-…` (flujo de la sección 5). Para el check-in elige un vuelo que salga **entre 60 minutos y 48 horas** desde ahora; para el resto, uno más lejano (Classic o Flex: Basic no admite cambio de fecha). Compra una segunda reserva solo para cancelar, así no pierdes la primera.
+3. **Lista (`/viajes`).** La reserva aparece en Próximos con ruta, fecha, estado y total. Cambia de pestaña. Con más de 10 reservas, «Cargar más viajes» pide la página siguiente sin repetir. *Anota:* orden, estado exacto, si `departureDate` coincide con la fecha local del aeropuerto.
+4. **Detalle y boletos.** Abre la reserva: estado del vuelo, pasajeros y, en `/boletos`, un boleto por pasajero con su número. *Anota:* estados de boleto, número de 13 dígitos.
+5. **Check-in.** Fuera de ventana, la página no ofrece el botón y explica cuándo abre (para ver el 409 `CHECK_IN_NOT_AVAILABLE` real usa el Swagger del backend local en `/api/docs`). Dentro de la ventana: «Hacer check-in» → 200 con asiento por tramo. Repite el clic: no debe hacer dos check-in. *Anota:* qué responde al repetir; en una ida y vuelta con solo la ida abierta debe dar 200 `IN_PROGRESS` y la pantalla debe decir «Listo para los vuelos que ya estaban abiertos» (no un error).
+6. **Pases.** Antes del check-in, `/pases` explica que aún no hay pases (la API responde 200 con la lista vacía) y no ofrece imprimir. Después, un pase por pasajero con asiento y QR. Escanea el QR con otro dispositivo y compara con el «Texto del código». Prueba «Imprimir / Guardar PDF». *Anota:* `barcodeType` (la API real nunca manda QR: PDF417 en económica o AZTEC en las demás; la pantalla lo dibuja como QR con el mismo texto y lo avisa, así que **compara el texto, no esperes que un lector de aeropuerto lo acepte**) y qué trae `boardingGroup`/`boardingPosition`.
+7. **Equipaje, tres veces** (cada intento usa una referencia nueva; los botones «Para probar» no aparecen con la API real: escribe la referencia en el campo):
+   - `PAY-OK-` + 8 letras o números → 200 «Equipaje agregado»; recarga y comprueba «Ya compraste 1».
+   - `PAY-PEND-…` → 202 «Pago en proceso»; espera 20–30 s y pulsa «Actualizar ahora» hasta ver «Listo».
+   - `PAY-REJ-…` → «El pago fue rechazado», **la selección sigue ahí**; escribe `PAY-OK-…` y paga de nuevo.
+   - Intenta pasar el máximo y comprueba el 409. *Anota:* si el rechazo llega como 422 `PAYMENT_NOT_AUTHORIZED` (el contrato no lo declara aquí).
+8. **Cambio de fecha.** Elige una fecha con vuelos y otra sin vuelos (debe dar «No hay vuelos»). Confirma con `PAY-OK-…` y revisa la nueva fecha en el detalle; repite con `PAY-REJ-…` (la oferta se conserva) y `PAY-PEND-…` (queda `CHANGE_PENDING` y luego confirmada). Si alguna alternativa cuesta 0, comprueba que no pide pago; la API nunca devuelve dinero en un cambio (si el nuevo vuelo cuesta menos, la pantalla avisa que esa diferencia no se devuelve). *Anota:* qué pasa con los asientos, la vigencia de la oferta y la moneda de los importes.
+9. **Cancelación (al final).** Abre `/cancelar` de la segunda reserva: cotización con total, penalidad y reembolso (comprueba que sumen). Marca «Entiendo…», confirma → 200 o 202 y la reserva sale en Cancelados. *Anota:* reembolso por familia, vigencia de la cotización, el cuerpo del 200 y si hay 202.
+10. **Permisos y ajenos.** Con un token sin `flights:cancel` (si puedes crearlo) el intento debe mostrar el mensaje de permiso. Con otra cuenta, abrir la URL de una reserva ajena debe mostrar «No encontramos este viaje» (404).
+11. **Reportar.** Por cada paso anota ✅ o ❌ y la diferencia en `docs/DISCREPANCIAS-F6.md` (sección 1): lo que se confirme se pasa a «Lo que aprendimos de la API real» de la sección 6 de este README y se ajusta el código marcado con `// DISCREPANCIA:`.
 
 ---
 
@@ -409,6 +494,21 @@ Verificado contra el **backend local** el 2026-10-07 (en Render no se crean rese
 | Asientos elegidos | Se aceptaban sin validar | 400/422/409 con los códigos de la tabla |
 | `SEAT_TAKEN` | Solo por la simulación de la demo | También por una reserva anterior del mismo asiento |
 
+### Lo que aprendimos de la postventa (F6)
+
+Fuente: lo que probó el dueño contra el backend local (pases) y la lectura del código del backend (**no ejecutado**: cada fila espera su verificación en marcha, ver `docs/DISCREPANCIAS-F6.md`).
+
+| Caso | Respuesta real |
+|---|---|
+| `GET .../boarding-passes` antes del check-in o con la reserva no confirmada | **200 con `boardingPasses: []`** (no 409). Confirmado por el dueño |
+| `barcodeType` de un pase | Nunca `QR`: `PDF417` en económica, `AZTEC` en las demás cabinas |
+| Ventana de check-in | Por vuelo (48 h a 60 min); un vuelo en ventana y otro no = 200 `IN_PROGRESS`; el estado del pasajero es `NOT_CHECKED_IN` si falta cualquier vuelo |
+| `GET .../baggage-options` | Una fila por pasajero e itinerario; el infante con `maxAllowed: 0` |
+| `totalToPay` de un cambio de fecha | `max(0, fareDifference + taxDifference) + changeFee`: nunca negativo; no hay reembolso |
+| Cancelación | Penalidad por familia (Basic 100 %, Classic 35 %, Flex 10 %, Business Flex 0 %); cotización de 15 min; `reason` hasta 500 sin HTML ni saltos de línea |
+| Errores sin código propio | `code: VALIDATION_FAILED` y solo el estado HTTP los distingue: 409 = reserva no confirmada, oferta ya usada o trámite en curso; 422 con `changeOfferId`/`quoteId` = oferta o cotización vencida y ya borrada |
+| 401 por token vencido | `code: VALIDATION_FAILED`, `detail: The access token expired` (sin código propio); el cliente renueva y reintenta una vez |
+
 ### Modelo de seguridad de la sesión
 
 | Qué | Dónde | Por qué |
@@ -492,7 +592,7 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 
 ## 8. Pruebas
 
-- **Hoy:** 446 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva. Desde F4b, las pantallas: formulario de pasajeros por tipo, temporizador con avisos a 5 y 2 minutos, tarjeta, y la ruta completa de la compra con sesión, que cuenta los clics y falla si pasan de 3 (no hay Playwright instalado: es una prueba de componentes de las cuatro pantallas), con la cuenta incrustada, volver atrás, los errores del pago y los estados de la confirmación.
+- **Hoy:** 621 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva. Desde F4b, las pantallas: formulario de pasajeros por tipo, temporizador con avisos a 5 y 2 minutos, tarjeta, y la ruta completa de la compra con sesión, que cuenta los clics y falla si pasan de 3 (no hay Playwright instalado: es una prueba de componentes de las cuatro pantallas), con la cuenta incrustada, volver atrás, los errores del pago y los estados de la confirmación. Desde F6, la postventa: las reglas del mock con los mismos códigos del contrato (lista por cursor, boletos, check-in, pases, equipaje, cambio de fecha, cancelación), `RealFlightsApi` contra un cliente HTTP falso (rutas, cabeceras, 200/201/202 y dinero en centavos), las acciones habilitadas por estado, los filtros de la lista, los totales de equipaje, la compra de equipaje con 200/201/202/422, las claves de idempotencia (generación, reutilización y clave nueva al cambiar el pago), los hooks de check-in y cambio de fecha, el QR y las pantallas de lista, pases, equipaje y cancelación.
 - **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. La de compra, también solo local: búsqueda real, hold y `GET`, `PAY-OK` 201 con boletos y el mismo envío dos veces con la misma clave = **una sola reserva** (`Idempotent-Replayed: true`), `PAY-REJ` 422 con el hold aún `HELD`, `PAY-PEND` 202 seguido hasta `CONFIRMED`, y liberar el hold. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 y reservas 10 por minuto).
 - **E2E:** `e2e/seats-demo.mjs` (selector de asientos, mock, 320/768/1280 px).
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
@@ -511,7 +611,7 @@ Se valida al salir del campo y al enviar, sin borrar lo que el usuario escribió
 | F4a | Núcleo de la compra: hold, reserva, pago simulado, máquina de estados, idempotencia | Hecha (tag `fase-4a`) |
 | F4b | Pantallas finales de la compra (cuenta incrustada, pasajeros, pago, confirmación) | Hecha (tag `fase-4b`) |
 | F5 | Selector de asientos (mapa en forma de avión, lista, filtros, conflictos 409/422), integrado en el paso 2 y verificado con la API real | Hecha (tag `fase-5`) |
-| F6 | Mis viajes: detalle, check-in, pases, equipaje, cambio de fecha, cancelación | Pendiente |
+| F6 | Mis viajes: lista, detalle, boletos, check-in, pases con QR, equipaje, cambio de fecha, cancelación | Hecha en mock (rama `fase-6-viajes`); **sin verificar con la API real** |
 | F7 | Ofertas y pulido del inicio | Pendiente |
 | F8 | Calidad y entrega: pruebas de extremo a extremo, accesibilidad, despliegue | Pendiente |
 

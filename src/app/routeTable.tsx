@@ -12,9 +12,11 @@ import { ProfilePage } from '@/pages/ProfilePage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { ResultsPage } from '@/pages/ResultsPage';
 import { TripCancelPage } from '@/pages/TripCancelPage';
+import { TripBaggagePage } from '@/pages/TripBaggagePage';
 import { TripCheckInPage } from '@/pages/TripCheckInPage';
+import { TripDateChangePage } from '@/pages/TripDateChangePage';
 import { TripPage } from '@/pages/TripPage';
-import { TripSoonPage } from '@/pages/TripSoonPage';
+import { TripTicketsPage } from '@/pages/TripTicketsPage';
 import { TripsPage } from '@/pages/TripsPage';
 import { RootLayout } from './layout/RootLayout';
 import { RouteErrorPage } from './layout/RouteErrorPage';
@@ -64,10 +66,12 @@ export function buildRoutes({ dev }: { dev: boolean }): RouteObject[] {
           children: [
             { id: 'trips', path: paths.trips, element: <TripsPage /> },
             { id: 'trip', path: paths.trip, element: <TripPage /> },
+            { id: 'tripTickets', path: paths.tripTickets, element: <TripTicketsPage /> },
             { id: 'tripCheckIn', path: paths.tripCheckIn, element: <TripCheckInPage /> },
-            { id: 'tripPasses', path: paths.tripPasses, element: <TripSoonPage kind="passes" /> },
-            { id: 'tripBaggage', path: paths.tripBaggage, element: <TripSoonPage kind="baggage" /> },
-            { id: 'tripDateChange', path: paths.tripDateChange, element: <TripSoonPage kind="dateChange" /> },
+            // Los pases cargan aparte (trae el dibujo del QR): nadie los necesita antes del check-in.
+            { id: 'tripPasses', path: paths.tripPasses, lazy: async () => ({ Component: (await import('@/pages/TripPassesPage')).TripPassesPage }) },
+            { id: 'tripBaggage', path: paths.tripBaggage, element: <TripBaggagePage /> },
+            { id: 'tripDateChange', path: paths.tripDateChange, element: <TripDateChangePage /> },
             { id: 'tripCancel', path: paths.tripCancel, element: <TripCancelPage /> },
             { id: 'profile', path: paths.profile, element: <ProfilePage /> },
           ],

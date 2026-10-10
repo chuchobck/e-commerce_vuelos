@@ -330,6 +330,13 @@ export function mockSeatMap(offerId: string, segmentId: string): SeatMapDto {
   };
 }
 
+/** Retrasos forzados de la demostración ("vuelo retrasado"): `número|fecha local` → minutos. */
+const forcedDelays = new Map<string, number>();
+
+export function forceFlightDelay(flightNumber: string, date: string, minutes: number): void {
+  forcedDelays.set(`${flightNumber}|${date}`, minutes);
+}
+
 /** GET /flights/{flightNumber}/status: estado coherente con la hora actual. */
 export function mockFlightStatus(flightNumber: string, date: string, now = Date.now()): FlightStatusDto {
   const flight = findFlight(flightNumber, date);
@@ -337,7 +344,8 @@ export function mockFlightStatus(flightNumber: string, date: string, now = Date.
     throw new ApiError({ status: 404, code: 'VALIDATION_FAILED', detail: `Flight ${flightNumber} was not found on ${date}` });
   }
   const rand = seeded(`${flightNumber}-${date}-status`);
-  const delayMin = rand() < 0.15 ? randomInt(rand, 1, 12) * 5 : 0;
+  const random = rand() < 0.15 ? randomInt(rand, 1, 12) * 5 : 0;
+  const delayMin = forcedDelays.get(`${flightNumber}|${date}`) ?? random;
   const estDep = flight.depUtc + delayMin * 60_000;
   const estArr = flight.arrUtc + delayMin * 60_000;
   const iso = (ms: number) => new Date(ms).toISOString();
