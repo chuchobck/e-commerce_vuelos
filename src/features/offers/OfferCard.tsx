@@ -14,7 +14,9 @@ const SEATS_NOTICE_MAX = 9;
  * Una oferta: ruta, fecha, aerolínea y vuelo, horario y «Desde $X». Todo sale de la respuesta de la búsqueda.
  * El enlace «Ver vuelo» cubre toda la tarjeta (se puede tocar en cualquier parte) y es el único elemento enfocable.
  */
-export function OfferCard({ offer, href }: { offer: Offer; href: string }) {
+/** `headingLevel`: h3 bajo el h2 «Ofertas» del inicio; h2 en la página /ofertas, donde el h1 es el título (sin saltar niveles). */
+export function OfferCard({ offer, href, headingLevel = 'h3' }: { offer: Offer; href: string; headingLevel?: 'h2' | 'h3' }) {
+  const Heading = headingLevel;
   const origin = cityOf(offer.origin);
   const destination = cityOf(offer.destination);
   const region = findAirport(offer.destination)?.region;
@@ -25,11 +27,11 @@ export function OfferCard({ offer, href }: { offer: Offer; href: string }) {
   return (
     <article className="relative flex h-full flex-col gap-4 rounded border-2 border-border bg-surface p-6 shadow-card transition-colors duration-150 focus-within:border-primary hover:border-primary motion-reduce:transition-none">
       <p className="text-sm font-bold uppercase tracking-wide text-muted">{region ? es.home.worlds[region].name : ' '}</p>
-      <h3 aria-label={fmt(t.routeLabel, { origin, destination })} className="flex flex-wrap items-center gap-x-2 font-display text-2xl font-semibold">
+      <Heading aria-label={fmt(t.routeLabel, { origin, destination })} className="flex flex-wrap items-center gap-x-2 font-display text-2xl font-semibold">
         {origin}
         <ArrowRight aria-hidden="true" className="size-6 shrink-0 text-primary" />
         {destination}
-      </h3>
+      </Heading>
       <div className="flex flex-col gap-2 text-muted">
         <p className="font-bold text-foreground">{formatShortDate(offer.date)}</p>
         <p>{fmt(t.flights, { airline: offer.airline.name, flights: offer.flightNumbers.join(' + ') })}</p>

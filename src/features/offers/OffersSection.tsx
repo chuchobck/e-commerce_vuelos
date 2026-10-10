@@ -122,7 +122,7 @@ export function OffersSection({ hrefFor, searchHref, heading = true }: OffersSec
         <ul aria-label={t.listLabel} className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((offer) => (
             <li key={offer.id}>
-              <OfferCard offer={offer} href={hrefFor(offer)} />
+              <OfferCard offer={offer} href={hrefFor(offer)} headingLevel={heading ? 'h3' : 'h2'} />
             </li>
           ))}
         </ul>

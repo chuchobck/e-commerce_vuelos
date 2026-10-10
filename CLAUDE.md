@@ -117,6 +117,25 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
   nunca importarlo desde un `index.ts` de barril). Siempre negro sobre blanco: un lector no entiende un QR invertido.
 - `NotYetConnectedError` queda como mecanismo para lo que falte conectar; desde F6 ninguna operación de `FlightsApi` lo lanza.
 
+## Ofertas e inicio (desde F7)
+
+- **Una «oferta» no es un descuento.** La API no tiene promociones ni precio anterior: es la tarifa económica más baja que devolvió una búsqueda real
+  de una ruta y fecha, «Desde $X». Prohibido inventar descuentos, porcentajes, precios tachados, «últimos asientos», «otros están viendo» o contadores.
+  «Quedan N asientos» solo con `availableSeats` de la API. La moneda sale de la respuesta.
+- **Presupuesto de búsquedas** (`features/offers/loadOffers.ts`, números en `popularRoutes.ts`): máximo 8 por carga del inicio, 2 a la vez, una sola petición
+  por búsqueda (`retry: false`), caché de 10 min (memoria + `sessionStorage` con `try/catch`), un 429 detiene todo y respeta `Retry-After`, ningún error se
+  reintenta en bucle. Las rutas populares son una sola lista (`POPULAR_ROUTES`) y deben existir en `shared/api/airports.ts`.
+- Las ofertas se piden **solo cuando la sección se ve** (`Offers`/`OffersLazy` + `useInView`) y se cancelan al salir (`AbortSignal`; `ABORTED` no se muestra ni se
+  reintenta). El inicio nunca depende de ellas: sin ofertas, error o 429 el resto de la página se ve igual. «Ver vuelo» usa `searchToQuery`, no otra lógica.
+- Una búsqueda que nadie espera en pantalla pasa `background: true`: el mock no le inyecta errores aleatorios. Los casos del mock se piden con `?escenario=`
+  (`shared/api/mock/scenarios.ts`) y sus pistas van dentro de `<MockOnly>`.
+- **Contenido verdadero:** preguntas frecuentes, ayuda y términos solo dicen reglas del contrato o documentadas (README, sección 6). Si se duda, se lee el
+  backend (solo lectura) antes de escribirlo; así se encontraron dos afirmaciones falsas en Ayuda (`docs/DISCREPANCIAS-F7.md`).
+- **Sin servidores externos** (CSP estricta en F8): tipografías locales en `public/fonts` (OFL), nada de Google Fonts, CDN ni imágenes remotas; una prueba
+  vigila `index.html` e `index.css`. Metadatos por ruta con `usePageMeta` (`Page` recibe `description`). Cada página nueva es `lazy` en `routeTable.tsx`
+  (`lazyPage`); el inicio queda en el paquete principal. Librerías pesadas de uso puntual, en su propio archivo (`lazy`).
+- Antes de afirmar rendimiento, se mide (Lighthouse sobre `vite preview`) y se informa el número real, no una estimación.
+
 ## Accesibilidad: WCAG 2.2 AA
 
 HTML semántico, un solo `h1` por página, "Saltar al contenido", foco siempre visible y nunca tapado,

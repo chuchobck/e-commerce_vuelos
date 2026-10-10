@@ -5,5 +5,3 @@ Allow: /
 Disallow: /compra/
 Disallow: /viajes
 Disallow: /perfil
-Disallow: /ingresar
-Disallow: /registrarse

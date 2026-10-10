@@ -79,6 +79,9 @@ describe('sección de ofertas: carga', () => {
     renderSection({ heading: false });
     expect(screen.queryByRole('heading', { level: 2, name: t.title })).toBeNull();
     expect(screen.getByRole('region', { name: t.listLabel })).toBeTruthy();
+    // Sin el h2 del inicio, las tarjetas son h2 (bajo el h1 de la página): no se salta ningún nivel.
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(ALL.length);
+    expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0);
   });
 });
 

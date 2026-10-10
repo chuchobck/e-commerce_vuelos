@@ -14,11 +14,11 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 
 ---
 
-## 1. Estado actual (2026-10-09, F6 hecha en mock y pendiente de verificación real)
+## 1. Estado actual (2026-10-10, F6 y F7 hechas en mock y pendientes de verificación real)
 
-- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 5; la F6 está en la rama `fase-6-viajes` (PR abierto, sin fusionar). 298 archivos en `src`, unas 27.400 líneas de TypeScript (sin contar los tipos generados).
-- 679 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
-- **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, "Escápate", estado de vuelo, la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas) **y la compra** (hold, reserva, pago simulado y confirmación); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
+- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 5; la F6 está en la rama `fase-6-viajes` (PR abierto, sin fusionar) y las mejoras de formularios en `mejora-ux-formularios`; la F7 está en `feat/f7-ofertas-inicio` (PR apilado sobre `mejora-ux-formularios`, sin fusionar ni tag). 338 archivos en `src`, unas 32.100 líneas de TypeScript (sin contar los tipos generados).
+- 806 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
+- **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, estado de vuelo, la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas) **y la compra** (hold, reserva, pago simulado y confirmación); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
 - Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para `/auth/*`, `contracts/backend-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
 - **Sesión** (sección 6, "Modelo de seguridad de la sesión"): access token solo en memoria, renovación única entre pestañas, cierre de sesión que se propaga a las demás pestañas, restauración al recargar sin parpadeo.
 - **Compra (F4a y F4b, sección 5):** máquina de estados pura (`features/checkout/machine.ts`), hold una sola vez por selección, tiempo del servidor, claves de idempotencia por intención, pago simulado reemplazable (`shared/payments`), seguimiento de reservas en proceso y, desde F4b, las pantallas finales: un bloque por pasajero, panel lateral con temporizador y resumen, tarjeta simulada y confirmación con el código de reserva copiable.
@@ -27,7 +27,8 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 - Navegación (sección 4): menú por momento del viajero, rutas centralizadas en `src/app/routes.ts`, rutas protegidas con `RequireAuth` (espera a que la sesión se restaure y conserva `?volver=`).
 - Camino feliz con sesión: **3 clics** desde "Elegir tarifa" hasta la confirmación (Elegir, Continuar al pago, Pagar), más escribir los datos del pasajero y de la tarjeta. Sin sesión se suman los de la cuenta.
 - Mis viajes (`/viajes`): lista con pestañas y paginación, detalle con acciones según el estado y el estado del vuelo en vivo, boletos, check-in (ventana 48 h / 60 min), pases de abordar con QR e impresión, equipaje extra, cambio de fecha y cancelación con cotización. Las escrituras llevan `Idempotency-Key` por intento y distinguen 200/201 (hecho), 202 (en proceso, se puede actualizar) y 422 (pago rechazado: se reintenta con otro pago sin perder lo elegido).
-- Ofertas es una pantalla inicial (F7). Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
+- **Ofertas y pulido del inicio (F7, sección 5e): hecho con el mock y NO verificado contra la API real** (el backend local no respondió). Una «oferta» es la tarifa económica más baja de una búsqueda real de las rutas populares, sin descuentos ni precios anteriores inventados; una carga del inicio hace como máximo 8 búsquedas (6 en el mock), de 2 en 2, solo cuando la sección se ve. Lo pendiente está en `docs/DISCREPANCIAS-F7.md` y los pasos en «Verificación F7 contra API real» (sección 5e).
+- Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
 - **Asientos (F5, secciones 5b y 6):** el selector (`features/seats`) está dentro del paso 2 como un bloque **opcional y plegado** ("Asignaremos tus asientos automáticamente. Elegir asientos (opcional)"): sin abrirlo no se pide ningún mapa y el camino sigue en 3 clics. Elige un asiento por pasajero en **cada tramo** (ida, vuelta y escalas) y viaja como `assignedSeats`; el panel lateral, la revisión del pago y la confirmación muestran los asientos de cada pasajero. Verificado con la API real (sección 6, "Lo que aprendimos de asientos").
 - **Mejora de buscar y comprar (rama `mejora-ihc-busqueda-compra`, sección 5d):** el buscador usa campos con sugerencias (se escribe y se predice al instante, con clic o teclado), el botón de buscar espera a que los datos estén completos y se corrige en tiempo real; si no hay vuelos esa fecha se ofrecen fechas cercanas con su precio, la otra cabina y otros destinos; los resultados separan Ida y Vuelta en dos pestañas centradas (elegir la ida pasa sola a la vuelta), con orden y "Solo directos"; y la cuenta salió del paso 2: sin sesión se va a Ingresar con el vuelo guardado y se vuelve sin perder nada.
 
@@ -69,7 +70,7 @@ Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
   - **Vacía → mock completo.** Todo funciona sin backend y se ven las pistas "Para probar".
   - **Con valor → API real.** Todo va a la API, incluidos Mis viajes y la postventa de F6 (escritos con las formas del contrato pero **aún sin verificar contra el backend**: pasos en la sección 5c). Las pistas "Para probar" (incluida la cuenta demo del mock) no se ven; las tarjetas de prueba del pago simulado se ven con el mock o en desarrollo.
 - **`VITE_LAST_FLIGHT_DATE`**: último día con salidas de la semilla del backend (la semilla genera 90 días desde su carga y esa ventana es fija). El buscador no deja elegir fechas posteriores; vacía = hoy + 89 días.
-- **`VITE_MOCK_ERROR_RATE`**: frecuencia de errores simulados. Solo afecta al mock; sirve para diseñar los estados de error.
+- **`VITE_MOCK_ERROR_RATE`**: frecuencia de errores simulados. Solo afecta al mock; sirve para diseñar los estados de error. Las ofertas del inicio (búsquedas «de fondo») no los reciben: para ellas existen los escenarios de la sección 5e.
 
 #### A qué API apuntar
 
@@ -88,7 +89,7 @@ Todas las variables que empiezan con `VITE_` quedan visibles en el navegador: **
 
 ```
 src/
-├─ main.tsx, index.css        arranque y tokens de diseño (claro y oscuro)
+├─ main.tsx, index.css        arranque, tokens de diseño (claro y oscuro) y tipografías propias (@font-face)
 ├─ app/
 │  ├─ routes.ts               tabla única de rutas (paths, routes.trip(id), returnTo, redirecciones)
 │  ├─ routeTable.tsx          qué página atiende cada ruta; router.tsx la monta
@@ -125,7 +126,7 @@ Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `np
 
 | Módulo (`features/`) | Responsabilidad | Estado |
 |---|---|---|
-| `home` | Inicio y "Escápate" (precios reales con caché de 10 min) | Hecho (mock y API real) |
+| `home` | Arte del inicio: panorama de Ecuador y las cuatro regiones con sus destinos | Hecho |
 | `search` | Buscador (solo pares con vuelos y fechas dentro de la ventana) | Hecho (mock y API real) |
 | `results` | Resultados y familias tarifarias reales | Hecho (mock y API real) |
 | `auth` | Sesión (`SessionManager`: tokens, renovación, pestañas, restauración), `AuthProvider`/`useAuth`, formularios de ingreso y registro (`RequireAuth` vive en `app/`) | Hecho (mock y API real) |
@@ -135,7 +136,7 @@ Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `np
 | `checkin` | Check-in dentro del viaje y pases de abordar con QR | Hecho en mock; sin verificar con la API real (F6) |
 | `aftersale` | Equipaje, cambio de fecha, cancelación con cotización, pago simulado de postventa, 200/202/422 | Hecho en mock; sin verificar con la API real (F6) |
 | `flight-status` | Estado de vuelo (público y dentro del viaje, con insignia de retraso) | Hecho (mock y API real) |
-| `offers` | Ofertas por destino | Planificado (carpeta creada) |
+| `offers` | Ofertas: tarifa económica más baja de las rutas populares (búsquedas reales con presupuesto, caché, carga al verse, tarjetas, filtros y estados) | Hecho en mock; sin verificar con la API real (F7) |
 
 ---
 
@@ -151,9 +152,9 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo** (Mis via
 
 | Ruta | Página | Acceso | API | Estado |
 |---|---|---|---|---|
-| `/` | Inicio con buscador | Público | `POST /search` | Hecho (mock y API real) |
+| `/` | Inicio: buscador, Ofertas, Destinos de Ecuador, Cómo funciona y preguntas frecuentes | Público | `POST /search` (las ofertas) | Buscador hecho (mock y API real); Ofertas hechas en mock (F7) |
 | `/resultados` | Vuelos y tarifas (paso 1) | Público | `POST /search` | Hecho (mock y API real) |
-| `/ofertas` | Precios más bajos por destino | Público | `POST /search` | Pantalla de espera (F7) |
+| `/ofertas` | Las mismas ofertas del inicio en una página (misma sección y misma caché) | Público | `POST /search` | Hecho en mock; sin verificar con la API real (F7) |
 | `/compra/datos` | Pasajeros (paso 2) | Sesión (sin ella va a `/ingresar?volver=/compra/datos`) | `/auth/*`, `POST`/`GET`/`DELETE /offers/hold`, `GET /offers/{id}/seatmap` | Hecho (mock y API real); asientos opcionales por tramo |
 | `/compra/pago` | Pago (paso 3) | Sesión | `POST /bookings`, `GET /offers/hold/{id}` | Hecho (mock y API real) |
 | `/compra/confirmacion/:id` | Confirmada, en proceso o fallida | Sesión | `GET /bookings/{id}` | Hecho (mock y API real) |
@@ -415,6 +416,87 @@ Más HCI: objetivos de 48 px, foco visible, `aria-live`, 320 px sin scroll horiz
 
 ---
 
+## 5e. Ofertas y pulido del inicio (F7)
+
+### Qué es una «oferta» (regla de honestidad)
+
+La API **no tiene** promociones, precio anterior ni descuentos. Una oferta es **la tarifa económica más baja que devuelve una búsqueda real** de una ruta y una fecha: «Desde $X, por persona, solo ida». Nada de porcentajes, precios tachados, «últimos asientos», «otros están viendo» ni contadores. «Quedan N asientos» solo sale si la API lo informa (`availableSeats`) y son 9 o menos. La moneda sale de la respuesta. Una prueba falla si la tarjeta muestra `%`, `descuento`, `últimos`, etc., y la sección lo dice al pie («no descuentos»).
+
+### Datos, presupuesto y caché (`features/offers`)
+
+- **Rutas:** una sola lista, `popularRoutes.ts` (Quito–Guayaquil, Quito–Cuenca, Guayaquil–Baltra, Quito–Baltra, Guayaquil–Cuenca, Loja–Cuenca); una prueba exige que todas tengan vuelos en la tabla de pares de `shared/api/airports.ts`.
+- **Qué se pide:** por ruta, una búsqueda de ida, 1 adulto, economía, en la primera fecha cercana con vuelos: hoy + 3 días y, si no hay, el día siguiente (hasta 3 fechas, sin pasar del último día con salidas).
+- **Presupuesto:** como máximo **8 búsquedas por carga**, **2 a la vez**, por el cliente HTTP único. Cada ruta recibe su primera búsqueda antes de que ninguna reciba la segunda. Una sola petición por búsqueda (`retry: false`: el cliente no repite un 503 ni un corte). **429:** se detiene todo y se muestra el `Retry-After`; «Reintentar» espera. Otros errores marcan solo esa ruta; no hay bucles.
+- **Carga:** `Offers` (`OffersLazy`) descarga el código y pide las búsquedas **solo cuando la sección está a punto de verse** (`IntersectionObserver`, 300 px de adelanto); nunca bloquea la primera pantalla. Al salir de la página se cancela lo que esté en vuelo (`AbortSignal` hasta el cliente HTTP y el mock; el error `ABORTED` no se muestra ni se reintenta). El doble montaje de StrictMode no envía nada.
+- **Caché:** 10 minutos en memoria y `sessionStorage` (con `try/catch`), clave ruta + fecha; también guarda «sin vuelos esa fecha». Un error nunca se guarda: «Reintentar» solo pide lo que falló.
+
+### Presentación y estados
+
+- Tarjetas (máx. 6, de menor a mayor precio): ruta con ciudades, fecha, aerolínea y número(s) de vuelo, horario (hora local de cada aeropuerto), directo o escalas, «Desde $X» y «Ver vuelo». Toda la tarjeta es un enlace con nombre accesible único («Ver vuelo de Quito a Guayaquil el 13 de oct, desde $55,00»); el foco es visible y es el único elemento enfocable.
+- «Ver vuelo» abre `/resultados` con **la misma búsqueda** (`searchToQuery`), sin duplicar lógica; esa pantalla la pide de nuevo.
+- Filtros: «Todas» y las ciudades de salida que tienen ofertas (orden fijo, `aria-pressed`). Nada de filtros inventados.
+- Estados: carga (marcadores del tamaño de las tarjetas; a los 8 s «Estamos despertando el servidor, puede tardar un poco.»), sin ofertas (mensaje + «Buscar vuelos»), error total (bloque discreto con «Reintentar» y «Buscar vuelos»), falla parcial (se muestran las rutas que cargaron y un aviso con «Reintentar»), 429 (cuenta regresiva del `Retry-After`). Nada rompe el resto del inicio. `aria-live`: «Se cargaron N ofertas.» y «Mostrando N ofertas desde Quito.» al filtrar.
+
+### Pulido del inicio
+
+Orden: **buscador (protagonista) → Ofertas → Destinos de Ecuador** (cada ciudad deja el destino en el buscador) **→ Cómo funciona** (busca; elige asientos; viaja y gestiona en Mis viajes) **→ Preguntas frecuentes** (equipaje, cambio de fecha, cancelación, check-in y tiempo para pagar). Un solo h1 por página.
+
+- **Preguntas frecuentes** con `<details>` nativo (`FaqList` en `shared/ui`, la usan el inicio y Ayuda con una sola fuente de texto): el encargo mencionaba un acordeón de Radix, pero `@radix-ui/react-accordion` no está instalado y no se sumó una dependencia para algo que el navegador ya hace con teclado y lectores de pantalla.
+- **Solo contenido verdadero.** Al contrastar con el código del backend se corrigieron dos afirmaciones falsas de la página de Ayuda: el asiento se asigna **al reservar** (no en el check-in) y **no existe** la «cancelación gratis en 24 horas» ni la tasa de Galápagos en el aeropuerto (`docs/DISCREPANCIAS-F7.md`, sección 3).
+- **Sin servidores externos:** las tipografías son locales (`public/fonts`, licencia OFL): Fraunces (títulos) con el tamaño óptico fijo y subconjunto latino (29 + 20 kB en vez de 68 + 81 kB) y Plus Jakarta Sans. Se precargan las dos que se ven al abrir. Una prueba falla si `index.html` o `index.css` apuntan a otro origen o a un archivo que falta. Para la CSP estricta de F8 solo habrá que permitir el propio origen (y mover o hashear el script del tema en `index.html`).
+- **SEO y metadatos:** `usePageMeta` pone por ruta el `<title>`, la `<meta name="description">` y `og:title`/`og:description` (sin descripción vuelve la general del sitio); `index.html` trae `lang="es"`, Open Graph básico, `theme-color` claro/oscuro, favicon y `robots.txt` (cierra `/compra/`, `/viajes` y `/perfil`). `og:image` y `og:url` esperan la dirección pública (F8).
+- **Código por ruta:** cada página es su propio archivo (React Router `lazy`; el inicio queda en el paquete principal), el calendario (`react-day-picker`) se descarga al abrirlo, y el cambio de página muestra una barra fina y un aviso para lectores de pantalla (`NavigationProgress`). El JavaScript de la primera carga baja de 293 a 238 kB comprimidos (el paquete principal incluye `shared/api`, mock incluido, y el Radix de uso general); el resto de las pantallas se descarga al entrar en ellas.
+- **Accesibilidad:** foco visible, objetivos de 48 px, `aria-live`, `prefers-reduced-motion`, 320 px sin scroll horizontal, claro y oscuro. El encabezado muestra la misma sesión (Ingresar o menú de usuario con Mis viajes, Mi perfil y Cerrar sesión) en todas las rutas.
+
+### Rendimiento medido (modo mock, compilación de producción)
+
+Lighthouse 13, móvil (4G lenta, CPU ×4), `vite preview` con `VITE_API_URL` vacía (3 corridas del inicio; 1 de cada una de las demás páginas):
+
+| | Antes del bloque 7d | Ahora |
+|---|---|---|
+| **LCP simulado (estrangulación por defecto)** | 3,5 s | **3,0 – 3,1 s** |
+| FCP · TBT · CLS | 2,9 s · 70–120 ms · 0,001 | 2,5–2,6 s · 40–100 ms · 0 |
+| Puntaje de rendimiento | 85 | 90 – 91 |
+| Transferido | 440 KiB | 330 KiB |
+| LCP con la red y la CPU **aplicadas** (método `devtools`) | — | 3,3 – 3,4 s |
+| LCP sin estrangulación | — | 0,19 s |
+
+**La meta de LCP < 2,5 s NO se cumplió.** El elemento LCP es el texto de presentación del inicio, que un SPA solo pinta después de descargar y ejecutar ~237 kB comprimidos de JavaScript (React 67, la aplicación 134, formularios 26, fechas 11). Lo que quitó unos 0,4 s: las tipografías (−100 kB) y el código por ruta (−55 kB comprimidos de JavaScript en la primera carga). Lo que falta, y no se hizo para no cambiar la experiencia ni sumar infraestructura: **generar el HTML del inicio al compilar** (prerender) o cargar el buscador después de pintar el título (el buscador es el protagonista, no se difirió). Accesibilidad 100, SEO 100 y mejores prácticas 100 en inicio, `/ofertas`, `/ayuda`, `/ingresar`, `/estado-vuelo` y `/resultados`.
+
+**Peticiones por carga del inicio** (mock, contadas en Chrome con las marcas `performance` «mock:search» que deja cada búsqueda): **0** antes de que la sección se vea, **6** al verla (una por ruta), **0** al recargar dentro de 10 minutos.
+
+### Cómo probar con el mock (`VITE_API_URL` vacía)
+
+Con el mock el inicio se ve completo (6 ofertas con precios, horarios y aerolíneas distintos; Loja–Cuenca sale con escala). Debajo de las ofertas, dentro de `<MockOnly>`, hay enlaces para recargar la página con un caso de la búsqueda simulada (`?escenario=…`; cada carga empieza de cero):
+
+| Escenario | Qué pasa | Se ve |
+|---|---|---|
+| (normal) | Todas las rutas con vuelos | 6 tarjetas; 6 búsquedas |
+| `sin-vuelos` | Ninguna ruta tiene vuelos (se agota el presupuesto: 8 búsquedas) | «Por ahora no hay ofertas que mostrar» + «Buscar vuelos» |
+| `ruta-sin-vuelos` | Quito–Cuenca no tiene vuelos (3 fechas = 3 búsquedas; en total 8) | 5 tarjetas y ningún aviso |
+| `limite-429` | La 3.ª búsqueda responde 429 con `Retry-After: 10`; después responde bien | Las tarjetas que cargaron, aviso y «Reintentar» desactivado 10 s; al reintentar, 6 tarjetas |
+| `error-503` | Guayaquil–Baltra responde 503 con `Retry-After: 5` | 5 tarjetas, aviso «Algunas rutas no se pudieron cargar» y «Reintentar» |
+| `servidor-caido` | Todas responden 503 | «No pudimos cargar las ofertas» + «Reintentar» y «Buscar vuelos» |
+| `lento` | La primera búsqueda tarda 12 s (arranque en frío) | Marcadores, a los 8 s «Estamos despertando el servidor…», a los ~13 s las 6 tarjetas |
+
+Las ofertas son búsquedas «de fondo» (`SearchOptions.background`): el mock no les inyecta errores aleatorios (`VITE_MOCK_ERROR_RATE`) para que el inicio no se vea incompleto sin motivo; los escenarios son la forma de ver los errores. La caché de ofertas se separa por escenario.
+
+### Verificación F7 contra API real
+
+**No se hizo:** el backend local (`http://localhost:3010/flights/v1`) no respondió (conexión rechazada; tampoco hay base de datos escuchando). Reglas: solo el backend **local**, nunca Render, nunca la cuenta de administrador sembrada, sin `./db/reset.sh`, sin modificar el backend. Cómo hacerla:
+
+1. Levantar el backend local (README del backend) y arrancar `VITE_API_URL=http://localhost:3010/flights/v1 npm run dev`. Abrir DevTools → Red, filtrar por `search`, vaciar el registro y `sessionStorage.clear()` (la caché es de la pestaña).
+2. Cargar `/` **sin bajar**: no debe haber ningún `POST /search`. Bajar hasta «Ofertas»: debe haber **como máximo 8** `POST /search` (lo esperado son 6), nunca más de 2 a la vez (columna «Cascada»). Cada uno: ida, 1 adulto, fecha = hoy + 3 días. *Anota:* cuántas rutas no tuvieron vuelos ese día y qué fecha usaron.
+3. Hacer clic en una tarjeta: debe abrir `/resultados` con la misma ruta y fecha, y el «Desde» debe ser el precio económico más bajo de esa lista. *Anota* si no coincide y por qué (moneda, familia, `pricePerAdult` vs `total`).
+4. Volver al inicio y recargar dentro de 10 minutos: **cero** búsquedas nuevas.
+5. Uso normal (varias cargas en un minuto sin vaciar la caché): ningún 429. Para provocarlo a propósito, vaciar `sessionStorage` y recargar 4 veces seguidas (más de 20 búsquedas en un minuto): debe aparecer el aviso con la cuenta regresiva del `Retry-After` (comprueba en la respuesta que la cabecera viene) y «Reintentar» debe habilitarse al terminar. No correr `npm run test:api` ese mismo minuto.
+6. Comparar «Quedan N asientos» (solo si N ≤ 9) con el mapa de asientos de ese vuelo.
+7. *Anota:* latencia de cada búsqueda y si Loja–Cuenca tiene vuelo directo y qué días vuela.
+
+Al verificar un punto, se pasa su fila de `docs/DISCREPANCIAS-F7.md` (sección 4) a «Lo que aprendimos de la API real» (sección 6) y se corrige el código si hace falta.
+
+---
+
 ## 6. Reglas de la API que el frontend respeta
 
 - **Rutas públicas:** búsqueda, mapa de asientos y estado de vuelo. Todo lo demás exige sesión.
@@ -547,6 +629,12 @@ Fuente: lo que probó el dueño contra el backend local (pases) y la lectura del
 | Errores sin código propio | `code: VALIDATION_FAILED` y solo el estado HTTP los distingue: 409 = reserva no confirmada, oferta ya usada o trámite en curso; 422 con `changeOfferId`/`quoteId` = oferta o cotización vencida y ya borrada |
 | 401 por token vencido | `code: VALIDATION_FAILED`, `detail: The access token expired` (sin código propio); el cliente renueva y reintenta una vez |
 
+### Lo que se leyó del backend para la Ayuda y las ofertas (F7, sin ejecutarlo)
+
+- El asiento sin elegir se asigna **al crear la reserva** (el primero libre de la cabina, por fila y letra); el check-in no asigna nada y falla si falta (`ops/reserva/asientos-reserva.ts`, `ops/checkin/checkin.service.ts`).
+- No hay «cancelación gratis en 24 horas»: la penalidad es por familia y no hay tope de horas. No hay promociones ni precio anterior en la API.
+- Detalle y lo pendiente de verificar con la API en marcha: `docs/DISCREPANCIAS-F7.md`.
+
 ### Modelo de seguridad de la sesión
 
 | Qué | Dónde | Por qué |
@@ -638,7 +726,7 @@ Si el contrato define un límite, se usa exactamente ese.
 
 ## 8. Pruebas
 
-- **Hoy:** 679 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva. Desde F4b, las pantallas: formulario de pasajeros por tipo, temporizador con avisos a 5 y 2 minutos, tarjeta, y la ruta completa de la compra con sesión, que cuenta los clics y falla si pasan de 3 (no hay Playwright instalado: es una prueba de componentes de las cuatro pantallas), con la cuenta incrustada, volver atrás, los errores del pago y los estados de la confirmación. Desde F6, la postventa: las reglas del mock con los mismos códigos del contrato (lista por cursor, boletos, check-in, pases, equipaje, cambio de fecha, cancelación), `RealFlightsApi` contra un cliente HTTP falso (rutas, cabeceras, 200/201/202 y dinero en centavos), las acciones habilitadas por estado, los filtros de la lista, los totales de equipaje, la compra de equipaje con 200/201/202/422, las claves de idempotencia (generación, reutilización y clave nueva al cambiar el pago), los hooks de check-in y cambio de fecha, el QR y las pantallas de lista, pases, equipaje y cancelación. Además, las pruebas del buscador con sugerencias, los resultados con pestañas, las fechas cercanas y el paso de cuenta (rama de mejoras de interacción).
+- **Hoy:** 806 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva. Desde F4b, las pantallas: formulario de pasajeros por tipo, temporizador con avisos a 5 y 2 minutos, tarjeta, y la ruta completa de la compra con sesión, que cuenta los clics y falla si pasan de 3 (no hay Playwright instalado: es una prueba de componentes de las cuatro pantallas), con la cuenta incrustada, volver atrás, los errores del pago y los estados de la confirmación. Desde F6, la postventa: las reglas del mock con los mismos códigos del contrato (lista por cursor, boletos, check-in, pases, equipaje, cambio de fecha, cancelación), `RealFlightsApi` contra un cliente HTTP falso (rutas, cabeceras, 200/201/202 y dinero en centavos), las acciones habilitadas por estado, los filtros de la lista, los totales de equipaje, la compra de equipaje con 200/201/202/422, las claves de idempotencia (generación, reutilización y clave nueva al cambiar el pago), los hooks de check-in y cambio de fecha, el QR y las pantallas de lista, pases, equipaje y cancelación. Además, las pruebas del buscador con sugerencias, los resultados con pestañas, las fechas cercanas y el paso de cuenta (rama de mejoras de interacción). Desde F7: la tarifa más baja de una búsqueda (orden, desempates, moneda), el tope de 6 tarjetas, el presupuesto de 8 búsquedas y la concurrencia de 2, la caché con vencimiento, cancelar al salir, el 429 con `Retry-After`, las rutas sin vuelos y las fallas parciales; la cancelación y el reintento en el cliente HTTP y el mock; las tarjetas, los filtros, los estados de carga, vacío, error, falla parcial y 429 y el clic hasta `/resultados`; el inicio (jerarquía y textos de ayuda), los metadatos por ruta, `index.html` (sin servidores externos, tipografías y `robots.txt`), los escenarios del mock y que el mock cubra las seis rutas populares cualquiera que sea el día de la semana.
 - **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. La de compra, también solo local: búsqueda real, hold y `GET`, `PAY-OK` 201 con boletos y el mismo envío dos veces con la misma clave = **una sola reserva** (`Idempotent-Replayed: true`), `PAY-REJ` 422 con el hold aún `HELD`, `PAY-PEND` 202 seguido hasta `CONFIRMED`, y liberar el hold. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 y reservas 10 por minuto).
 - **E2E:** `e2e/seats-demo.mjs` (selector de asientos, mock, 320/768/1280 px).
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
@@ -658,7 +746,7 @@ Si el contrato define un límite, se usa exactamente ese.
 | F4b | Pantallas finales de la compra (pasajeros, pago, confirmación; la cuenta incrustada se retiró después, ver 5d) | Hecha (tag `fase-4b`) |
 | F5 | Selector de asientos (mapa en forma de avión, lista, filtros, conflictos 409/422), integrado en el paso 2 y verificado con la API real | Hecha (tag `fase-5`) |
 | F6 | Mis viajes: lista, detalle, boletos, check-in, pases con QR, equipaje, cambio de fecha, cancelación | Hecha en mock (rama `fase-6-viajes`); **sin verificar con la API real** |
-| F7 | Ofertas y pulido del inicio | Pendiente |
+| F7 | Ofertas y pulido del inicio | Hecha en mock (rama `feat/f7-ofertas-inicio`); **sin verificar con la API real**; LCP 3,0–3,1 s, meta 2,5 s no cumplida |
 | F8 | Calidad y entrega: pruebas de extremo a extremo, accesibilidad, despliegue | Pendiente |
 
 Desde F2, cada fase se cierra funcionando **con el mock y con la API real**.
