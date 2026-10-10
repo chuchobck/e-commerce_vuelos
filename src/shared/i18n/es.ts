@@ -123,6 +123,7 @@ export const es = {
     paymentNotAuthorized: 'El pago no fue autorizado. No se te cobró nada: prueba con otro pago.',
     paymentReferenceInvalid: 'La referencia de pago no sirve (ya se usó o no es válida). Usa otra distinta.',
     bookingNotConfirmed: 'La reserva todavía no está confirmada, por eso no se puede hacer esto. Espera un momento y actualiza.',
+    bookingStateChanged: 'La reserva ya no está en un estado que permita esto: puede estar cancelada, tener otro trámite en proceso o esa oferta ya se usó. Actualiza para ver cómo está.',
     waking: 'El servidor se está despertando, puede tardar hasta un minuto.',
     fields: {
       date: 'Revisa la fecha del vuelo.',

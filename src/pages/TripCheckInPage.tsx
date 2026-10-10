@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
 import { useAuth } from '@/features/auth';
-import { CheckInPassengers, notCheckedIn, useCheckIn } from '@/features/checkin';
+import { CheckInPassengers, checkInProgress, useCheckIn } from '@/features/checkin';
 import { TripFallback, useBooking } from '@/features/trips';
 import { errorMessage, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
@@ -28,7 +28,9 @@ export function TripCheckInPage() {
   const confirm = async () => {
     const result = await submit();
     if (!result) return;
-    if (notCheckedIn(result).length === 0) {
+    const { checked, pending } = checkInProgress(result);
+    // Todo registrado: directo a los pases. Si falta algún vuelo (la vuelta aún no abre) o ninguno quedó, se queda aquí y se explica.
+    if (checked > 0 && pending === 0) {
       toast({ title: c.successTitle, variant: 'success' });
       navigate(routes.tripPasses(id), { replace: true });
     }
@@ -79,22 +81,28 @@ export function TripCheckInPage() {
           </Alert>
         ) : null}
 
-        {state.status === 'done' && notCheckedIn(state.result).length > 0 ? (
-          <Alert
-            variant="warning"
-            live="polite"
-            title={c.partialTitle}
-            action={
-              <Button asChild variant="secondary">
-                <Link to={routes.tripPasses(id)}>
-                  <QrCode aria-hidden="true" />
-                  {c.seePasses}
-                </Link>
-              </Button>
-            }
-          >
-            <p>{c.partialText}</p>
-          </Alert>
+        {state.status === 'done' && checkInProgress(state.result).pending > 0 ? (
+          checkInProgress(state.result).checked > 0 ? (
+            <Alert
+              variant="success"
+              live="polite"
+              title={c.partialTitle}
+              action={
+                <Button asChild variant="secondary">
+                  <Link to={routes.tripPasses(id)}>
+                    <QrCode aria-hidden="true" />
+                    {c.seePasses}
+                  </Link>
+                </Button>
+              }
+            >
+              <p>{c.partialText}</p>
+            </Alert>
+          ) : (
+            <Alert variant="warning" live="assertive" title={c.noneTitle}>
+              <p>{c.noneText}</p>
+            </Alert>
+          )
         ) : null}
 
         <div>{backToTrip}</div>

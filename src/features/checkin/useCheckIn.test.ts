@@ -6,7 +6,7 @@ import { ApiError, type CheckInResult } from '@/shared/api';
 const api = vi.hoisted(() => ({ checkIn: vi.fn() }));
 vi.mock('@/shared/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/shared/api')>()), flightsApi: api }));
 
-import { notCheckedIn, useCheckIn } from './useCheckIn';
+import { checkInProgress, useCheckIn } from './useCheckIn';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const authorized = <T,>(call: () => Promise<T>) => call();
@@ -80,10 +80,31 @@ describe('check-in', () => {
   });
 });
 
-describe('pasajeros sin check-in', () => {
-  it('lista a quienes la API dejó fuera', () => {
-    expect(notCheckedIn(RESULT)).toEqual([]);
-    const partial: CheckInResult = { ...RESULT, status: 'FAILED', passengers: [RESULT.passengers[0], { passengerId: 'PAX2', status: 'FAILED', segments: [] }] };
-    expect(notCheckedIn(partial)).toEqual(['PAX2']);
+describe('avance del check-in por vuelo', () => {
+  it('todo registrado: los vuelos de los pasajeros con asiento cuentan; el infante (sin vuelos propios) no suma ni resta', () => {
+    expect(checkInProgress(RESULT)).toEqual({ checked: 1, pending: 0 });
+  });
+
+  it('ida y vuelta con solo la ida abierta: la API deja al pasajero NOT_CHECKED_IN, pero la ida sí quedó registrada', () => {
+    const partial: CheckInResult = {
+      bookingId: 'b',
+      status: 'IN_PROGRESS',
+      passengers: [
+        {
+          passengerId: 'PAX1',
+          status: 'NOT_CHECKED_IN',
+          segments: [
+            { segmentId: 'ida', seat: '14C', status: 'CHECKED_IN' },
+            { segmentId: 'vuelta', seat: null, status: 'NOT_CHECKED_IN' },
+          ],
+        },
+      ],
+    };
+    expect(checkInProgress(partial)).toEqual({ checked: 1, pending: 1 });
+  });
+
+  it('ningún vuelo registrado: 0 hechos', () => {
+    const none: CheckInResult = { ...RESULT, status: 'IN_PROGRESS', passengers: [{ passengerId: 'PAX1', status: 'FAILED', segments: [{ segmentId: 's1', seat: null, status: 'FAILED' }] }] };
+    expect(checkInProgress(none)).toEqual({ checked: 0, pending: 1 });
   });
 });

@@ -107,6 +107,12 @@ export function errorMessage(error: unknown): string {
     default:
       break;
   }
+  // El backend rotula como VALIDATION_FAILED casi todo error sin código propio (leído en su código): se distingue por el
+  // estado y por el parámetro. Una oferta de cambio o una cotización vencida hace rato ya no existe (422 con su id); un 409
+  // genérico en la postventa es una reserva que ya no está confirmada, un trámite en proceso o una oferta ya usada.
+  if (error.status === 422 && error.fieldErrors.some(({ field }) => field === 'changeOfferId')) return e.changeOfferExpired;
+  if (error.status === 422 && error.fieldErrors.some(({ field }) => field === 'quoteId')) return e.quoteExpired;
+  if (error.status === 409 && error.code === 'VALIDATION_FAILED') return e.bookingStateChanged;
   if (error.status === 429) return error.retryAfter ? fmt(e.rateLimited, { seconds: error.retryAfter }) : e.rateLimitedNoTime;
   if (error.status === 0) return e.network;
   if (error.status === 400) return e.badRequest400;

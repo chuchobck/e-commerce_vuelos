@@ -2,25 +2,29 @@ import type { DateChangePrice, Itinerary, Money } from '@/shared/api';
 import { addDays } from 'date-fns';
 import { parseDisplayDate, parseIsoDate, toIsoDate, today } from '@/shared/lib/dates';
 
-/** Qué le pasa al bolsillo con un cambio de fecha: positivo se paga, negativo se devuelve, cero no cuesta. */
-export type PriceDirection = 'pay' | 'refund' | 'free';
+/**
+ * Qué le pasa al bolsillo con un cambio de fecha: se paga o no cuesta. La API (leída en su código) calcula
+ * `totalToPay = max(0, fareDifference + taxDifference) + changeFee`: nunca es negativo; si el nuevo vuelo cuesta menos, la
+ * diferencia no se devuelve (solo se paga el cargo por cambio, si lo hay).
+ */
+export type PriceDirection = 'pay' | 'free';
 
 export function priceDirection(price: Pick<DateChangePrice, 'total'>): PriceDirection {
-  return price.total.cents > 0 ? 'pay' : price.total.cents < 0 ? 'refund' : 'free';
+  return price.total.cents > 0 ? 'pay' : 'free';
 }
 
-/** Lo que hay que pagar ahora (0 si es reembolso o gratis): solo con algo que pagar se pide un pago. */
+/** El nuevo vuelo cuesta menos que el actual (tarifa más impuestos): esa diferencia a favor no se devuelve. */
+export function cheaperThanCurrent(price: Pick<DateChangePrice, 'fare' | 'taxes'>): boolean {
+  return price.fare.cents + price.taxes.cents < 0;
+}
+
+/** Lo que hay que pagar ahora (0 si no cuesta): solo con algo que pagar se pide un pago. */
 export function amountDue(price: Pick<DateChangePrice, 'total'>): Money {
   return { cents: Math.max(0, price.total.cents), currency: price.total.currency };
 }
 
 export function needsPayment(price: Pick<DateChangePrice, 'total'>): boolean {
   return price.total.cents > 0;
-}
-
-/** El valor absoluto, para escribir "Te devolvemos $X" sin el signo menos. */
-export function absMoney(money: Money): Money {
-  return { cents: Math.abs(money.cents), currency: money.currency };
 }
 
 export type NewDateProblem = 'invalid' | 'past' | 'same';

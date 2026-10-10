@@ -109,6 +109,14 @@ describe('pantalla de cancelación', () => {
     expect(key).toMatch(UUID);
   });
 
+  it('el motivo admite hasta 500 caracteres y no deja escribir etiquetas HTML ni saltos de línea (la API los rechaza)', async () => {
+    renderPage();
+    const reason = (await screen.findByLabelText(t.reasonLabel, { exact: false })) as HTMLInputElement;
+    expect(reason.maxLength).toBe(500);
+    fireEvent.change(reason, { target: { value: 'hola <b>mundo</b>\n' } });
+    expect(reason.value).toBe('hola bmundo/b');
+  });
+
   it('el motivo escrito viaja en la petición, sin espacios sobrantes', async () => {
     api.cancelBooking.mockResolvedValue({ status: 'done', data: undefined });
     renderPage();

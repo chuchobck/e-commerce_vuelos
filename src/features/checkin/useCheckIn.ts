@@ -9,9 +9,22 @@ export type CheckInState =
   | { status: 'error'; error: unknown }
   | { status: 'done'; result: CheckInResult };
 
-/** Pasajeros del resultado que NO quedaron con check-in (la API puede dejar a alguno fuera). */
-export function notCheckedIn(result: CheckInResult): string[] {
-  return result.passengers.filter((p) => p.status !== 'CHECKED_IN').map((p) => p.passengerId);
+/**
+ * Cuántos vuelos de los pasajeros quedaron con check-in y cuántos no. Se cuenta por vuelo (`segments[].status`), no por el
+ * estado del pasajero: la API (leída en su código) marca al pasajero `NOT_CHECKED_IN` o `FAILED` si le falta CUALQUIER vuelo,
+ * aunque otro ya esté `CHECKED_IN`, y responde 200 `IN_PROGRESS` cuando un vuelo está en ventana y otro todavía no. Los
+ * infantes viajan en brazos y no traen vuelos propios.
+ */
+export function checkInProgress(result: CheckInResult): { checked: number; pending: number } {
+  let checked = 0;
+  let pending = 0;
+  for (const passenger of result.passengers) {
+    for (const segment of passenger.segments) {
+      if (segment.status === 'CHECKED_IN') checked += 1;
+      else pending += 1;
+    }
+  }
+  return { checked, pending };
 }
 
 /**
