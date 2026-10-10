@@ -8,6 +8,7 @@ import { Alert, Button, EmptyState, LoadingState, RetryButton } from '@/shared/u
 import { originsOf, visibleOffers, type Offer } from './cheapestOffer';
 import { OfferCard } from './OfferCard';
 import { OfferFilters } from './OfferFilters';
+import { OffersMockHints } from './OffersMockHints';
 import { OffersFrame } from './OffersFrame';
 import { OffersSkeleton } from './OffersSkeleton';
 import { OFFERS } from './popularRoutes';
@@ -85,14 +86,32 @@ export function OffersSection({ hrefFor, searchHref, heading = true }: OffersSec
 
       {report && offers.length === 0 ? (
         report.rateLimited ? (
-          <Alert variant="warning" live="polite" title={t.rateLimitedTitle} action={<RetryButton onRetry={reload} waitSeconds={retryWait} label={t.retry} />}>
+          <Alert
+            variant="warning"
+            live="polite"
+            title={t.rateLimitedTitle}
+            action={
+              <div className="flex flex-wrap items-start gap-4">
+                <RetryButton onRetry={reload} waitSeconds={retryWait} label={t.retry} />
+                {searchLink}
+              </div>
+            }
+          >
             {t.rateLimitedText}
-            <span className="mt-4 flex">{searchLink}</span>
           </Alert>
         ) : report.failed.length > 0 ? (
-          <Alert variant="info" live="polite" title={t.errorTitle} action={<RetryButton onRetry={reload} waitSeconds={0} label={t.retry} />}>
+          <Alert
+            variant="info"
+            live="polite"
+            title={t.errorTitle}
+            action={
+              <div className="flex flex-wrap items-start gap-4">
+                <RetryButton onRetry={reload} waitSeconds={0} label={t.retry} />
+                {searchLink}
+              </div>
+            }
+          >
             {t.errorText}
-            <span className="mt-4 flex">{searchLink}</span>
           </Alert>
         ) : (
           <EmptyState title={t.emptyTitle} text={t.emptyText} headingLevel={heading ? 'h3' : 'h2'} action={searchLink} />
@@ -114,6 +133,8 @@ export function OffersSection({ hrefFor, searchHref, heading = true }: OffersSec
       {problem && offers.length > 0 ? (
         <Alert variant="info" live="polite" title={t.partialText} action={<RetryButton onRetry={reload} waitSeconds={retryWait} label={t.retry} />} />
       ) : null}
+
+      <OffersMockHints />
     </OffersFrame>
   );
 }

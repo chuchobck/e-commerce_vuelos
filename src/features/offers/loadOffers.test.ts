@@ -61,6 +61,8 @@ describe('carga de ofertas', () => {
       expect(call.returnDate).toBeUndefined();
     }
     expect(stats.options.every((o) => o.retry === false)).toBe(true);
+    // Son búsquedas de fondo: nadie las espera en pantalla (el mock no les inyecta errores aleatorios).
+    expect(stats.options.every((o) => o.background === true)).toBe(true);
   });
 
   it('devuelve la tarifa más baja de cada ruta, de menor a mayor precio', async () => {
@@ -144,6 +146,18 @@ describe('carga de ofertas', () => {
     expect(search).toHaveBeenCalledTimes(POPULAR_ROUTES.length);
     expect(second.searches).toBe(0);
     expect(second.offers).toEqual(first.offers);
+  });
+
+  it('el alcance (con el mock, el escenario) separa las entradas de la caché', async () => {
+    let scope = '';
+    const { deps, search } = setup(withFlights, { scope: () => scope });
+    await loadOffers(deps);
+    expect(search).toHaveBeenCalledTimes(POPULAR_ROUTES.length);
+    await loadOffers(deps); // mismo alcance: todo de la caché
+    expect(search).toHaveBeenCalledTimes(POPULAR_ROUTES.length);
+    scope = 'limite-429:'; // otro alcance: no se mezclan las respuestas
+    await loadOffers(deps);
+    expect(search).toHaveBeenCalledTimes(POPULAR_ROUTES.length * 2);
   });
 
   it('«esta fecha no tiene vuelos» también se guarda: no se vuelve a preguntar', async () => {

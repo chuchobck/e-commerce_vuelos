@@ -12,6 +12,8 @@ export interface LoadOffersDeps {
   today?: () => Date;
   /** Última fecha con vuelos. */
   lastDate?: () => Date;
+  /** Qué más cambia lo que responde la API (con el mock, el escenario de la URL): separa las entradas de la caché. */
+  scope?: () => string;
 }
 
 export interface LoadOffersOptions {
@@ -53,7 +55,8 @@ interface Pending {
  *  - Como máximo `budget` búsquedas HTTP por carga, `concurrency` a la vez. Cada ruta recibe su primera búsqueda
  *    antes de que ninguna reciba la segunda (cola en rondas), así una ruta sin vuelos no se come el presupuesto de las demás.
  *  - Lo que está en caché (incluida «sin vuelos esa fecha») no cuesta ninguna búsqueda.
- *  - Cada búsqueda se envía una sola vez (`retry: false`): el cliente no la repite ante un 503 ni un corte de red.
+ *  - Cada búsqueda se envía una sola vez (`retry: false`): el cliente no la repite ante un 503 ni un corte de red. Es una
+ *    búsqueda de fondo (`background`): nadie la espera en pantalla.
  *  - Un 429 detiene todo: no se vuelve a pedir nada hasta que la persona lo intente de nuevo. Otro error marca esa
  *    ruta como fallida y sigue con las demás; nunca hay un bucle de reintentos.
  *  - Con `signal` cancelada no se envía nada más y lo que esté en vuelo se aborta.
@@ -68,6 +71,7 @@ export async function loadOffers(deps: LoadOffersDeps, options: LoadOffersOption
     signal,
   } = options;
   const start = addDays((deps.today ?? todayDate)(), firstDayOffset);
+  const scope = deps.scope?.() ?? '';
   const last = toIsoDate((deps.lastDate ?? lastFlightDate)());
 
   const queue: Pending[] = routes.map((route) => ({ route, attempt: 0 }));
@@ -93,7 +97,7 @@ export async function loadOffers(deps: LoadOffersDeps, options: LoadOffersOption
       noFlights.push(route);
       return;
     }
-    const key = offerId(route, date);
+    const key = scope + offerId(route, date);
     const cached = deps.cache.get(key);
     if (cached !== undefined) {
       if (cached) found.push(cached);
@@ -108,7 +112,7 @@ export async function loadOffers(deps: LoadOffersDeps, options: LoadOffersOption
     try {
       const result = await deps.search(
         { origin: route.origin, destination: route.destination, departDate: date, passengers: { adults: 1, children: 0, infants: 0 }, cabin: 'ECONOMY' },
-        { signal, retry: false },
+        { signal, retry: false, background: true },
       );
       const offer = cheapestOffer(route, date, result.offers);
       deps.cache.set(key, offer);

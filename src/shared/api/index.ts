@@ -44,4 +44,5 @@ export {
   setForcedError,
   type SimulatedStatus,
 } from './mock/network';
+export { activeScenario as mockScenario, MOCK_SCENARIOS, SCENARIO_PARAM, type MockScenario } from './mock/scenarios';
 export { clearSeatSimulation, seatConflictError, simulateSeatTaken } from './mock/seatSimulation';

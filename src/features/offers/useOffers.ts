@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { flightsApi } from '@/shared/api';
+import { flightsApi, mockScenario } from '@/shared/api';
 import { loadOffers, type LoadOffersDeps, type LoadOffersReport } from './loadOffers';
 import { offersCache } from './offersCache';
 
 export type OffersState = { status: 'loading' } | { status: 'done'; report: LoadOffersReport };
 
-const DEFAULT_DEPS: LoadOffersDeps = { search: (params, options) => flightsApi.search(params, options), cache: offersCache };
+const DEFAULT_DEPS: LoadOffersDeps = {
+  search: (params, options) => flightsApi.search(params, options),
+  cache: offersCache,
+  // Con el mock, cada escenario de la URL responde distinto: no se mezclan en la caché.
+  scope: () => (mockScenario() ? `${mockScenario()}:` : ''),
+};
 
 /**
  * Carga las ofertas cuando `enabled` pasa a verdadero (la sección entró en pantalla). Sale de la página = se cancela lo que

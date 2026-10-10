@@ -317,6 +317,18 @@ export const es = {
     rateLimitedText: 'Para cuidar el servicio hicimos una pausa. Vuelve a intentarlo en unos segundos o busca tu vuelo directamente.',
     partialText: 'Algunas rutas no se pudieron cargar. Estas son las que sí.',
     retry: 'Reintentar',
+    /** Pistas del mock (solo se ven con VITE_API_URL vacía). */
+    mockTitle: 'Para probar las ofertas (solo con el mock)',
+    mockText: 'Recarga la página con un caso de la API simulada para ver cada estado:',
+    scenarioNormal: 'Normal',
+    scenarios: {
+      'sin-vuelos': 'Sin vuelos',
+      'ruta-sin-vuelos': 'Una ruta sin vuelos (Quito–Cuenca)',
+      'limite-429': 'Límite de búsquedas (429, espera 10 s)',
+      'error-503': 'Error 503 en una ruta (Guayaquil–Baltra)',
+      'servidor-caido': 'Servidor caído (503 en todas)',
+      lento: 'Servidor lento (la primera búsqueda tarda 12 s)',
+    },
   },
 
   results: {
