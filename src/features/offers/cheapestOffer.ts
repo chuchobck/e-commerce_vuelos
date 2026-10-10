@@ -1,5 +1,5 @@
 import { faresForCabin, type Fare, type FlightOffer, type Itinerary, type Money } from '@/shared/api';
-import type { PopularRoute } from './popularRoutes';
+import { POPULAR_ROUTES, type PopularRoute } from './popularRoutes';
 
 /**
  * Una «oferta» NO es un descuento: es la tarifa económica más baja que devolvió la búsqueda real de una
@@ -93,7 +93,9 @@ export function visibleOffers(offers: readonly Offer[], origin: string | null, l
   return sortOffers(origin ? offers.filter((o) => o.origin === origin) : offers).slice(0, limit);
 }
 
-/** Orígenes que tienen alguna oferta, en el orden de la lista de ofertas (para los chips de filtro). */
-export function originsOf(offers: readonly Offer[]): string[] {
-  return [...new Set(sortOffers(offers).map((o) => o.origin))];
+/** Orígenes que tienen alguna oferta, en el orden fijo de la lista de rutas populares (para los chips de filtro). */
+export function originsOf(offers: readonly Offer[], routes: readonly PopularRoute[] = POPULAR_ROUTES): string[] {
+  const order = [...new Set(routes.map((r) => r.origin))];
+  const present = new Set(offers.map((o) => o.origin));
+  return [...order.filter((o) => present.has(o)), ...[...present].filter((o) => !order.includes(o))];
 }

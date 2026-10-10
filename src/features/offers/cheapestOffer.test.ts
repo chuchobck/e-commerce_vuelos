@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cheapestOffer, originsOf, sortOffers, visibleOffers, type Offer } from './cheapestOffer';
-import { fare, flightOffer } from './testSupport';
+import { fare, flightOffer, offer } from './testSupport';
 
 const ROUTE = { origin: 'UIO', destination: 'GYE' };
 const DATE = '2026-10-13';
@@ -56,20 +56,8 @@ describe('la oferta más barata de una ruta', () => {
   });
 });
 
-const o = (id: string, origin: string, cents: number, departureTime = '2026-10-13T08:00:00-05:00'): Offer => ({
-  id,
-  origin,
-  destination: 'XXX',
-  date: '2026-10-13',
-  price: { cents, currency: 'USD' },
-  airline: { code: 'LA', name: 'LATAM' },
-  flightNumbers: ['LA1'],
-  departureTime,
-  arrivalTime: departureTime,
-  durationMinutes: 60,
-  stops: 0,
-  seatsLeft: 10,
-});
+const o = (id: string, origin: string, cents: number, departureTime = '2026-10-13T08:00:00-05:00'): Offer =>
+  offer({ id, origin, destination: 'XXX', price: { cents, currency: 'USD' }, departureTime, arrivalTime: departureTime });
 
 describe('orden, filtro y tope', () => {
   const list = [o('a', 'UIO', 7000), o('b', 'GYE', 4000), o('c', 'UIO', 5000), o('d', 'GYE', 9000), o('e', 'CUE', 6000), o('f', 'UIO', 8000), o('g', 'LOH', 3000)];
@@ -95,7 +83,9 @@ describe('orden, filtro y tope', () => {
     expect(visibleOffers(list, 'XYZ', 6)).toEqual([]);
   });
 
-  it('los chips de origen solo ofrecen orígenes con ofertas, del más barato al más caro', () => {
-    expect(originsOf(list)).toEqual(['LOH', 'GYE', 'UIO', 'CUE']);
+  it('los chips de origen solo ofrecen orígenes con ofertas, en el orden fijo de las rutas populares (no cambian con los precios)', () => {
+    expect(originsOf(list)).toEqual(['UIO', 'GYE', 'LOH', 'CUE']);
+    expect(originsOf([o('z', 'GYE', 1000), o('y', 'UIO', 9000)])).toEqual(['UIO', 'GYE']);
+    expect(originsOf([])).toEqual([]);
   });
 });

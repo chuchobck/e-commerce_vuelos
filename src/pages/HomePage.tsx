@@ -1,12 +1,14 @@
 import { CreditCard, Ticket, UserRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { routes, SEARCH_ANCHOR_ID } from '@/app/routes';
-import { cityLabel, Escapes, Panorama, REGION_BG, REGIONS, RegionArt } from '@/features/home';
+import { cityLabel, Panorama, REGION_BG, REGIONS, RegionArt } from '@/features/home';
+import { Offers } from '@/features/offers';
 import { SearchForm } from '@/features/search';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { usePageTitle } from '@/shared/lib/usePageTitle';
 import { Card } from '@/shared/ui';
+import { offerHref } from './offerHref';
 
 const h = es.home;
 
@@ -96,7 +98,7 @@ export function HomePage() {
         </ul>
       </section>
 
-      <Escapes />
+      <Offers hrefFor={offerHref} searchHref={routes.search()} />
 
       {/* Ecuador en cifras */}
       <section aria-labelledby="cifras-title" className="container-page flex flex-col gap-8 py-16">

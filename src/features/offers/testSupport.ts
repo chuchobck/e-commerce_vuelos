@@ -1,5 +1,6 @@
 import type { Fare, FlightOffer, SearchParams, SearchResult } from '@/shared/api';
 import type { CabinClass } from '@/shared/api';
+import type { Offer } from './cheapestOffer';
 import type { PopularRoute } from './popularRoutes';
 
 /** Una familia tarifaria de prueba (la forma de la interfaz, ya mapeada). */
@@ -52,4 +53,26 @@ export function flightOffer(route: PopularRoute, date: string, spec: FlightSpec)
 
 export function searchResult(params: SearchParams, offers: FlightOffer[]): SearchResult {
   return { params, offers };
+}
+
+/** Una oferta ya elegida (lo que muestra una tarjeta). */
+export function offer(over: Partial<Offer> = {}): Offer {
+  const origin = over.origin ?? 'UIO';
+  const destination = over.destination ?? 'GYE';
+  const date = over.date ?? '2026-10-13';
+  return {
+    id: `${origin}-${destination}-${date}`,
+    origin,
+    destination,
+    date,
+    price: { cents: 5500, currency: 'USD' },
+    airline: { code: 'LA', name: 'LATAM' },
+    flightNumbers: ['LA1400'],
+    departureTime: `${date}T06:00:00-05:00`,
+    arrivalTime: `${date}T06:55:00-05:00`,
+    durationMinutes: 55,
+    stops: 0,
+    seatsLeft: 24,
+    ...over,
+  };
 }
