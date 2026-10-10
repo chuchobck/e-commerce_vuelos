@@ -2,7 +2,7 @@ import { Accessibility, Mail, Phone } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Page } from '@/app/layout/Page';
 import { es, fmt } from '@/shared/i18n';
-import { Card } from '@/shared/ui';
+import { Card, FaqList } from '@/shared/ui';
 
 const h = es.help;
 
@@ -21,16 +21,7 @@ export function HelpPage() {
   return (
     <Page title={h.pageTitle} heading={h.heading} lead={h.lead} width="narrow">
       <Section id="preguntas" title={h.faqTitle}>
-        <div className="flex flex-col gap-2">
-          {h.faqs.map((f) => (
-            <details key={f.q} className="group rounded border-2 border-border bg-surface">
-              <summary className="flex min-h-12 cursor-pointer items-center px-4 py-2 font-bold marker:text-primary">
-                <span className="pl-2">{f.q}</span>
-              </summary>
-              <p className="px-6 pb-4">{f.a}</p>
-            </details>
-          ))}
-        </div>
+        <FaqList items={h.faqs} />
       </Section>
 
       <Section id="equipaje" title={h.baggageTitle}>

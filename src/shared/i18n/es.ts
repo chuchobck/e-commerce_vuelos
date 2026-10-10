@@ -243,8 +243,8 @@ export const es = {
     heroTitleB: 'Un solo vuelo.',
     heroLead:
       'Playas, volcanes, selva y las islas más famosas del planeta, a pocas horas de tu casa. Precios finales en dólares.',
-    worldsTitle: 'Los cuatro mundos de Ecuador',
-    worldsLead: 'Elige qué quieres vivir. Nosotros te llevamos.',
+    worldsTitle: 'Destinos de Ecuador',
+    worldsLead: 'Elige a dónde quieres ir y lo dejamos puesto en el buscador.',
     worldsDestinations: 'Destinos en {region}',
     worlds: {
       galapagos: { name: 'Galápagos', hook: 'Lobos marinos, tortugas gigantes y aguas turquesa como en ningún otro lugar.' },
@@ -265,20 +265,13 @@ export const es = {
       LGQ: 'Lago Agrio (Nueva Loja)',
     },
     flyTo: 'Volar a {city}',
-    factsTitle: 'Ecuador en cifras',
-    facts: [
-      { value: '4', text: 'mundos en un solo país: Costa, Andes, Amazonía y Galápagos.' },
-      { value: '+130', text: 'especies de quindes (colibríes). Por eso nos llamamos así.' },
-      { value: '97 %', text: 'de la superficie de Galápagos es parque nacional.' },
-      { value: '6.263 m', text: 'mide el Chimborazo: su cima es el punto más alejado del centro de la Tierra.' },
-    ],
-    stepsTitle: 'Compra en 3 pasos',
-    step1Title: 'Elige tu vuelo',
-    step1Text: 'Compara horarios y escoge Basic, Classic o Flex según el equipaje que necesitas.',
-    step2Title: 'Tu cuenta y pasajeros',
-    step2Text: 'Ingresa o crea tu cuenta y confirma quién viaja. Tus datos se precargan.',
-    step3Title: 'Paga y listo',
-    step3Text: 'Confirma el pago y recibe tu código de reserva al instante. El asiento se asigna solo si no lo eliges.',
+    stepsTitle: 'Cómo funciona',
+    step1Title: 'Busca',
+    step1Text: 'Elige de dónde sales, a dónde vas y cuándo. Compara horarios y tarifas de cada vuelo.',
+    step2Title: 'Elige tus asientos',
+    step2Text: 'Escoge tu tarifa y, si quieres, tu asiento. Si no eliges, te asignamos uno al confirmar tu reserva.',
+    step3Title: 'Viaja y gestiona en Mis viajes',
+    step3Text: 'Con tu cuenta ves tu reserva, haces el check-in, descargas tu pase de abordar y puedes agregar equipaje o cambiar la fecha.',
     stepLabel: 'Paso {n}',
   },
 
@@ -768,28 +761,57 @@ export const es = {
       { keys: 'Esc', action: 'Cerrar menús, calendarios y diálogos' },
       { keys: 'Alt + B', action: 'Ir al buscador de vuelos desde cualquier página' },
     ],
+    /**
+     * Preguntas frecuentes. Solo hechos del contrato y de las reglas documentadas (README, sección 6): el check-in abre 48 h
+     * antes y cierra 60 min antes, el hold dura 15 min, la cotización de cancelación vale 15 min, el asiento se asigna al
+     * reservar, Basic no admite cambios ni reembolso. El inicio muestra las de `homeFaqIds`.
+     */
     faqs: [
       {
+        id: 'baggage',
         q: '¿Qué equipaje incluye cada tarifa?',
-        a: 'Basic incluye solo un artículo personal. Classic suma un equipaje de mano y una maleta en bodega. Flex suma un equipaje de mano y dos maletas, con cambios sin costo. En ejecutiva, Business Flex incluye dos de mano y dos maletas. Al elegir tu vuelo verás exactamente qué incluye cada tarifa.',
+        a: 'Basic incluye solo un artículo personal. Classic suma un equipaje de mano y una maleta en bodega. Flex suma un equipaje de mano y dos maletas, con cambios sin costo. En ejecutiva, Business Flex incluye dos de mano y dos maletas. Al elegir tu vuelo verás exactamente qué incluye cada tarifa, y si necesitas más puedes agregar maletas extra desde Mis viajes: ves el precio antes de pagar.',
       },
       {
+        id: 'date',
+        q: '¿Puedo cambiar la fecha de mi vuelo?',
+        a: 'Depende de tu tarifa: Basic no admite cambios; Classic tiene un cargo por el cambio y Flex no. Se hace desde Mis viajes y, antes de pagar, ves el costo exacto. Si el vuelo nuevo cuesta menos, esa diferencia no se devuelve.',
+      },
+      {
+        id: 'cancel',
+        q: '¿Puedo cancelar mi reserva y recuperar mi dinero?',
+        a: 'Sí, desde Mis viajes. Antes de confirmar ves cuánto te devolvemos y cuánto se descuenta por la penalidad de tu tarifa; con Basic no hay reembolso. La cotización vale 15 minutos y cancelar no se puede deshacer.',
+      },
+      {
+        id: 'checkin',
+        q: '¿Cuándo puedo hacer el check-in?',
+        a: 'El check-in se abre 48 horas antes de la salida y se cierra 60 minutos antes. Lo haces desde Mis viajes, con tu cuenta, y al terminar descargas tus pases de abordar. En un viaje de ida y vuelta, cada vuelo tiene su propia ventana.',
+      },
+      {
+        id: 'hold',
+        q: '¿Cuánto tiempo tengo para pagar?',
+        a: 'Reservamos tu precio por 15 minutos. Verás un contador en pantalla y te avisaremos cuando queden 5 y 2 minutos.',
+      },
+      {
+        id: 'seat',
         q: '¿Tengo que elegir asiento?',
-        a: 'No. Si no eliges, te asignamos uno automáticamente sin costo al hacer el check-in.',
+        a: 'No. Elegirlo es opcional y no tiene costo; si no eliges, te asignamos uno al confirmar tu reserva.',
       },
       {
+        id: 'document',
         q: '¿Qué documento necesito para volar?',
         a: 'Ecuatorianos: cédula vigente. Extranjeros: pasaporte vigente. Los menores de edad también necesitan su documento.',
       },
       {
-        q: '¿Cuánto tiempo tengo para pagar?',
-        a: 'Reservamos tu precio por 15 minutos. Verás un contador en pantalla y te avisaremos cuando queden 2 minutos.',
-      },
-      {
+        id: 'infant',
         q: '¿Puedo viajar con un bebé?',
         a: 'Sí. Los infantes (menores de 2 años) viajan en brazos de un adulto. Cada adulto puede llevar un infante.',
       },
     ],
+    homeFaqIds: ['baggage', 'date', 'cancel', 'checkin', 'hold'],
+    homeFaqTitle: 'Preguntas frecuentes',
+    homeFaqLead: 'Lo que más nos preguntan antes de comprar.',
+    homeFaqAll: 'Ver todas las preguntas',
     baggageTitle: 'Equipaje permitido por tarifa',
     baggageCaption: 'Equipaje incluido en cada tarifa (por pasajero)',
     baggageCols: { fare: 'Tarifa', personal: 'Artículo personal', carry: 'Equipaje de mano', checked: 'Maletas en bodega', changes: 'Cambios' },
@@ -803,7 +825,7 @@ export const es = {
     contactEmail: 'Escríbenos: {email}',
     termsTitle: 'Términos y condiciones',
     termsText:
-      'Al comprar aceptas las condiciones de tu tarifa. El precio que ves es final e incluye impuestos; la tasa de ingreso a Galápagos se paga en el aeropuerto. Puedes cancelar sin costo dentro de las 24 horas siguientes a la compra si faltan más de 7 días para el vuelo.',
+      'Al comprar aceptas las condiciones de tu tarifa: equipaje, cambios y reembolso (mira la tabla de arriba y las preguntas frecuentes). Antes de pagar, de cambiar la fecha o de cancelar ves el valor exacto. Al cancelar se descuenta la penalidad de tu tarifa y los cargos por cambio no se devuelven.',
     privacyTitle: 'Política de privacidad',
     privacyText:
       'Usamos tus datos solo para emitir tu reserva y avisarte de cambios en tu vuelo. No los vendemos. Puedes pedir que los borremos escribiendo a {email}.',

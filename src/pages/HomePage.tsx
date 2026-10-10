@@ -1,4 +1,4 @@
-import { CreditCard, Ticket, UserRound } from 'lucide-react';
+import { Armchair, Plane, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { routes, SEARCH_ANCHOR_ID } from '@/app/routes';
 import { cityLabel, Panorama, REGION_BG, REGIONS, RegionArt } from '@/features/home';
@@ -7,16 +7,18 @@ import { SearchForm } from '@/features/search';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { usePageTitle } from '@/shared/lib/usePageTitle';
-import { Card } from '@/shared/ui';
+import { Card, FaqList } from '@/shared/ui';
 import { offerHref } from './offerHref';
 
 const h = es.home;
 
 const STEPS = [
-  { icon: Ticket, title: h.step1Title, text: h.step1Text },
-  { icon: UserRound, title: h.step2Title, text: h.step2Text },
-  { icon: CreditCard, title: h.step3Title, text: h.step3Text },
+  { icon: Search, title: h.step1Title, text: h.step1Text },
+  { icon: Armchair, title: h.step2Title, text: h.step2Text },
+  { icon: Plane, title: h.step3Title, text: h.step3Text },
 ];
+
+const FAQS = es.help.faqs.filter((f) => (es.help.homeFaqIds as readonly string[]).includes(f.id));
 
 export function HomePage() {
   usePageTitle(h.pageTitle);
@@ -55,7 +57,10 @@ export function HomePage() {
         </Card>
       </div>
 
-      {/* Los cuatro mundos */}
+      {/* Ofertas: tarifas más bajas reales de las rutas populares; carga cuando la sección se acerca a la pantalla. */}
+      <Offers hrefFor={offerHref} searchHref={routes.search()} />
+
+      {/* Destinos de Ecuador: cada ciudad deja el destino puesto en el buscador. */}
       <section aria-labelledby="mundos-title" className="container-page flex flex-col gap-8 py-16">
         <div className="flex flex-col items-center gap-2 text-center">
           <h2 id="mundos-title" className="text-3xl md:text-4xl">
@@ -98,46 +103,45 @@ export function HomePage() {
         </ul>
       </section>
 
-      <Offers hrefFor={offerHref} searchHref={routes.search()} />
-
-      {/* Ecuador en cifras */}
-      <section aria-labelledby="cifras-title" className="container-page flex flex-col gap-8 py-16">
-        <h2 id="cifras-title" className="text-center text-3xl md:text-4xl">
-          {h.factsTitle}
-        </h2>
-        <dl className="grid gap-8 text-center sm:grid-cols-2 lg:grid-cols-4">
-          {h.facts.map((f) => (
-            <div key={f.value} className="flex flex-col items-center gap-2">
-              <dt className="order-2 text-muted">{f.text}</dt>
-              <dd className="order-1 font-display text-4xl font-semibold text-primary">{f.value}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      {/* Compra en 3 pasos: franja breve */}
-      <section aria-labelledby="pasos-title" className="border-t-2 border-border">
-        <div className="container-page flex flex-col gap-8 py-12">
-          <h2 id="pasos-title" className="text-center text-2xl md:text-3xl">
+      {/* Cómo funciona */}
+      <section aria-labelledby="pasos-title" className="bg-surface">
+        <div className="container-page flex flex-col gap-8 py-16">
+          <h2 id="pasos-title" className="text-center text-3xl md:text-4xl">
             {h.stepsTitle}
           </h2>
-          <ol className="grid gap-6 md:grid-cols-3">
+          <ol className="grid gap-8 md:grid-cols-3">
             {STEPS.map(({ icon: Icon, title, text }, i) => (
               <li key={title} className="flex items-start gap-4">
-                <span className="relative flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Icon aria-hidden="true" className="size-6" />
                 </span>
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-lg">
+                  <h3 className="text-xl">
                     <span className="text-muted">{fmt(h.stepLabel, { n: i + 1 })} · </span>
                     {title}
                   </h3>
-                  <p className="text-sm text-muted">{text}</p>
+                  <p className="text-muted">{text}</p>
                 </div>
               </li>
             ))}
           </ol>
         </div>
+      </section>
+
+      {/* Ayuda breve: las mismas respuestas de la página de ayuda (una sola fuente). */}
+      <section aria-labelledby="ayuda-title" className="container-page flex max-w-[48rem] flex-col gap-8 py-16">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <h2 id="ayuda-title" className="text-3xl md:text-4xl">
+            {es.help.homeFaqTitle}
+          </h2>
+          <p className="text-lg text-muted">{es.help.homeFaqLead}</p>
+        </div>
+        <FaqList items={FAQS} />
+        <p className="text-center">
+          <Link to={routes.help('preguntas')} className="inline-flex min-h-12 items-center font-bold">
+            {es.help.homeFaqAll}
+          </Link>
+        </p>
       </section>
     </>
   );
