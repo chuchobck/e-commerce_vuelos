@@ -3,12 +3,34 @@
 @tailwind utilities;
 
 /*
- * ─────────────────────────────────────────────────────────────
- *  Quinde · Tokens de diseño
- *  Valores en canales RGB para permitir opacidad en Tailwind.
- *  Contrastes verificados (ver README › Tokens de color).
- * ─────────────────────────────────────────────────────────────
+ * Tipografías LOCALES (sin servidores externos: la CSP estricta de F8 solo permite `font-src 'self'`).
+ * Subconjunto latino de Fraunces (títulos) y Plus Jakarta Sans (textos), ambas con licencia SIL OFL; ver public/fonts/LICENSE.txt.
+ * Fraunces va con el tamaño óptico fijo (la fuente variable completa pesa 68 + 81 kB; así, 29 + 20 kB). La itálica solo
+ * se usa en el título del inicio y por eso trae un solo peso. `swap`: el texto se ve de inmediato con la fuente del
+ * sistema y cambia cuando llega la propia (las dos normales se precargan).
  */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  src: url('/fonts/fraunces-600-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/fraunces-italic-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/plus-jakarta-sans-normal-400-500-700-800.woff2') format('woff2');
+}
+
 @layer base {
   :root {
     color-scheme: light;

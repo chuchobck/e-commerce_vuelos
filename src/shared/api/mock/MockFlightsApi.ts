@@ -46,6 +46,7 @@ import type {
   Hold,
   ListBookingsParams,
   PostSaleOutcome,
+  SearchOptions,
   SearchParams,
   SearchResult,
   SeatMap,
@@ -64,7 +65,8 @@ import {
 import { mockFlightStatus, mockSearch } from './generators';
 import * as aftersale from './aftersale';
 import * as purchase from './purchase';
-import { simulate } from './network';
+import { simulate, simulated } from './network';
+import { activeScenario, planFor } from './scenarios';
 import { refreshSeed, seedDb } from './seed';
 import { hashPassword, loadDb, saveDb, type MockDb, type StoredBooking, type StoredUser } from './store';
 
@@ -106,9 +108,12 @@ export class MockFlightsApi implements FlightsApi {
     return user;
   }
 
-  async search(params: SearchParams): Promise<SearchResult> {
-    await simulate('search', [429, 503]);
-    return mapSearchResponse(mockSearch(toSearchRequest(params)), params);
+  async search(params: SearchParams, options: SearchOptions = {}): Promise<SearchResult> {
+    const plan = planFor(activeScenario(), params);
+    await simulate('search', [429, 503], { signal: options.signal, randomErrors: !options.background, extraDelayMs: plan.extraDelayMs });
+    if (plan.failure) throw simulated(plan.failure, 'search');
+    const dto = mockSearch(toSearchRequest(params));
+    return mapSearchResponse(plan.noFlights ? { ...dto, totalOffers: 0, offers: [] } : dto, params);
   }
 
   async getSeatMap(offerId: string, segmentId: string): Promise<SeatMap> {

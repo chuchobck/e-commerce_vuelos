@@ -213,6 +213,68 @@ describe('cliente HTTP', () => {
   });
 });
 
+describe('cancelación', () => {
+  /** Un fetch que nunca responde y rechaza con AbortError cuando se aborta su señal, como el real. */
+  function hangingFetch() {
+    return vi.fn(
+      (_url: unknown, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          const fail = () => reject(new DOMException('The operation was aborted.', 'AbortError'));
+          if (init?.signal?.aborted) fail();
+          init?.signal?.addEventListener('abort', fail, { once: true });
+        }),
+    );
+  }
+
+  it('abortar la señal corta la petición en vuelo con ABORTED (no TIMEOUT ni NETWORK) y no la reintenta', async () => {
+    const fetchImpl = hangingFetch();
+    const sleep = vi.fn(async () => undefined);
+    const http = createHttpClient({ baseUrl: BASE, fetchImpl: fetchImpl as unknown as typeof fetch, sleep });
+    const controller = new AbortController();
+    const pending = failure(http.request('POST', '/search', { body: {}, retry: true, signal: controller.signal }));
+    controller.abort();
+    expect(await pending).toMatchObject({ status: 0, code: 'ABORTED' });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it('con la señal ya abortada no llega a enviar nada útil: falla con ABORTED', async () => {
+    const http = createHttpClient({ baseUrl: BASE, fetchImpl: hangingFetch() as unknown as typeof fetch });
+    const controller = new AbortController();
+    controller.abort();
+    expect(await failure(http.request('GET', '/x', { retry: true, signal: controller.signal }))).toMatchObject({ code: 'ABORTED' });
+  });
+
+  it('cancelar mientras espera el reintento (503 con Retry-After) no vuelve a pedir', async () => {
+    const controller = new AbortController();
+    const fetchImpl = vi.fn(async () => json(503, { status: 503 }, { 'Retry-After': '2' }));
+    const sleep = vi.fn(async () => controller.abort());
+    const http = createHttpClient({ baseUrl: BASE, fetchImpl: fetchImpl as unknown as typeof fetch, sleep });
+    expect(await failure(http.request('GET', '/x', { retry: true, signal: controller.signal }))).toMatchObject({ code: 'ABORTED' });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('el tiempo agotado sigue siendo TIMEOUT cuando hay señal sin abortar', async () => {
+    const http = createHttpClient({ baseUrl: BASE, fetchImpl: hangingFetch() as unknown as typeof fetch, timeoutMs: 10, sleep: async () => undefined });
+    const controller = new AbortController();
+    expect(await failure(http.request('GET', '/x', { signal: controller.signal }))).toMatchObject({ code: 'TIMEOUT' });
+  });
+
+  it('una petición con señal no se deduplica con otra igual: cancelar una no puede cortar a la otra', async () => {
+    const { http, fetchImpl } = client([json(200, { n: 1 }), json(200, { n: 2 })]);
+    const controller = new AbortController();
+    await Promise.all([http.request('POST', '/search', { body: {}, retry: true, signal: controller.signal }), http.request('POST', '/search', { body: {}, retry: true })]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('sin retry: un 503 se envía una sola vez', async () => {
+    const { http, fetchImpl, sleep } = client([json(503, { status: 503 }, { 'Retry-After': '1' }), json(200, {})]);
+    expect(await failure(http.request('POST', '/search', { body: {}, retry: false }))).toMatchObject({ status: 503 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+});
+
 describe('parseRetryAfter', () => {
   it('acepta segundos y fechas HTTP', () => {
     const now = Date.parse('2026-10-07T12:00:00Z');

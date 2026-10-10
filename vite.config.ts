@@ -12,21 +12,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Librerías en chunks separados: cambian poco y el navegador las reutiliza en caché.
+        // Librerías de uso general en chunks separados: cambian poco y el navegador las reutiliza en caché. Las que solo usan
+        // algunas pantallas (react-day-picker, Radix de diálogos y casillas, la librería del QR) quedan en el archivo
+        // de la pantalla que las pide, para que la primera carga no las descargue.
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom'],
-          radix: [
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-label',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-radio-group',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-toast',
-          ],
           forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
-          dates: ['date-fns', 'react-day-picker'],
+          dates: ['date-fns'],
         },
       },
     },

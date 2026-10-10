@@ -20,6 +20,7 @@ import type {
   Hold,
   ListBookingsParams,
   PostSaleOutcome,
+  SearchOptions,
   SearchParams,
   SearchResult,
   SeatMap,
@@ -40,8 +41,10 @@ import type {
  * Errores: toda implementación lanza `ApiError` (./errors.ts).
  */
 export interface FlightsApi {
-  /** POST /search. Ida y vuelta va en una sola búsqueda con dos tramos. */
-  search(params: SearchParams): Promise<SearchResult>;
+  /**
+   * POST /search. Ida y vuelta va en una sola búsqueda con dos tramos. Con `signal` se puede cancelar (ApiError ABORTED).
+   */
+  search(params: SearchParams, options?: SearchOptions): Promise<SearchResult>;
   /** GET /offers/{offerId}/seatmap?segmentId=… (la pantalla llega en F5). */
   getSeatMap(offerId: string, segmentId: string): Promise<SeatMap>;
   /** GET /flights/{flightNumber}/status?date=yyyy-MM-dd (fecha local de salida). */

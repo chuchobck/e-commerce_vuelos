@@ -100,6 +100,22 @@ export interface FlightOffer {
   grandTotal: Money;
 }
 
+/** Opciones de una búsqueda que no cambian lo que se pide: poder cancelarla y decidir si se reintenta sola. */
+export interface SearchOptions {
+  signal?: AbortSignal;
+  /**
+   * Por defecto la lectura se reintenta una vez ante red, tiempo agotado o 503 (ver el cliente HTTP).
+   * `false` la envía una sola vez: para quien lleva la cuenta de las peticiones (las ofertas del inicio).
+   */
+  retry?: boolean;
+  /**
+   * Búsqueda que nadie espera en pantalla (decoración, como las ofertas del inicio): el mock no le inyecta errores aleatorios,
+   * para que esas secciones se vean completas; los casos de error se piden con `?escenario=` (ver mock/scenarios.ts). La API
+   * real la trata como cualquier otra.
+   */
+  background?: boolean;
+}
+
 export interface SearchResult {
   params: SearchParams;
   offers: FlightOffer[];

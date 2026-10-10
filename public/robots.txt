@@ -1,0 +1,7 @@
+# Quinde: las páginas públicas se pueden indexar; la compra, Mis viajes y el perfil son de cada persona.
+# El mapa del sitio (Sitemap:) pide la dirección pública definitiva: se agrega al publicar (F8).
+User-agent: *
+Allow: /
+Disallow: /compra/
+Disallow: /viajes
+Disallow: /perfil

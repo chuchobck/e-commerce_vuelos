@@ -1,24 +1,30 @@
 <!doctype html>
-<html lang="es-EC">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <!-- Sin maximum-scale ni user-scalable=no: el zoom siempre está permitido. -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Quinde · Vuelos en Ecuador</title>
+    <title>Vuelos en Ecuador · Quinde</title>
     <meta
       name="description"
-      content="Quinde: compra vuelos dentro de Ecuador en 3 pasos. Quito, Guayaquil, Cuenca, Galápagos y más, con precios en dólares y una experiencia accesible."
+      content="Compra vuelos dentro de Ecuador con Quinde: las tarifas más bajas a Quito, Guayaquil, Cuenca y Galápagos, y tus viajes, check-in y pases en un solo lugar."
+    />
+    <!-- Open Graph básico. La app actualiza título y descripción en cada ruta; og:image y og:url piden la dirección pública definitiva (F8). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Quinde" />
+    <meta property="og:locale" content="es_EC" />
+    <meta property="og:title" content="Vuelos en Ecuador · Quinde" />
+    <meta
+      property="og:description"
+      content="Compra vuelos dentro de Ecuador con Quinde: las tarifas más bajas a Quito, Guayaquil, Cuenca y Galápagos, y tus viajes, check-in y pases en un solo lugar."
     />
     <meta name="theme-color" content="#0B5C6B" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0D1B26" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/png" href="/brand/favicon.png" />
     <link rel="apple-touch-icon" href="/brand/favicon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600;1,9..144,700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Tipografías propias (public/fonts): sin servidores externos. Se precargan las dos que se ven al abrir el inicio. -->
+    <link rel="preload" href="/fonts/fraunces-600-700.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/plus-jakarta-sans-normal-400-500-700-800.woff2" as="font" type="font/woff2" crossorigin />
     <script>
       // Aplica el tema antes de pintar para evitar parpadeo (respeta prefers-color-scheme).
       (function () {

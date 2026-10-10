@@ -1,14 +1,14 @@
 import { Home, RefreshCw } from 'lucide-react';
 import { routes } from '@/app/routes';
 import { es } from '@/shared/i18n';
-import { usePageTitle } from '@/shared/lib/usePageTitle';
+import { usePageMeta } from '@/shared/lib/usePageMeta';
 
 /**
  * Último recurso si una página falla al renderizar. No depende del router ni de los
  * proveedores (pueden ser la causa del fallo), por eso usa enlaces y estilos simples.
  */
 export function RouteErrorPage() {
-  usePageTitle(es.states.errorTitle);
+  usePageMeta(es.states.errorTitle);
   return (
     <main className="container-page flex min-h-dvh flex-col items-center justify-center gap-6 py-12 text-center">
       <h1 className="text-3xl">{es.states.errorTitle}</h1>
