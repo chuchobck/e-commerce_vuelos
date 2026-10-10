@@ -25,7 +25,7 @@ import { es, fmt } from '@/shared/i18n';
 import { attemptKeys } from '@/shared/lib/attemptKeys';
 import { formatMoney } from '@/shared/lib/format';
 import { useAsync } from '@/shared/lib/useAsync';
-import { Button, Card, EmptyState, ErrorState, LoadingState } from '@/shared/ui';
+import { Button, Card, EmptyState, ErrorState, FormStatus, LoadingState } from '@/shared/ui';
 
 const t = es.aftersale.baggage;
 
@@ -48,7 +48,6 @@ export function TripBaggagePage() {
   const [step, setStep] = useState<Step>('select');
   const [selection, setSelection] = useState<BaggageSelection>({});
   const [reference, setReference] = useState(() => newPaymentReference('OK'));
-  const [referenceError, setReferenceError] = useState<string | undefined>();
   const [paying, setPaying] = useState(false);
   const [results, setResults] = useState<LineResult[] | null>(null);
   const [attempted, setAttempted] = useState(0);
@@ -75,15 +74,11 @@ export function TripBaggagePage() {
     return first && last ? fmt(t.leg, { label, route: `${first.origin} → ${last.destination}` }) : label;
   };
 
+  const referenceOk = isPaymentReference(reference);
   const purchasedCount = () => list.reduce((n, o) => n + o.alreadyPurchased, 0);
 
   const pay = async () => {
-    if (paying) return;
-    if (!isPaymentReference(reference)) {
-      setReferenceError(es.aftersale.payment.invalid);
-      return;
-    }
-    setReferenceError(undefined);
+    if (paying || !referenceOk) return;
     setPaying(true);
     setBoughtBefore(purchasedCount());
     const toBuy = lines.map((l) => ({ passengerId: l.option.passengerId, itineraryId: l.option.itineraryId, quantity: l.quantity }));
@@ -202,15 +197,16 @@ export function TripBaggagePage() {
           </PostSaleNotice>
         ) : null}
 
-        <PaymentField id="baggage-payment" value={reference} onChange={setReference} error={referenceError} />
+        <PaymentField id="baggage-payment" value={reference} onChange={setReference} />
         <div className="flex flex-wrap gap-4">
-          <Button size="lg" onClick={() => void pay()} loading={paying} loadingText={t.paying}>
+          <Button size="lg" onClick={() => void pay()} loading={paying} loadingText={t.paying} disabled={!referenceOk} aria-describedby="baggage-status">
             {fmt(t.pay, { total: formatMoney(total) })}
           </Button>
           <Button variant="secondary" disabled={paying} onClick={() => setStep('select')}>
             {t.edit}
           </Button>
         </div>
+        <FormStatus id="baggage-status" ready={referenceOk} invalid={referenceOk ? [] : [es.aftersale.payment.label.toLowerCase()]} readyText={es.aftersale.payment.ready} />
       </>
     );
   } else {

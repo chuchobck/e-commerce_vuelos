@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { es } from '@/shared/i18n';
 import { Button, Field, Input, MockOnly } from '@/shared/ui';
-import { newPaymentReference } from './paymentReference';
+import { isPaymentReference, newPaymentReference } from './paymentReference';
 
 const t = es.aftersale.payment;
 
@@ -8,20 +9,22 @@ interface PaymentFieldProps {
   id: string;
   value: string;
   onChange: (value: string) => void;
-  error?: string;
 }
 
 /**
  * Pago simulado de la postventa: una referencia de la Payment API simulada (`PAY-OK-…` aprobado, `PAY-PEND-…` pendiente,
  * `PAY-REJ-…` rechazado). Viene llena con una aprobada y nueva (camino feliz sin escribir nada); se puede cambiar. Los
- * botones de prueba solo se ven con el mock.
+ * botones de prueba solo se ven con el mock. Valida en vivo: el error sale al salir del campo y se va al corregirlo; quien
+ * la usa deshabilita el botón de pagar mientras `isPaymentReference(value)` sea falso.
  */
-export function PaymentField({ id, value, onChange, error }: PaymentFieldProps) {
+export function PaymentField({ id, value, onChange }: PaymentFieldProps) {
+  const [touched, setTouched] = useState(false);
+  const error = touched && !isPaymentReference(value) ? t.invalid : undefined;
   return (
     <fieldset className="flex flex-col gap-4">
       <legend className="text-xl font-bold">{t.legend}</legend>
       <Field id={id} label={t.label} hint={t.hint} error={error} required>
-        <Input value={value} onChange={(e) => onChange(e.target.value.toUpperCase().replace(/\s+/g, ''))} autoComplete="off" spellCheck={false} maxLength={64} />
+        <Input value={value} onChange={(e) => onChange(e.target.value.toUpperCase().replace(/\s+/g, ''))} onBlur={() => setTouched(true)} autoComplete="off" spellCheck={false} maxLength={64} />
       </Field>
       <MockOnly>
         <div className="flex flex-col gap-2 rounded border-2 border-dashed border-input p-4">

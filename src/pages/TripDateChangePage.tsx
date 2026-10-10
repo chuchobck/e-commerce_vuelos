@@ -22,7 +22,7 @@ import { errorMessage, isApiError, type Booking, type Itinerary } from '@/shared
 import { es, fmt } from '@/shared/i18n';
 import { lastFlightDate, toDisplayDate, today } from '@/shared/lib/dates';
 import { formatLongDate, formatMoney, formatTime } from '@/shared/lib/format';
-import { Button, Card, DatePicker, EmptyState, Field, RadioGroup, Stepper, TripSummary } from '@/shared/ui';
+import { Button, Card, DatePicker, EmptyState, Field, FormStatus, RadioGroup, Stepper, TripSummary } from '@/shared/ui';
 
 const t = es.aftersale.dateChange;
 
@@ -51,9 +51,8 @@ export function TripDateChangePage() {
 
   const [itineraryId, setItineraryId] = useState('');
   const [dateText, setDateText] = useState('');
-  const [dateError, setDateError] = useState<string | undefined>();
+  const [dateTouched, setDateTouched] = useState(false);
   const [reference, setReference] = useState(() => newPaymentReference('OK'));
-  const [referenceError, setReferenceError] = useState<string | undefined>();
   const [checked, setChecked] = useState(false);
   const [resolved, setResolved] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,25 +68,28 @@ export function TripDateChangePage() {
   const leg = legs.find((l) => l.itinerary.id === itineraryId) ?? legs[0];
   const stepIndex = { search: 0, options: 1, confirm: 2, result: 3 }[state.step];
 
+  // La nueva fecha se valida en vivo: el error sale al terminar de escribirla o al salir del campo, y el botón de buscar
+  // se activa solo con una fecha posible. La mascara del campo ya impide meses o días imposibles.
+  const checkedDate = leg ? newDateProblem(dateText, leg.itinerary) : null;
+  const dateOk = !!checkedDate && !('problem' in checkedDate);
+  const dateError =
+    checkedDate && 'problem' in checkedDate && dateText !== '' && (dateText.length === 10 || dateTouched)
+      ? checkedDate.problem === 'same'
+        ? t.same
+        : checkedDate.problem === 'past'
+          ? t.past
+          : es.validation.dateInvalid
+      : undefined;
+
   const submitSearch = () => {
-    if (!leg) return;
-    const checkedDate = newDateProblem(dateText, leg.itinerary);
-    if ('problem' in checkedDate) {
-      setDateError(checkedDate.problem === 'same' ? t.same : checkedDate.problem === 'past' ? t.past : es.validation.dateInvalid);
-      return;
-    }
-    setDateError(undefined);
+    if (!leg || !checkedDate || 'problem' in checkedDate) return;
     void flow.search(leg.itinerary.id, checkedDate.date);
   };
 
+  const referenceOk = isPaymentReference(reference);
   const submitConfirm = () => {
     const chosen = state.chosen;
-    if (!chosen) return;
-    if (needsPayment(chosen.price) && !isPaymentReference(reference)) {
-      setReferenceError(es.aftersale.payment.invalid);
-      return;
-    }
-    setReferenceError(undefined);
+    if (!chosen || (needsPayment(chosen.price) && !referenceOk)) return;
     void flow.confirm(reference);
   };
 
@@ -186,16 +188,19 @@ export function TripDateChangePage() {
           </PostSaleNotice>
         ) : null}
 
-        {needsPayment(chosen.price) ? <PaymentField id="date-change-payment" value={reference} onChange={setReference} error={referenceError} /> : null}
+        {needsPayment(chosen.price) ? <PaymentField id="date-change-payment" value={reference} onChange={setReference} /> : null}
 
         <div className="flex flex-wrap gap-4">
-          <Button size="lg" onClick={submitConfirm} loading={state.confirming} loadingText={t.confirming}>
+          <Button size="lg" onClick={submitConfirm} loading={state.confirming} loadingText={t.confirming} disabled={needsPayment(chosen.price) && !referenceOk} aria-describedby="date-change-confirm-status">
             {direction > 0 ? fmt(t.confirmPay, { total: formatMoney(due) }) : t.confirm}
           </Button>
           <Button variant="secondary" disabled={state.confirming} onClick={flow.backToOptions}>
             {t.back}
           </Button>
         </div>
+        {needsPayment(chosen.price) ? (
+          <FormStatus id="date-change-confirm-status" ready={referenceOk} invalid={referenceOk ? [] : [es.aftersale.payment.label.toLowerCase()]} readyText={es.aftersale.payment.ready} />
+        ) : null}
       </>
     );
   } else if (state.step === 'options' && state.options) {
@@ -248,19 +253,27 @@ export function TripDateChangePage() {
                 setItineraryId(value);
                 const next = legs.find((l) => l.itinerary.id === value);
                 if (next) setDateText(toDisplayDate(suggestedDate(next.itinerary)));
-                setDateError(undefined);
+                setDateTouched(false);
               }}
               options={legs.map((l) => ({ value: l.itinerary.id, label: fmt(t.legOption, { label: l.label, route: routeOf(l.itinerary), date: formatLongDate(l.itinerary.segments[0].departureTime) }) }))}
             />
           ) : null}
           <Field id="date-change-date" label={t.newDate} hint={t.newDateHint} error={dateError} required>
-            <DatePicker value={dateText} onValueChange={setDateText} calendarLabel={t.newDate.toLowerCase()} minDate={today()} maxDate={lastFlightDate()} />
+            <DatePicker value={dateText} onValueChange={setDateText} onBlur={() => setDateTouched(true)} calendarLabel={t.newDate.toLowerCase()} minDate={today()} maxDate={lastFlightDate()} />
           </Field>
-          <div>
-            <Button type="submit" size="lg" loading={state.searching} loadingText={t.searching}>
+          <div className="flex flex-wrap items-center gap-4">
+            <Button type="submit" size="lg" loading={state.searching} loadingText={t.searching} disabled={!dateOk} aria-describedby="date-change-status">
               <Search aria-hidden="true" />
               {t.search}
             </Button>
+            <FormStatus
+              id="date-change-status"
+              ready={dateOk}
+              missing={dateText === '' ? [t.newDate.toLowerCase()] : []}
+              invalid={dateText !== '' && !dateOk ? [t.newDate.toLowerCase()] : []}
+              readyText={t.ready}
+              className="min-w-0 flex-1 basis-48"
+            />
           </div>
         </form>
       </>

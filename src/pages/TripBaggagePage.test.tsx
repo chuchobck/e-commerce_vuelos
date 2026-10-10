@@ -48,7 +48,7 @@ async function chooseAndReview(bags: number) {
   await screen.findByText(t.reviewTitle);
 }
 
-const payButton = (bags: number) => screen.getByRole('button', { name: fmt(t.pay, { total: formatMoney({ cents: 3500 * bags, currency: 'USD' }) }) });
+const payButton = (bags: number) => screen.getByRole('button', { name: fmt(t.pay, { total: formatMoney({ cents: 3500 * bags, currency: 'USD' }) }) }) as HTMLButtonElement;
 const referenceInput = () => screen.getByLabelText(new RegExp(es.aftersale.payment.label)) as HTMLInputElement;
 
 beforeEach(() => {
@@ -163,13 +163,22 @@ describe('pantalla de equipaje extra', () => {
     expect(await screen.findByText(t.successTitle)).toBeTruthy();
   });
 
-  it('una referencia que no tiene el formato se corrige antes de cobrar (nunca se envía)', async () => {
+  it('una referencia que no tiene el formato: el error sale al salir del campo, «Pagar» queda desactivado y nunca se envía', async () => {
     renderPage();
     await chooseAndReview(1);
+    expect(payButton(1).disabled).toBe(false);
     fireEvent.change(referenceInput(), { target: { value: '4111111111111111' } });
-    fireEvent.click(payButton(1));
+    expect(payButton(1).disabled).toBe(true);
+    expect(screen.queryByText(es.aftersale.payment.invalid)).toBeNull(); // aún no salió del campo
+    fireEvent.blur(referenceInput());
     expect(await screen.findByText(es.aftersale.payment.invalid)).toBeTruthy();
+    expect(document.getElementById('baggage-status')?.textContent).toContain('Revisa: referencia de pago');
+    fireEvent.click(payButton(1));
     expect(api.addBaggage).not.toHaveBeenCalled();
+    // Al corregirla, el error se va y el botón vuelve a activarse.
+    fireEvent.change(referenceInput(), { target: { value: 'PAY-OK-ABCD1234' } });
+    await waitFor(() => expect(screen.queryByText(es.aftersale.payment.invalid)).toBeNull());
+    expect(payButton(1).disabled).toBe(false);
   });
 
   it('un 403 sin permiso se explica con el mensaje de permisos, no con un rechazo de pago', async () => {
