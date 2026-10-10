@@ -19,7 +19,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
 
 export function HelpPage() {
   return (
-    <Page title={h.pageTitle} heading={h.heading} lead={h.lead} width="narrow">
+    <Page title={h.pageTitle} description={h.metaDescription} heading={h.heading} lead={h.lead} width="narrow">
       <Section id="preguntas" title={h.faqTitle}>
         <FaqList items={h.faqs} />
       </Section>

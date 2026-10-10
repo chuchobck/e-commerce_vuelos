@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/shared/lib/cn';
-import { usePageTitle } from '@/shared/lib/usePageTitle';
+import { usePageMeta } from '@/shared/lib/usePageMeta';
 
 interface PageProps {
   /** Título de la pestaña del navegador. */
   title: string;
+  /** Descripción para buscadores y vistas previas (`<meta name="description">`); sin ella, la general del sitio. */
+  description?: string;
   /** Texto del único h1 de la página (por defecto, el título). */
   heading?: ReactNode;
   lead?: ReactNode;
@@ -19,8 +21,8 @@ interface PageProps {
  * Esqueleto de toda página interna: un solo h1 que se muestra de inmediato
  * (aunque el contenido aún esté cargando) para que el foco de ruta tenga dónde caer.
  */
-export function Page({ title, heading, lead, aside, width = 'default', className, children }: PageProps) {
-  usePageTitle(title);
+export function Page({ title, description, heading, lead, aside, width = 'default', className, children }: PageProps) {
+  usePageMeta(title, description);
   return (
     <div className={cn('container-page flex flex-col gap-8 py-12', width === 'narrow' && 'max-w-[48rem]', className)}>
       <div className="flex flex-wrap items-start justify-between gap-4">

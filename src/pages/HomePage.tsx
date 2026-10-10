@@ -6,7 +6,7 @@ import { Offers } from '@/features/offers';
 import { SearchForm } from '@/features/search';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
-import { usePageTitle } from '@/shared/lib/usePageTitle';
+import { usePageMeta } from '@/shared/lib/usePageMeta';
 import { Card, FaqList } from '@/shared/ui';
 import { offerHref } from './offerHref';
 
@@ -21,7 +21,7 @@ const STEPS = [
 const FAQS = es.help.faqs.filter((f) => (es.help.homeFaqIds as readonly string[]).includes(f.id));
 
 export function HomePage() {
-  usePageTitle(h.pageTitle);
+  usePageMeta(h.pageTitle, h.metaDescription);
 
   return (
     <>
@@ -29,7 +29,7 @@ export function HomePage() {
       <section aria-labelledby="hero-title" className="hero-sky">
         <div className="container-page flex flex-col items-center gap-4 pt-12 text-center md:pt-16">
           <p className="inline-flex items-center gap-2 rounded-full border-2 border-border bg-surface/70 px-4 py-2 text-sm font-bold text-primary">
-            <img src="/brand/favicon.png" alt="" width={24} height={24} className="size-6" />
+            <img src="/brand/mark-80.png" alt="" width={24} height={24} decoding="async" className="size-6" />
             {h.heroEyebrow}
           </p>
           <h1 id="hero-title" className="text-4xl leading-tight md:text-[3.75rem] md:leading-[1.05]">

@@ -13,6 +13,7 @@ export const es = {
   app: {
     name: 'Quinde',
     titleSuffix: 'Quinde',
+    description: 'Quinde: compra vuelos dentro de Ecuador. Quito, Guayaquil, Cuenca, Galápagos y más, con asientos, equipaje y check-in en un solo lugar.',
     logoAlt: 'Quinde, ir a la página de inicio',
   },
 
@@ -238,6 +239,7 @@ export const es = {
 
   home: {
     pageTitle: 'Vuelos en Ecuador',
+    metaDescription: 'Compra vuelos dentro de Ecuador con Quinde: las tarifas más bajas a Quito, Guayaquil, Cuenca y Galápagos, y tus viajes, check-in y pases en un solo lugar.',
     heroEyebrow: 'Vuelos dentro de Ecuador',
     heroTitleA: 'Cuatro mundos.',
     heroTitleB: 'Un solo vuelo.',
@@ -279,6 +281,7 @@ export const es = {
     pageTitle: 'Ofertas',
     heading: 'Ofertas por destino',
     pageLead: 'Los precios más bajos que encontramos para las próximas fechas en las rutas más pedidas.',
+    metaDescription: 'Las tarifas más bajas que encontramos hoy en las rutas más pedidas de Ecuador: Quito, Guayaquil, Cuenca, Loja y Galápagos. Precio por persona, solo ida.',
     /** Qué es una «oferta» aquí: sin descuentos ni precios anteriores. */
     what: 'Una oferta es la tarifa más baja que encontramos hoy para esa ruta y fecha, en economía y por persona. No es un descuento: es el precio real.',
     title: 'Ofertas',
@@ -318,6 +321,7 @@ export const es = {
 
   results: {
     pageTitle: 'Resultados de búsqueda',
+    metaDescription: 'Compara horarios, escalas y tarifas de los vuelos de tu búsqueda dentro de Ecuador y elige el que más te convenga.',
     heading: 'Vuelos de {origin} a {destination}',
     headingFallback: 'Resultados de búsqueda',
     summary: '{date} · {passengers} · {cabin}',
@@ -640,6 +644,7 @@ export const es = {
 
   status: {
     pageTitle: 'Estado de vuelo',
+    metaDescription: 'Consulta el estado de un vuelo dentro de Ecuador con su número de vuelo y la fecha.',
     heading: 'Estado de vuelo',
     lead: 'Consulta si tu vuelo sale a tiempo.',
     flightNumber: 'Número de vuelo',
@@ -675,6 +680,7 @@ export const es = {
 
   auth: {
     loginTitle: 'Ingresar',
+    loginMeta: 'Ingresa a tu cuenta de Quinde para ver y gestionar tus viajes.',
     loginHeading: 'Ingresa a tu cuenta',
     loginLead: 'Puedes pegar tu contraseña o usar tu gestor de contraseñas.',
     email: 'Correo electrónico',
@@ -694,6 +700,7 @@ export const es = {
     accountCreatedLoginFailed: 'Tu cuenta se creó, pero no pudimos ingresar todavía: {reason} Ingresa con tu correo y contraseña.',
     invalidData: 'Revisa el correo y la contraseña: algún dato no es válido.',
     registerTitle: 'Crear cuenta',
+    registerMeta: 'Crea tu cuenta de Quinde para comprar vuelos dentro de Ecuador y gestionar tus viajes.',
     registerHeading: 'Crea tu cuenta',
     registerLead: 'Solo necesitas tu correo y una contraseña. Los datos de quien viaja se piden al comprar.',
     newPassword: 'Crea una contraseña',
@@ -746,12 +753,13 @@ export const es = {
     pageTitle: 'Ayuda',
     heading: 'Centro de ayuda',
     lead: 'Respuestas cortas a las preguntas más comunes.',
+    metaDescription: 'Respuestas sobre equipaje, cambio de fecha, cancelación, check-in y pagos en Quinde, y cómo contactarnos.',
     faqTitle: 'Preguntas frecuentes',
     contactTitle: '¿Necesitas hablar con alguien?',
     contactText: 'Nuestro equipo te atiende por teléfono o correo.',
     a11yTitle: 'Declaración de accesibilidad',
     a11yText:
-      'Quinde busca cumplir las WCAG 2.2 nivel AA: navegación completa con teclado, compatibilidad con lectores de pantalla, textos legibles con tipografía Atkinson Hyperlegible, contraste suficiente en modo claro y oscuro, y formularios con mensajes de error claros.',
+      'Quinde busca cumplir las WCAG 2.2 nivel AA: navegación completa con teclado, compatibilidad con lectores de pantalla, textos legibles, contraste suficiente en modo claro y oscuro, y formularios con mensajes de error claros.',
     a11yContact: 'Si encuentras una barrera, escríbenos a {email} y te responderemos en máximo 2 días hábiles.',
     shortcutsTitle: 'Atajos de teclado (opcionales)',
     shortcuts: [

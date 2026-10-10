@@ -9,7 +9,7 @@ const o = es.offers;
 /** Todas las ofertas en una página: las mismas búsquedas y la misma caché que la sección del inicio. */
 export function OffersPage() {
   return (
-    <Page title={o.pageTitle} heading={o.heading} lead={o.pageLead}>
+    <Page title={o.pageTitle} description={o.metaDescription} heading={o.heading} lead={o.pageLead}>
       <p className="max-w-prose text-muted">{o.what}</p>
       <Offers eager heading={false} hrefFor={offerHref} searchHref={routes.search()} />
     </Page>
