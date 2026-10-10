@@ -46,6 +46,7 @@ import type {
   Hold,
   ListBookingsParams,
   PostSaleOutcome,
+  SearchOptions,
   SearchParams,
   SearchResult,
   SeatMap,
@@ -106,8 +107,8 @@ export class MockFlightsApi implements FlightsApi {
     return user;
   }
 
-  async search(params: SearchParams): Promise<SearchResult> {
-    await simulate('search', [429, 503]);
+  async search(params: SearchParams, options: SearchOptions = {}): Promise<SearchResult> {
+    await simulate('search', [429, 503], options.signal);
     return mapSearchResponse(mockSearch(toSearchRequest(params)), params);
   }
 

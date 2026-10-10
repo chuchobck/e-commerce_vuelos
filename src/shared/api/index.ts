@@ -28,6 +28,7 @@ export {
   authFieldErrors,
   errorMessage,
   fieldErrorMessage,
+  isAbortError,
   isApiError,
   NotYetConnectedError,
   type AuthAction,

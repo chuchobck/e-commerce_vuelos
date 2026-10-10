@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { es, fmt } from '@/shared/i18n';
-import { ApiError, authErrorMessage, authFieldErrors, errorMessage, fieldErrorMessage, NotYetConnectedError } from './errors';
+import { abortedError, ApiError, authErrorMessage, authFieldErrors, errorMessage, fieldErrorMessage, isAbortError, NotYetConnectedError } from './errors';
 
 const e = es.errors;
 const err = (status: number, extra: Partial<ConstructorParameters<typeof ApiError>[0]> = {}) => new ApiError({ status, ...extra });
@@ -91,5 +91,15 @@ describe('errores de cuenta (/auth/*)', () => {
     expect(authFieldErrors(err(400, { fieldErrors: [{ field: 'password', message: 'password must be shorter than or equal to 128 characters' }] }))).toEqual({
       password: es.validation.passwordMax,
     });
+  });
+});
+
+describe('petición cancelada', () => {
+  it('es un ApiError ABORTED que se reconoce como cancelación y no como falla de red', () => {
+    expect(abortedError()).toBeInstanceOf(ApiError);
+    expect(isAbortError(abortedError())).toBe(true);
+    expect(isAbortError(new ApiError({ status: 0, code: 'NETWORK' }))).toBe(false);
+    expect(isAbortError(new Error('x'))).toBe(false);
+    expect(isAbortError(undefined)).toBe(false);
   });
 });

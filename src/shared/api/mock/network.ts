@@ -1,5 +1,5 @@
 import { apiConfig } from '../config';
-import { ApiError, type ApiErrorCode } from '../errors';
+import { abortedError, ApiError, type ApiErrorCode } from '../errors';
 
 /** Estados de error que el mock puede simular para diseñar los estados de la interfaz. */
 export type SimulatedStatus = 403 | 409 | 422 | 429 | 503;
@@ -14,10 +14,21 @@ const CODES: Record<SimulatedStatus, ApiErrorCode> = {
   503: 'SERVICE_UNAVAILABLE',
 };
 
-/** Espera entre 300 y 800 ms para simular la red. */
-function latency(min = 300, max = 800): Promise<void> {
+/** Espera entre 300 y 800 ms para simular la red. Con una señal cancelada se corta y lanza ABORTED. */
+function latency(min = 300, max = 800, signal?: AbortSignal): Promise<void> {
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortedError());
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortedError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 /**
@@ -53,9 +64,9 @@ function maybeFail(operation: string, allowed: SimulatedStatus[]): void {
   throw simulated(status, operation);
 }
 
-/** Simula red: latencia + error ocasional. */
-export async function simulate(operation: string, allowed: SimulatedStatus[]): Promise<void> {
-  await latency();
+/** Simula red: latencia + error ocasional. Con `signal`, la cancelación corta la espera. */
+export async function simulate(operation: string, allowed: SimulatedStatus[], signal?: AbortSignal): Promise<void> {
+  await latency(300, 800, signal);
   maybeFail(operation, allowed);
 }
 

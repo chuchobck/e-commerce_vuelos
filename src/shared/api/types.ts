@@ -100,6 +100,16 @@ export interface FlightOffer {
   grandTotal: Money;
 }
 
+/** Opciones de una búsqueda que no cambian lo que se pide: poder cancelarla y decidir si se reintenta sola. */
+export interface SearchOptions {
+  signal?: AbortSignal;
+  /**
+   * Por defecto la lectura se reintenta una vez ante red, tiempo agotado o 503 (ver el cliente HTTP).
+   * `false` la envía una sola vez: para quien lleva la cuenta de las peticiones (las ofertas del inicio).
+   */
+  retry?: boolean;
+}
+
 export interface SearchResult {
   params: SearchParams;
   offers: FlightOffer[];

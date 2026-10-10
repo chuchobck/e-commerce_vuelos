@@ -6,7 +6,7 @@ import type { ProblemCode } from './contract';
  * simulados del mock. Los errores de cuenta (/auth/*) no tienen
  * código propio: la API manda VALIDATION_FAILED y el status dice qué pasó (ver authErrorMessage).
  */
-export type LocalErrorCode = 'NETWORK' | 'TIMEOUT' | 'NOT_CONNECTED' | 'CONFLICT' | 'SERVICE_UNAVAILABLE';
+export type LocalErrorCode = 'NETWORK' | 'TIMEOUT' | 'ABORTED' | 'NOT_CONNECTED' | 'CONFLICT' | 'SERVICE_UNAVAILABLE';
 
 export type ApiErrorCode = ProblemCode | LocalErrorCode;
 
@@ -62,6 +62,16 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError;
 }
 
+/** El error de una petición que canceló quien la pidió. */
+export function abortedError(): ApiError {
+  return new ApiError({ status: 0, code: 'ABORTED', detail: 'cancelada por quien la pidió' });
+}
+
+/** La petición la canceló quien la pidió (`AbortSignal`): no es una falla ni se avisa al usuario. */
+export function isAbortError(error: unknown): boolean {
+  return isApiError(error) && error.code === 'ABORTED';
+}
+
 const e = es.errors;
 
 /**
@@ -76,6 +86,9 @@ export function errorMessage(error: unknown): string {
       return e.timeout;
     case 'NETWORK':
       return e.network;
+    case 'ABORTED':
+      // La cancela quien pidió la respuesta: no se le muestra a nadie. Queda el genérico por si se llegara a mostrar.
+      return e.unknown;
     case 'CHECK_IN_NOT_AVAILABLE':
       return e.checkInNotAvailable;
     case 'CHECK_IN_FAILED':
