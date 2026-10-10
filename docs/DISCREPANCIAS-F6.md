@@ -63,7 +63,8 @@ El estado del vuelo en vivo (`GET /flights/{n}/status`) ya estaba verificado des
 ### 1.4 `GET /bookings/{id}/boarding-passes`
 
 - **Respuesta esperada (200):** `{ bookingId, boardingPasses: [{ passengerId, segmentId, seat, boardingGroup?, boardingPosition?, barcode, barcodeType (AZTEC|PDF417|QR) }] }`.
-- **Verificar:** antes del check-in, 409 `BOARDING_PASS_NOT_AVAILABLE` (el frontend también trata 404 como «aún no hay pases»);
+- **Hallazgo (confirmado con la API real por el dueño y en `pase-abordar.service.ts` del backend, leído, no ejecutado):** antes del check-in, o con la reserva ya no `CONFIRMED`, responde **200 con `boardingPasses: []`**, no 409. El primer diseño asumía 409 y mostraba un botón «Imprimir» sin pases; ya se corrigió (lista vacía = «aún no hay pases», sin botón de imprimir) y el mock responde igual que la API.
+- **Verificar:** que tras el check-in la lista traiga un pase por pasajero con asiento (el infante no lleva); un 404 solo para reserva ajena o inexistente;
   que `barcode` sea texto que un lector pueda leer como QR (el frontend dibuja siempre un QR con ese texto, también si `barcodeType` es `AZTEC` o `PDF417`);
   que no traiga puerta ni hora de embarque (el contrato no las define; la pantalla no las muestra); un pase por pasajero con asiento y por tramo.
 

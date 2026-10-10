@@ -99,10 +99,14 @@ describe('boletos', () => {
 });
 
 describe('check-in y pases de abordar', () => {
-  it('antes del check-in no hay pases (409 BOARDING_PASS_NOT_AVAILABLE)', async () => {
+  it('antes del check-in no hay pases: 200 con la lista vacía, como la API real (no un error)', async () => {
     const { api } = await freshApi();
-    const error = await failure(api.getBoardingPasses(id('QG4P9X')));
-    expect([error.status, error.code]).toEqual([409, 'BOARDING_PASS_NOT_AVAILABLE']);
+    expect(await api.getBoardingPasses(id('QG4P9X'))).toEqual([]);
+  });
+
+  it('una reserva cancelada tampoco tiene pases válidos: lista vacía', async () => {
+    const { api } = await freshApi();
+    expect(await api.getBoardingPasses(id('QC9S4Z'))).toEqual([]);
   });
 
   it('en la ventana: check-in 200 con asiento por tramo, y luego pases con el código tal como lo da la API', async () => {

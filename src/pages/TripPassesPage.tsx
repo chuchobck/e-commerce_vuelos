@@ -14,8 +14,8 @@ const t = es.aftersale.passes;
 
 /**
  * Pases de abordar de una reserva, con su código QR y un botón para imprimir o guardar en PDF (la hoja de impresión
- * oculta el menú, las pestañas y los botones; ver las clases `print:`). Antes del check-in la API responde 409: se explica
- * y se lleva al check-in.
+ * oculta el menú, las pestañas y los botones; ver las clases `print:`). Antes del check-in la API responde 200 con la lista
+ * vacía: se explica y se lleva al check-in, sin botón de imprimir (no habría nada que imprimir).
  */
 export function TripPassesPage() {
   const { id = '' } = useParams();
@@ -24,7 +24,10 @@ export function TripPassesPage() {
   const passes = useAsync(() => authorized(() => flightsApi.getBoardingPasses(id)), [id]);
   const booking = trip.booking;
 
-  const notYet = passes.status === 'error' && isApiError(passes.error) && (passes.error.status === 409 || passes.error.status === 404);
+  // La API real responde 200 con la lista vacía antes del check-in (no un error); un 409/404 también se trata como "aún no".
+  const notYet =
+    (passes.status === 'success' && passes.data.length === 0) ||
+    (passes.status === 'error' && isApiError(passes.error) && (passes.error.status === 409 || passes.error.status === 404));
   const segments = booking ? [booking.outbound, booking.inbound].flatMap((leg) => leg?.itinerary.segments ?? []) : [];
 
   let content;

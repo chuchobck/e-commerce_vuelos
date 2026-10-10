@@ -53,11 +53,18 @@ describe('pases de abordar', () => {
     expect(screen.getAllByText(t.notGiven)).toHaveLength(2);
   });
 
-  it('antes del check-in (409) lo explica y lleva al check-in', async () => {
-    api.getBoardingPasses.mockRejectedValue(new ApiError({ status: 409, code: 'BOARDING_PASS_NOT_AVAILABLE' }));
+  it('antes del check-in la API responde 200 con la lista vacía: lo explica, lleva al check-in y no ofrece imprimir', async () => {
+    api.getBoardingPasses.mockResolvedValue([]);
     renderPage();
     expect(await screen.findByText(t.emptyTitle)).toBeTruthy();
     expect(screen.getByRole('link', { name: t.goCheckIn }).getAttribute('href')).toBe(routes.tripCheckIn('b1'));
+    expect(screen.queryByRole('button', { name: t.print })).toBeNull();
+  });
+
+  it('si la API respondiera 409 también se trata como "aún no hay pases"', async () => {
+    api.getBoardingPasses.mockRejectedValue(new ApiError({ status: 409, code: 'BOARDING_PASS_NOT_AVAILABLE' }));
+    renderPage();
+    expect(await screen.findByText(t.emptyTitle)).toBeTruthy();
   });
 
   it('una reserva cancelada no tiene pases', async () => {

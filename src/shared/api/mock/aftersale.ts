@@ -170,10 +170,13 @@ export function checkIn(stored: StoredBooking, now: number): CheckInResponseDto 
   };
 }
 
-/** GET /bookings/{id}/boarding-passes: un pase por pasajero y tramo de ida. Antes del check-in, 409. */
+/**
+ * GET /bookings/{id}/boarding-passes: un pase por pasajero y tramo de ida. Como la API real (pase-abordar.service.ts del
+ * backend), antes del check-in o con la reserva ya no CONFIRMED responde 200 con la lista vacía, no con un error.
+ */
 export function boardingPasses(stored: StoredBooking): BoardingPassListDto {
-  if (!stored.checkedIn) throw problem(409, 'BOARDING_PASS_NOT_AVAILABLE', 'Check-in has not been done');
   const { dto } = stored;
+  if (!stored.checkedIn || dto.status !== 'CONFIRMED') return { bookingId: dto.bookingId, boardingPasses: [] };
   const outbound = dto.itineraries?.[0]?.segments ?? [];
   const group = dto.itineraries?.[0]?.pricingOptions[0]?.fareBrand;
   const rank = group === 'BASIC' ? '3' : group === 'CLASSIC' ? '2' : '1';
