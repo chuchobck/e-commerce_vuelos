@@ -7,14 +7,19 @@ import type { SeatPassenger, SeatSegment } from './types';
 
 /** Datos deterministas para las pruebas: ofertas del mock (sin latencia ni errores aleatorios). */
 export function offerFor(origin: string, destination: string, adults = 1) {
-  const params = {
-    origin,
-    destination,
-    departDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
-    passengers: { adults, children: 0, infants: 0 },
-    cabin: 'ECONOMY' as const,
-  };
-  return mapSearchResponse(mockSearch(toSearchRequest(params)), params).offers[0];
+  // No todas las rutas vuelan todos los días de la semana: se toma el primer día, desde dentro de 7, que tenga vuelos.
+  for (let days = 7; days < 14; days++) {
+    const params = {
+      origin,
+      destination,
+      departDate: format(addDays(new Date(), days), 'yyyy-MM-dd'),
+      passengers: { adults, children: 0, infants: 0 },
+      cabin: 'ECONOMY' as const,
+    };
+    const [offer] = mapSearchResponse(mockSearch(toSearchRequest(params)), params).offers;
+    if (offer) return offer;
+  }
+  throw new Error(`Sin vuelos ${origin}-${destination} en la próxima semana`);
 }
 
 export function seatMapFor(origin: string, destination: string): { offerId: string; segmentId: string; map: SeatMap } {
