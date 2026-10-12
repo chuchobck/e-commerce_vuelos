@@ -1,11 +1,14 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { ChevronDown, CircleHelp, LogIn, LogOut, Moon, Sun, Ticket, User, UserRound } from 'lucide-react';
+import { ChevronDown, CircleHelp, LogIn, LogOut, Moon, Sun, Ticket, Trash2, User, UserRound } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth';
+import { ForgetProfileDialog } from '@/features/profile';
 import { useTheme } from '@/app/providers/ThemeProvider';
 import { routes, safeReturnTo } from '@/app/routes';
 import { es, fmt } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
+import { usePerfilViajero } from '@/shared/profile';
 import { Button, toast } from '@/shared/ui';
 import { MobileMenu } from './MobileMenu';
 import { isNavItemActive, NAV_ITEMS } from './nav-items';
@@ -46,6 +49,8 @@ function UserMenu() {
   const { status, user, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
+  const { saved: hasSavedData } = usePerfilViajero(user?.id);
+  const [forgetOpen, setForgetOpen] = useState(false);
   // Mientras se restaura la sesión se reserva el espacio: ni "Ingresar" ni el menú parpadean.
   if (status === 'restoring') return <span aria-hidden="true" className="hidden h-12 w-32 lg:inline-block" />;
   if (!user) {
@@ -91,6 +96,12 @@ function UserMenu() {
               {es.nav.profile}
             </Link>
           </DropdownMenu.Item>
+          {hasSavedData ? (
+            <DropdownMenu.Item onSelect={() => setForgetOpen(true)} className={MENU_ITEM}>
+              <Trash2 aria-hidden="true" className="size-6 text-primary" />
+              {es.nav.forgetData}
+            </DropdownMenu.Item>
+          ) : null}
           <DropdownMenu.Separator className="my-2 h-px bg-border" />
           <DropdownMenu.Item
             onSelect={() => {
@@ -106,6 +117,8 @@ function UserMenu() {
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
+      {/* Dentro de la raíz pero fuera del menú: el diálogo no se desmonta cuando el menú se cierra al elegir la opción. */}
+      <ForgetProfileDialog open={forgetOpen} onOpenChange={setForgetOpen} userId={user.id} />
     </DropdownMenu.Root>
   );
 }

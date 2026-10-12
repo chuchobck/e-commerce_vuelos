@@ -134,6 +134,7 @@ function fillCard(number: string) {
 
 beforeEach(() => {
   sessionStorage.clear();
+  localStorage.clear(); // el perfil de viajero vive en localStorage: cada prueba empieza sin él
   vi.spyOn(flightsApi, 'createHold').mockImplementation(async () => hold());
   vi.spyOn(flightsApi, 'getHold').mockImplementation(async () => ({ ...hold(), remainingSeconds: 880 }));
   vi.spyOn(flightsApi, 'cancelHold').mockResolvedValue(undefined);
@@ -352,11 +353,24 @@ describe('paso 2 sin sesión: va a Ingresar y vuelve sin perder nada', () => {
     expect(await screen.findByRole('region', { name: p.pendingTitle })).toBeTruthy();
     change(await screen.findByLabelText(/^Correo electrónico/), USER.email);
     change(screen.getByLabelText(/^Crea una contraseña/, { selector: 'input' }), 'una frase larga de prueba');
+    // Los datos de quien viaja se piden al crear la cuenta y se guardan solo en este dispositivo.
+    change(screen.getByLabelText(/^Nombres/), 'Ana María');
+    change(screen.getByLabelText(/^Apellidos/), 'Pérez Loor');
+    change(screen.getByLabelText(/^Número de documento/), '1710034065');
+    change(screen.getByLabelText(/^Sexo según el documento/), 'F');
+    change(screen.getByLabelText(/^Fecha de nacimiento/), '15/03/1990');
+    change(screen.getByLabelText(/^Celular/), '991234567');
     fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(es.auth.terms) }));
     fireEvent.click(screen.getAllByRole('button', { name: es.auth.submitRegister }).find((b) => b.getAttribute('type') === 'submit')!);
     expect(await screen.findByText(new RegExp(`Compras como ${USER.email}`))).toBeTruthy();
     expect(api.register).toHaveBeenCalledTimes(1);
+    // A la API solo van el correo y la contraseña.
+    expect(api.register).toHaveBeenCalledWith({ email: USER.email, password: 'una frase larga de prueba' });
     await waitFor(() => expect(flightsApi.createHold).toHaveBeenCalledTimes(1));
+    // Y al volver a la compra, el pasajero 1 sale prellenado con esos datos.
+    expect(await screen.findByText(f.prefilled)).toBeTruthy();
+    expect((screen.getAllByLabelText(/^Nombres/)[0] as HTMLInputElement).value).toBe('Ana María');
+    expect((screen.getAllByLabelText(/^Celular/)[0] as HTMLInputElement).value).toBe('991234567');
   });
 });
 

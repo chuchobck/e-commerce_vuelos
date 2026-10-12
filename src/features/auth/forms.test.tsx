@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AuthTokens, type User } from '@/shared/api';
 import { es } from '@/shared/i18n';
+import { perfilViajero } from '@/shared/profile';
 import { AuthProvider } from './AuthProvider';
 import { createLocalLock } from './crossTab';
 import { LoginForm } from './LoginForm';
@@ -52,7 +53,10 @@ const email = () => screen.getByRole('textbox', { name: new RegExp(a.email) }) a
 const password = (label: string = a.password) => screen.getByLabelText(new RegExp(`^${label}`)) as HTMLInputElement;
 const submit = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('LoginForm', () => {
   it('sin datos: errores por campo con role="alert" y foco en el primero', async () => {
@@ -125,22 +129,46 @@ describe('LoginForm', () => {
 });
 
 describe('RegisterForm', () => {
-  const fill = () => {
+  const t = es.travelerForm;
+  const f = es.checkoutForms;
+  const field = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElement;
+  const type = (label: RegExp, value: string) => fireEvent.change(field(label), { target: { value } });
+
+  /** La cuenta y las condiciones. */
+  const fillAccount = () => {
     fireEvent.change(email(), { target: { value: 'ana@example.test' } });
     fireEvent.change(password(a.newPassword), { target: { value: GOOD_PASSWORD } });
     fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(a.terms) }));
   };
+  /** Los datos de viajero (una adulta ecuatoriana con cédula válida). */
+  const fillTraveler = (over: Partial<Record<'first' | 'last' | 'doc' | 'birth' | 'phone', string>> = {}) => {
+    type(/^Nombres/, over.first ?? 'Ana María');
+    type(/^Apellidos/, over.last ?? 'Pérez Loor');
+    type(/^Número de documento/, over.doc ?? '1710034065');
+    fireEvent.change(field(/^Sexo según el documento/), { target: { value: 'F' } });
+    type(/^Fecha de nacimiento/, over.birth ?? '15/03/1990');
+    type(/^Celular/, over.phone ?? '991234567');
+  };
+  const fill = () => {
+    fillAccount();
+    fillTraveler();
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
 
   it('pide aceptar los términos', async () => {
     setup('register');
     fireEvent.change(email(), { target: { value: 'ana@example.test' } });
     fireEvent.change(password(a.newPassword), { target: { value: GOOD_PASSWORD } });
+    fillTraveler();
     submit(a.submitRegister);
     expect(await screen.findByText(es.validation.termsRequired)).toBeTruthy();
   });
 
-  it('409: "correo ya registrado" en el campo de correo, con foco', async () => {
-    setup('register', {
+  it('409: "correo ya registrado" en el campo de correo, con foco; no guarda nada y conserva todo lo escrito', async () => {
+    const { onSuccess } = setup('register', {
       register: async () => {
         throw new ApiError({ status: 409, code: 'VALIDATION_FAILED' });
       },
@@ -149,9 +177,17 @@ describe('RegisterForm', () => {
     submit(a.submitRegister);
     expect(await screen.findByText(a.emailTaken)).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(email()));
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(localStorage.length).toBe(0);
+    // Nada de lo escrito se perdió.
+    expect(field(/^Nombres/).value).toBe('Ana María');
+    expect(field(/^Número de documento/).value).toBe('1710034065');
+    expect(field(/^Fecha de nacimiento/).value).toBe('15/03/1990');
+    expect(field(/^Celular/).value).toBe('991234567');
+    expect(password(a.newPassword).value).toBe(GOOD_PASSWORD);
   });
 
-  it('cuenta creada pero el ingreso falló: lo explica sin decir que el registro falló', async () => {
+  it('cuenta creada pero el ingreso falló: lo explica sin decir que el registro falló y no guarda el perfil (no hay sesión)', async () => {
     setup('register', {
       login: async () => {
         throw new ApiError({ status: 429, code: 'RATE_LIMIT_EXCEEDED', retryAfter: 20 });
@@ -160,13 +196,177 @@ describe('RegisterForm', () => {
     fill();
     submit(a.submitRegister);
     expect(await screen.findByText(/Tu cuenta se creó/)).toBeTruthy();
+    expect(localStorage.length).toBe(0);
+    expect(field(/^Nombres/).value).toBe('Ana María');
   });
 
-  it('nunca envía un rol: solo correo y contraseña', async () => {
+  it('a /auth/register solo van el correo y la contraseña: nunca un rol ni los datos de viajero', async () => {
     const { api, onSuccess } = setup('register');
     fill();
     submit(a.submitRegister);
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(api.register).toHaveBeenCalledTimes(1);
     expect(api.register).toHaveBeenCalledWith({ email: 'ana@example.test', password: GOOD_PASSWORD });
+    expect(Object.keys((api.register as ReturnType<typeof vi.fn>).mock.calls[0][0] as object).sort()).toEqual(['email', 'password']);
+  });
+
+  it('con la cuenta creada y la sesión iniciada guarda los datos de viajero en este dispositivo, con la clave del usuario y sin contraseña ni tokens', async () => {
+    const { onSuccess } = setup('register');
+    fill();
+    submit(a.submitRegister);
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(USER, { profileSaved: true }));
+    expect(perfilViajero.read(USER.id)).toEqual({
+      firstName: 'Ana María',
+      lastName: 'Pérez Loor',
+      documentType: 'NATIONAL_ID',
+      documentNumber: '1710034065',
+      nationality: 'EC',
+      gender: 'F',
+      birthDate: '15/03/1990',
+      documentExpiryDate: '',
+      email: 'ana@example.test',
+      phone: '991234567',
+    });
+    expect([...Array(localStorage.length).keys()].map((i) => localStorage.key(i))).toEqual([`quinde.perfil.v1:${USER.id}`]);
+    const stored = localStorage.getItem(`quinde.perfil.v1:${USER.id}`) ?? '';
+    expect(stored).not.toContain(GOOD_PASSWORD);
+    expect(stored).not.toContain(TOKENS.refreshToken);
+    expect(stored).not.toContain(TOKENS.accessToken);
+  });
+
+  it('si el navegador no deja guardar los datos, la cuenta igual queda creada y se avisa (profileSaved: false)', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    const { api, onSuccess } = setup('register');
+    fill();
+    submit(a.submitRegister);
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(USER, { profileSaved: false }));
+    expect(api.register).toHaveBeenCalled();
+  });
+
+  it('avisa con una línea clara que los datos se guardan solo en este dispositivo', () => {
+    setup('register');
+    expect(screen.getByText(t.localNotice)).toBeTruthy();
+    expect(t.localNotice).toMatch(/solo en este dispositivo/);
+  });
+
+  it('sin datos: ningún envío, un error por campo (no una caja global) y el foco en el primero', async () => {
+    const { api } = setup('register');
+    submit(a.submitRegister);
+    expect(await screen.findAllByText(es.validation.required)).not.toHaveLength(0);
+    expect(api.register).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Revisa \d+ campo/)).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(email()));
+  });
+
+  it('tras enviar vacío, los errores se van al corregir cada campo: también en los que se limpian al teclear (nombres, fecha) y en el contacto que sigue a la cuenta', async () => {
+    setup('register');
+    submit(a.submitRegister);
+    expect((await screen.findAllByText(es.validation.required)).length).toBeGreaterThan(5);
+    fireEvent.change(email(), { target: { value: 'ana@example.test' } });
+    type(/^Nombres/, 'Ana2 María'); // el dígito no entra: queda «Ana María»
+    type(/^Fecha de nacimiento/, '15031990'); // la máscara pone las barras
+    await waitFor(() => expect(field(/^Nombres/).getAttribute('aria-invalid')).toBeNull());
+    await waitFor(() => expect(field(/^Fecha de nacimiento/).getAttribute('aria-invalid')).toBeNull());
+    await waitFor(() => expect(field(new RegExp(`^${t.contactEmail}`)).getAttribute('aria-invalid')).toBeNull());
+    expect(field(new RegExp(`^${t.contactEmail}`)).value).toBe('ana@example.test');
+  });
+
+  describe('validación de los datos de viajero (al salir del campo)', () => {
+    it('los nombres no admiten números ni signos: no entran', () => {
+      setup('register');
+      type(/^Nombres/, 'Ana2 !Mar-ía');
+      expect(field(/^Nombres/).value).toBe('Ana María');
+    });
+
+    it('cédula inválida: el mensaje sale al salir del campo y se va al corregirla', async () => {
+      setup('register');
+      type(/^Número de documento/, '1710034066');
+      expect(screen.queryByText(es.validation.cedulaInvalid)).toBeNull();
+      fireEvent.blur(field(/^Número de documento/));
+      expect(await screen.findByText(es.validation.cedulaInvalid)).toBeTruthy();
+      type(/^Número de documento/, '1710034065');
+      await waitFor(() => expect(screen.queryByText(es.validation.cedulaInvalid)).toBeNull());
+    });
+
+    it('la cédula solo admite 10 dígitos; el pasaporte pide su vencimiento', async () => {
+      setup('register');
+      type(/^Número de documento/, '17-10 034 065xx99');
+      expect(field(/^Número de documento/).value).toBe('1710034065');
+      expect(screen.queryByLabelText(new RegExp(`^${f.documentExpiry}`))).toBeNull();
+      fireEvent.change(screen.getByLabelText(new RegExp(`^${f.documentType}`)), { target: { value: 'PASSPORT' } });
+      expect(field(new RegExp(`^${f.documentExpiry}`))).toBeTruthy();
+      type(/^Número de documento/, 'ab-123 45');
+      expect(field(/^Número de documento/).value).toBe('AB12345');
+      fireEvent.blur(field(new RegExp(`^${f.documentExpiry}`)));
+      expect(await screen.findByText(es.validation.required)).toBeTruthy();
+    });
+
+    it('la fecha no deja escribir un mes 13 ni un día 32, y un menor de 18 años recibe su mensaje', async () => {
+      setup('register');
+      type(/^Fecha de nacimiento/, '45/13/2000');
+      expect(field(/^Fecha de nacimiento/).value).not.toMatch(/13/);
+      type(/^Fecha de nacimiento/, '01/01/2020');
+      fireEvent.blur(field(/^Fecha de nacimiento/));
+      expect(await screen.findByText(t.birthAdult)).toBeTruthy();
+    });
+
+    it('el celular solo admite dígitos (9 después de +593)', async () => {
+      setup('register');
+      type(/^Celular/, '09 91-23 4567abc');
+      expect(field(/^Celular/).value).toBe('099123456');
+      fireEvent.blur(field(/^Celular/));
+      expect(await screen.findByText(es.validation.phoneInvalid)).toBeTruthy();
+    });
+
+    it('nacionalidad distinta de Ecuador: se puede registrar y se explica que por ahora no se puede comprar con ella', () => {
+      setup('register');
+      fireEvent.change(field(new RegExp(`^${f.nationality}`)), { target: { value: 'PE' } });
+      expect(screen.getByText(t.nationalityNotBookable)).toBeTruthy();
+    });
+  });
+
+  it('el correo de contacto es el de la cuenta hasta que se cambia; después ya no lo sigue', async () => {
+    setup('register');
+    const contact = () => field(new RegExp(`^${t.contactEmail}`));
+    fireEvent.change(email(), { target: { value: 'ana@example.test' } });
+    await waitFor(() => expect(contact().value).toBe('ana@example.test'));
+    fireEvent.change(email(), { target: { value: 'ana.perez@example.test' } });
+    await waitFor(() => expect(contact().value).toBe('ana.perez@example.test'));
+    fireEvent.change(contact(), { target: { value: 'contacto@example.test' } });
+    fireEvent.change(email(), { target: { value: 'otra@example.test' } });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(contact().value).toBe('contacto@example.test');
+  });
+
+  it('junto al botón dice qué falta y qué revisar, y al terminar «Todo listo» (el botón sigue activo para los gestores de contraseñas)', async () => {
+    setup('register');
+    const status = () => document.getElementById('reg-status')?.textContent ?? '';
+    expect(status()).toMatch(/^Falta completar: /);
+    expect(status()).toContain('correo electrónico');
+    fillAccount();
+    fillTraveler({ phone: '99' });
+    await waitFor(() => expect(status()).toMatch(/Revisa: celular/));
+    fillTraveler();
+    await waitFor(() => expect(status()).toBe(es.forms.ready));
+    expect((screen.getByRole('button', { name: a.submitRegister }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe('cerrar sesión no borra el perfil de viajero', () => {
+  it('el perfil sigue ahí después de cerrar sesión (solo se borra a pedido de la persona)', async () => {
+    localStorage.clear();
+    perfilViajero.save(USER.id, { firstName: 'Ana', lastName: 'Pérez', documentType: 'NATIONAL_ID', documentNumber: '1710034065', nationality: 'EC', gender: 'F', birthDate: '15/03/1990', documentExpiryDate: '', email: 'ana@example.test', phone: '991234567' });
+    const manager = new SessionManager({
+      api: { register: vi.fn(async () => USER), login: vi.fn(async () => TOKENS), refresh: vi.fn(async () => TOKENS), logout: vi.fn(async () => undefined), me: vi.fn(async () => USER) },
+      store: createTokenStore(memoryStorage(), memoryStorage()),
+      lock: createLocalLock(),
+      channel: { post: () => undefined, listen: () => () => undefined },
+      schedule: () => () => undefined,
+    });
+    await manager.login({ email: USER.email, password: GOOD_PASSWORD }, false);
+    await manager.logout();
+    expect(perfilViajero.read(USER.id)?.firstName).toBe('Ana');
   });
 });

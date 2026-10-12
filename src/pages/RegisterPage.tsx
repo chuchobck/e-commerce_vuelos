@@ -18,8 +18,10 @@ export function RegisterPage() {
       {returnTo?.startsWith(CHECKOUT_BASE) ? <PendingTrip /> : null}
       <Card>
         <RegisterForm
-          onSuccess={(u) => {
+          onSuccess={(u, { profileSaved }) => {
             toast({ title: fmt(a.registered, { email: u.email }), variant: 'success' });
+            // Los datos de viajero solo se guardan en este dispositivo: si el navegador no lo permitió, se dice y se sigue.
+            if (!profileSaved) toast({ title: a.registeredProfileNotSaved });
             navigate(returnTo ?? routes.trips(), { replace: true });
           }}
         />

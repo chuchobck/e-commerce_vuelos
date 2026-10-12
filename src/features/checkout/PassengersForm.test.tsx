@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { BookingPassenger } from '@/shared/api';
 import { es } from '@/shared/i18n';
+import type { TravelerValues } from '@/shared/profile';
 import { PassengersForm } from './PassengersForm';
 import type { CheckoutSelection } from './selection';
 
@@ -23,10 +24,10 @@ const selection = (passengers: CheckoutSelection['passengers']): CheckoutSelecti
   searchQuery: '',
 });
 
-function setup(passengers: CheckoutSelection['passengers'], { draft = [] as BookingPassenger[], accountEmail = 'cuenta@example.test', rejected = [] as { field: string; message: string }[] } = {}) {
+function setup(passengers: CheckoutSelection['passengers'], { draft = [] as BookingPassenger[], accountEmail = 'cuenta@example.test', rejected = [] as { field: string; message: string }[], profile = null as TravelerValues | null } = {}) {
   const onDone = vi.fn();
   const onDraft = vi.fn();
-  render(<PassengersForm selection={selection(passengers)} draft={draft} accountEmail={accountEmail} rejected={rejected} onDraft={onDraft} onDone={onDone} />);
+  render(<PassengersForm selection={selection(passengers)} draft={draft} accountEmail={accountEmail} profile={profile} rejected={rejected} onDraft={onDraft} onDone={onDone} />);
   return { onDone, onDraft };
 }
 
@@ -259,3 +260,91 @@ describe('formulario de pasajeros', () => {
     await waitFor(() => expect(document.activeElement).toBe(field(/^Fecha de nacimiento/)));
   });
 });
+
+describe('errores pegados', () => {
+  it('tras un envío con errores, los campos que limpian lo que se teclea (nombres, fecha) dejan de marcarse al corregirlos', async () => {
+    setup({ adults: 1, children: 0, infants: 0 });
+    fireEvent.submit(screen.getByRole('form', { name: es.purchase.passengersTitle }));
+    await waitFor(() => expect(field(/^Nombres/).getAttribute('aria-invalid')).toBe('true'));
+    change(field(/^Nombres/), 'Ana2 María');
+    change(field(/^Fecha de nacimiento/), '15041990');
+    await waitFor(() => expect(field(/^Nombres/).getAttribute('aria-invalid')).toBeNull());
+    await waitFor(() => expect(field(/^Fecha de nacimiento/).getAttribute('aria-invalid')).toBeNull());
+  });
+});
+
+describe('prellenado con el perfil de viajero', () => {
+  const PROFILE: TravelerValues = { firstName: 'Ana', lastName: 'Pérez', documentType: 'NATIONAL_ID', documentNumber: '1710034065', nationality: 'EC', gender: 'F', birthDate: '15/03/1990', documentExpiryDate: '', email: 'contacto@example.test', phone: '991234567' };
+  const label = () => screen.queryAllByText(f.prefilled);
+  const continueButton = () => screen.getByRole('button', { name: f.saveAndContinue }) as HTMLButtonElement;
+
+  it('el pasajero 1 (adulto) sale con sus datos y la etiqueta «Prellenado con tus datos»; sigue siendo editable', async () => {
+    const { onDraft } = setup({ adults: 1, children: 0, infants: 0 }, { profile: PROFILE });
+    expect(field(/^Nombres/).value).toBe('Ana');
+    expect(field(/^Apellidos/).value).toBe('Pérez');
+    expect(field(/^Número de documento/).value).toBe('1710034065');
+    expect(field(/^Fecha de nacimiento/).value).toBe('15/03/1990');
+    expect(field(/^Sexo según el documento/).value).toBe('F');
+    expect(field(/^Correo electrónico/).value).toBe('contacto@example.test');
+    expect(field(/^Celular/).value).toBe('991234567');
+    expect(label()).toHaveLength(1);
+    expect(within(screen.getAllByRole('group')[0]).getByText(f.prefilled)).toBeTruthy();
+    // Con el perfil completo no falta nada: ya se puede continuar.
+    expect(continueButton().disabled).toBe(false);
+    // Se puede cambiar cualquier dato y lo que se escribe manda.
+    change(field(/^Nombres/), 'Ana María');
+    expect(field(/^Nombres/).value).toBe('Ana María');
+    await waitFor(() => expect(onDraft).toHaveBeenCalled(), { timeout: 2000 });
+    expect((onDraft.mock.calls.at(-1)![0] as BookingPassenger[])[0]).toMatchObject({ firstName: 'Ana María', documentNumber: '1710034065' });
+  });
+
+  it('envía el pedido con los datos del perfil sin escribir nada', async () => {
+    const { onDone } = setup({ adults: 1, children: 0, infants: 0 }, { profile: PROFILE });
+    fireEvent.click(continueButton());
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect((onDone.mock.calls[0][0] as BookingPassenger[])[0]).toMatchObject({ id: 'PAX1', type: 'ADULT', firstName: 'Ana', lastName: 'Pérez', documentNumber: '1710034065', birthDate: '1990-03-15', gender: 'F', email: 'contacto@example.test', phone: '+593991234567' });
+  });
+
+  it('NUNCA llena a los demás: ni otros adultos, ni niños, ni infantes (y la etiqueta sale solo en el pasajero 1)', () => {
+    setup({ adults: 2, children: 1, infants: 1 }, { profile: PROFILE });
+    expect(field(/^Nombres/, 0).value).toBe('Ana');
+    for (const n of [1, 2, 3]) {
+      expect(field(/^Nombres/, n).value).toBe('');
+      expect(field(/^Apellidos/, n).value).toBe('');
+      expect(field(/^Número de documento/, n).value).toBe('');
+      expect(field(/^Fecha de nacimiento/, n).value).toBe('');
+      expect(field(/^Sexo según el documento/, n).value).toBe('');
+    }
+    expect(label()).toHaveLength(1);
+  });
+
+  it('sin perfil no hay etiqueta ni datos', () => {
+    setup({ adults: 1, children: 0, infants: 0 });
+    expect(label()).toHaveLength(0);
+    expect(field(/^Nombres/).value).toBe('');
+  });
+
+  it('perfil incompleto: llena lo válido, marca lo que falta y deja de marcarlo cuando se completa', async () => {
+    setup({ adults: 1, children: 0, infants: 0 }, { profile: { ...PROFILE, phone: '', birthDate: '01/01/2020' } });
+    expect(field(/^Nombres/).value).toBe('Ana');
+    expect(field(/^Celular/).value).toBe('');
+    expect(field(/^Fecha de nacimiento/).value).toBe('');
+    expect(screen.getByText(/Falta completar o revisar: fecha de nacimiento y celular\./)).toBeTruthy();
+    expect(continueButton().disabled).toBe(true);
+    change(field(/^Celular/), '991234567');
+    await waitFor(() => expect(screen.getByText(/Falta completar o revisar: fecha de nacimiento\./)).toBeTruthy());
+    change(field(/^Fecha de nacimiento/), '15/03/1990');
+    await waitFor(() => expect(screen.queryByText(/Falta completar o revisar/)).toBeNull());
+    expect(continueButton().disabled).toBe(false);
+    expect(label()).toHaveLength(1);
+  });
+
+  it('si el borrador ya trae datos del pasajero 1, no se pisan con el perfil', () => {
+    const draft = [{ id: 'PAX1', type: 'ADULT', firstName: 'Otra', lastName: 'Persona', documentType: 'NATIONAL_ID', documentNumber: '0926687856', nationality: 'EC', birthDate: '1985-05-05', gender: 'M', email: 'otra@example.test', phone: '+593981111111' }] as BookingPassenger[];
+    setup({ adults: 1, children: 0, infants: 0 }, { draft, profile: PROFILE });
+    expect(field(/^Nombres/).value).toBe('Otra');
+    expect(field(/^Número de documento/).value).toBe('0926687856');
+    expect(label()).toHaveLength(0);
+  });
+});
+

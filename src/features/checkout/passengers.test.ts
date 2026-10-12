@@ -7,7 +7,6 @@ import {
   isDraftComplete,
   passengersSchema,
   passengerTypes,
-  sanitizeDocument,
   toBookingPassengers,
   type PassengerFormValue,
   type PassengersFormValues,
@@ -89,12 +88,6 @@ describe('pasajeros del paso 2', () => {
     expect(errorsOf(schema.safeParse(form([person({ email: 'ana@' })])))).toEqual([`passengers.0.email: ${v.emailInvalid}`]);
     expect(errorsOf(schema.safeParse(form([person({ firstName: 'Ana2' })])))).toEqual([`passengers.0.firstName: ${v.nameInvalid}`]);
     expect(errorsOf(schema.safeParse(form([person({ firstName: 'A'.repeat(61) })])))).toEqual([`passengers.0.firstName: ${v.nameLength}`]);
-  });
-
-  it('solo-dígitos y límites al teclear o pegar el documento', () => {
-    expect(sanitizeDocument({ documentType: 'NATIONAL_ID', nationality: 'EC' }, '1710-034 065abc99')).toBe('1710034065');
-    expect(sanitizeDocument({ documentType: 'PASSPORT', nationality: 'EC' }, 'ab-123 456!')).toBe('AB123456');
-    expect(sanitizeDocument({ documentType: 'PASSPORT', nationality: 'EC' }, 'x'.repeat(30))).toHaveLength(20);
   });
 
   it('al pedido: PAX1…, infante con el adulto elegido, documento compactado, fechas ISO y +593', () => {

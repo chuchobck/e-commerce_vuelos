@@ -1,20 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowRight } from 'lucide-react';
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { ArrowRight, UserCheck } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Controller, useForm, useWatch, type Resolver } from 'react-hook-form';
 import type { BookingPassenger, FieldError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { countries, isBookableCountry } from '@/shared/lib/countries';
 import { maskDateInput } from '@/shared/lib/dates';
+import { joinList } from '@/shared/lib/joinList';
 import { onlyDigits, onlyLetters } from '@/shared/lib/validators';
+import { isEcuadorianId, sanitizeDocument, type TravelerValues } from '@/shared/profile';
 import { Button, Checkbox, Field, FormStatus, Input, Select } from '@/shared/ui';
 import {
   initialPassengerValues,
-  isEcuadorianId,
   passengerIdAt,
   passengersSchema,
   passengerTypes,
-  sanitizeDocument,
   toBookingPassengers,
   tripDates,
   withSharedContact,
@@ -23,6 +23,7 @@ import {
   type ToAssignedSeats,
 } from './passengers';
 import { apiFieldToForm } from './passengerFields';
+import { prefillFromProfile } from './prefill';
 import { seatLines } from './seatLines';
 import { SeatsBlock } from './SeatsBlock';
 import type { CheckoutSelection } from './selection';
@@ -94,6 +95,11 @@ interface PassengersFormProps {
   seats?: SeatsSlot;
   draft: BookingPassenger[];
   accountEmail?: string;
+  /**
+   * Perfil de viajero guardado en este dispositivo (no viaja a la API): llena SOLO el pasajero 1, si es adulto y no hay
+   * nada escrito de él en el borrador. Nunca llena niños, infantes ni otros adultos.
+   */
+  profile?: TravelerValues | null;
   /** Campos que la API rechazó al pagar (p. ej. "passengers[0].birthDate"). */
   rejected: FieldError[];
   /** Cada cambio (con una pausa corta) y al salir: el borrador sobrevive a refrescar y a un hold vencido. */
@@ -107,12 +113,14 @@ interface PassengersFormProps {
  * y la fecha no deja escribir un mes 13. «Continuar» se activa cuando no falta nada y el estado junto al botón dice qué
  * falta (no hay resumen de errores). El correo de la cuenta precarga el contacto del primer pasajero.
  */
-export function PassengersForm({ selection, seats, draft, accountEmail, rejected, onDraft, onDone }: PassengersFormProps) {
+export function PassengersForm({ selection, seats, draft, accountEmail, profile, rejected, onDraft, onDone }: PassengersFormProps) {
   const types = useMemo(() => passengerTypes(selection.passengers), [selection.passengers]);
   const schema = useMemo(() => passengersSchema(tripDates(selection)), [selection]);
   const resolver = useMemo<Resolver<PassengersFormValues>>(() => (values, context, options) => zodResolver(schema)(withSharedContact(values), context, options), [schema]);
   const list = useMemo(() => countries(), []);
   const submitted = useRef(false);
+  // El perfil se vuelca una sola vez, al abrir el paso: lo que la persona edite después manda.
+  const [prefill] = useState(() => prefillFromProfile(initialPassengerValues(types, draft, accountEmail, seats?.segmentIds), profile));
 
   const {
     register,
@@ -123,11 +131,15 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
     formState: { errors },
   } = useForm<PassengersFormValues>({
     resolver,
-    defaultValues: initialPassengerValues(types, draft, accountEmail, seats?.segmentIds),
+    defaultValues: prefill.values,
     mode: 'onTouched',
     shouldFocusError: true,
   });
   const values = useWatch({ control }) as PassengersFormValues;
+  // Al limpiar lo que se teclea (solo letras, máscara de fecha…) el valor cambia por debajo de la validación: si el campo ya mostraba un
+  // error, se vuelve a validar con el valor limpio para que el mensaje no quede pegado a algo que ya está bien.
+  const clean = (i: number, name: 'firstName' | 'lastName' | 'documentNumber' | 'birthDate' | 'documentExpiryDate' | 'phone', value: string) =>
+    setValue(`passengers.${i}.${name}` as `passengers.0.firstName`, value, { shouldValidate: !!errors.passengers?.[i]?.[name] });
 
   // Borrador: con una pausa corta tras escribir, y al salir de la pantalla (salvo al continuar).
   const latest = useRef(values);
@@ -168,6 +180,10 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
   const lines = seatLines(draftPassengers, selection.outbound, selection.inbound);
   const nameOf = (i: number) => [values?.passengers?.[i]?.firstName, values?.passengers?.[i]?.lastName].filter(Boolean).join(' ');
 
+  // De lo que el perfil no pudo llenar, lo que todavía falta o está mal (se va quitando a medida que se completa).
+  const openIssues = parsed.success ? [] : parsed.error.issues.filter((issue) => issue.path[0] === 'passengers' && issue.path[1] === 0).map((issue) => issue.path[2]);
+  const stillToReview = FIELDS.filter(([key]) => (prefill.review as readonly string[]).includes(key) && openIssues.includes(key)).map(([, , label]) => label.toLowerCase());
+
   /** "Adulto 1", "Adulto 2", "Niño 1", "Infante 1": se numera por tipo. */
   const ordinal = (i: number) => types.slice(0, i + 1).filter((t) => t === types[i]).length;
   return (
@@ -191,12 +207,21 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
         return (
           <fieldset key={id('set')} className="flex flex-col gap-4 rounded border-2 border-border bg-surface p-6 shadow-card">
             <legend className="px-2 text-xl font-bold">{fmt(f.passengerTitle, { type: TYPE_LABEL[type], number: ordinal(i) })}</legend>
+            {i === 0 && prefill.applied ? (
+              <p className="flex flex-col gap-1 text-sm">
+                <span className="inline-flex items-center gap-2 font-bold">
+                  <UserCheck aria-hidden="true" className="size-5 shrink-0 text-primary" />
+                  {f.prefilled}
+                </span>
+                {stillToReview.length > 0 ? <span className="text-muted">{fmt(f.prefilledReview, { fields: joinList(stillToReview) })}</span> : null}
+              </p>
+            ) : null}
             <div className="grid items-start gap-4 sm:grid-cols-2">
               <Field id={id('first')} label={f.firstName} error={own?.firstName?.message} required>
-                <Input autoComplete={i === 0 ? 'given-name' : 'off'} maxLength={60} {...register(`passengers.${i}.firstName`, { onChange: (e) => setValue(`passengers.${i}.firstName`, onlyLetters(e.target.value)) })} />
+                <Input autoComplete={i === 0 ? 'given-name' : 'off'} maxLength={60} {...register(`passengers.${i}.firstName`, { onChange: (e) => clean(i, 'firstName', onlyLetters(e.target.value)) })} />
               </Field>
               <Field id={id('last')} label={f.lastName} error={own?.lastName?.message} required>
-                <Input autoComplete={i === 0 ? 'family-name' : 'off'} maxLength={60} {...register(`passengers.${i}.lastName`, { onChange: (e) => setValue(`passengers.${i}.lastName`, onlyLetters(e.target.value)) })} />
+                <Input autoComplete={i === 0 ? 'family-name' : 'off'} maxLength={60} {...register(`passengers.${i}.lastName`, { onChange: (e) => clean(i, 'lastName', onlyLetters(e.target.value)) })} />
               </Field>
               <Field id={id('doctype')} label={f.documentType} required>
                 <Select
@@ -214,7 +239,7 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
                   autoComplete="off"
                   inputMode={current && isEcuadorianId(current) ? 'numeric' : 'text'}
                   maxLength={current && isEcuadorianId(current) ? 10 : 20}
-                  {...register(`passengers.${i}.documentNumber`, { onChange: (e) => setValue(`passengers.${i}.documentNumber`, sanitizeDocument(current ?? { documentType: 'NATIONAL_ID', nationality: 'EC' }, e.target.value)) })}
+                  {...register(`passengers.${i}.documentNumber`, { onChange: (e) => clean(i, 'documentNumber', sanitizeDocument(current ?? { documentType: 'NATIONAL_ID', nationality: 'EC' }, e.target.value)) })}
                 />
               </Field>
               <Field id={id('nat')} label={f.nationality} error={own?.nationality?.message} required>
@@ -242,7 +267,7 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
                   inputMode="numeric"
                   autoComplete={i === 0 ? 'bday' : 'off'}
                   maxLength={10}
-                  {...register(`passengers.${i}.birthDate`, { onChange: (e) => setValue(`passengers.${i}.birthDate`, maskDateInput(e.target.value)) })}
+                  {...register(`passengers.${i}.birthDate`, { onChange: (e) => clean(i, 'birthDate', maskDateInput(e.target.value)) })}
                 />
               </Field>
               {passport ? (
@@ -251,7 +276,7 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
                     inputMode="numeric"
                     autoComplete="off"
                     maxLength={10}
-                    {...register(`passengers.${i}.documentExpiryDate`, { onChange: (e) => setValue(`passengers.${i}.documentExpiryDate`, maskDateInput(e.target.value)) })}
+                    {...register(`passengers.${i}.documentExpiryDate`, { onChange: (e) => clean(i, 'documentExpiryDate', maskDateInput(e.target.value)) })}
                   />
                 </Field>
               ) : null}
@@ -278,7 +303,7 @@ export function PassengersForm({ selection, seats, draft, accountEmail, rejected
                     autoComplete={i === 0 ? 'tel-national' : 'off'}
                     prefix="+593"
                     maxLength={9}
-                    {...register(`passengers.${i}.phone`, { onChange: (e) => setValue(`passengers.${i}.phone`, onlyDigits(e.target.value).slice(0, 9)) })}
+                    {...register(`passengers.${i}.phone`, { onChange: (e) => clean(i, 'phone', onlyDigits(e.target.value).slice(0, 9)) })}
                   />
                 </Field>
                 {i === 0 && types.length > 1 ? (
