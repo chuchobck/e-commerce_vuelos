@@ -33,12 +33,12 @@ export function useFieldControl() {
 
 interface FieldProps {
   label: ReactNode;
-  /** Instrucción persistente bajo la etiqueta (nunca se usa el placeholder como etiqueta). */
+  /** Instrucción persistente bajo el control (nunca se usa el placeholder como etiqueta). */
   hint?: ReactNode;
   error?: string;
   /** Los campos opcionales se marcan con "(opcional)"; los obligatorios llevan aria-required. */
   required?: boolean;
-  /** id del control; si se omite se genera uno. Útil para enlazar desde el resumen de errores. */
+  /** id del control; si se omite se genera uno. Útil para llevar el foco allí desde fuera. */
   id?: string;
   className?: string;
   labelClassName?: string;
@@ -57,19 +57,21 @@ export function Field({ label, hint, error, required = false, id, className, lab
     required,
   };
 
+  // Orden fijo: etiqueta → control → error → ayuda. Con la ayuda debajo del control, los controles de dos campos
+  // vecinos quedan a la misma altura aunque una ayuda ocupe más líneas que la otra.
   return (
     <FieldContext.Provider value={value}>
-      <div className={cn('flex flex-col gap-2', className)}>
+      <div className={cn('flex min-w-0 flex-col gap-2', className)}>
         <FieldLabel htmlFor={controlId} className={labelClassName} optional={!required}>
           {label}
         </FieldLabel>
+        {children}
+        <FieldError id={value.errorId} message={error} />
         {hint ? (
-          <p id={value.hintId} className="-mt-2 text-sm text-muted">
+          <p id={value.hintId} className="text-sm text-muted">
             {hint}
           </p>
         ) : null}
-        {children}
-        <FieldError id={value.errorId} message={error} />
       </div>
     </FieldContext.Provider>
   );
@@ -94,12 +96,15 @@ function FieldLabel({
   );
 }
 
-/** Mensaje de error con icono + texto (nunca solo color). */
+/**
+ * Mensaje de error junto al campo, con icono + texto (nunca solo color). Es una ayuda para corregir, no un regaño:
+ * tamaño de texto normal, sin negrita y sin cajas rojas; aparece al salir del campo y se va solo al corregirlo.
+ */
 export function FieldError({ id, message }: { id?: string; message?: string }) {
   if (!message) return null;
   return (
-    <p id={id} role="alert" className="flex items-start gap-2 text-sm font-bold text-error">
-      <AlertCircle aria-hidden="true" className="size-6 shrink-0" />
+    <p id={id} role="alert" className="flex items-start gap-2 text-sm text-error">
+      <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
       <span>{message}</span>
     </p>
   );

@@ -124,16 +124,86 @@ describe('formulario de pasajeros', () => {
     ]);
   });
 
-  it('enviar vacío: resumen de errores, error en cada campo y foco en el primero; no borra lo escrito', async () => {
-    const { onDone } = setup({ adults: 1, children: 0, infants: 0 });
-    change(field(/^Apellidos/), 'Pérez');
-    fireEvent.submit(screen.getByRole('form', { name: es.purchase.passengersTitle }));
-    const summary = await screen.findByText(/^Revisa \d+ campos?/);
-    expect(summary.closest('[role="alert"]')).toBeTruthy();
-    expect(within(summary.closest('[role="alert"]') as HTMLElement).getByText(/Pasajero 1 · Nombres/)).toBeTruthy();
-    await waitFor(() => expect(document.activeElement).toBe(field(/^Nombres/)));
-    expect(field(/^Apellidos/).value).toBe('Pérez');
-    expect(onDone).not.toHaveBeenCalled();
+  describe('validación en vivo: sin resumen de errores', () => {
+    const next = () => screen.getByRole('button', { name: f.saveAndContinue }) as HTMLButtonElement;
+
+    it('al empezar «Continuar» está desactivado y el estado junto al botón dice qué falta, sin cajas de error', () => {
+      setup({ adults: 1, children: 0, infants: 0 });
+      expect(next().disabled).toBe(true);
+      const text = document.getElementById('passengers-status')?.textContent ?? '';
+      expect(text).toMatch(/Falta completar:/);
+      // Nombra los primeros y resume el resto: nunca una lista larga y asustadora.
+      for (const label of ['nombres', 'apellidos', 'número de documento']) expect(text.toLowerCase()).toContain(label);
+      expect(text).toMatch(/y \d+ más/);
+      // Ningún resumen de errores ni mensajes de error antes de que el usuario toque un campo.
+      expect(screen.queryByText(/^Revisa \d+ campos?/)).toBeNull();
+      expect(screen.queryAllByRole('alert')).toHaveLength(0);
+      expect(next().getAttribute('aria-describedby')).toBe('passengers-status');
+    });
+
+    it('con varios pasajeros dice de quién es cada dato que falta y resume el resto', () => {
+      setup({ adults: 2, children: 0, infants: 0 });
+      const text = document.getElementById('passengers-status')?.textContent ?? '';
+      expect(text).toMatch(/\(adulto 1\)/);
+      expect(text).toMatch(/y \d+ más/);
+    });
+
+    it('se activa solo cuando todo está completo y bien; el estado pasa a «Todo listo»', async () => {
+      setup({ adults: 1, children: 0, infants: 0 });
+      fill(0);
+      change(field(/^Celular/, 0), '991234567');
+      await waitFor(() => expect(next().disabled).toBe(false));
+      expect(document.getElementById('passengers-status')?.textContent).toContain(es.forms.ready);
+    });
+
+    it('un dato escrito que no sirve se nombra como «Revisa», no como «Falta», y el botón sigue desactivado', async () => {
+      setup({ adults: 1, children: 0, infants: 0 });
+      fill(0, { doc: '1710034066' });
+      change(field(/^Celular/, 0), '991234567');
+      await waitFor(() => expect(document.getElementById('passengers-status')?.textContent).toMatch(/Revisa: número de documento/));
+      expect(next().disabled).toBe(true);
+    });
+
+    it('el error de un campo aparece al salir de él, junto al campo, y se va solo al corregirlo', async () => {
+      setup({ adults: 1, children: 0, infants: 0 });
+      const doc = field(/^Número de documento/);
+      change(doc, '1710034066');
+      expect(screen.queryByText(es.validation.cedulaInvalid)).toBeNull(); // aún escribiendo: no se regaña
+      fireEvent.blur(doc);
+      expect(await screen.findByText(es.validation.cedulaInvalid)).toBeTruthy();
+      change(doc, '1710034065');
+      await waitFor(() => expect(screen.queryByText(es.validation.cedulaInvalid)).toBeNull());
+    });
+
+    it('nombres y apellidos no admiten números, puntos ni signos: no entran al teclear ni al pegar', () => {
+      setup({ adults: 1, children: 0, infants: 0 });
+      change(field(/^Nombres/), 'Ana3 María.');
+      expect(field(/^Nombres/).value).toBe('Ana María');
+      change(field(/^Apellidos/), "O'Neil-Pérez 2");
+      expect(field(/^Apellidos/).value).toBe('ONeilPérez ');
+      change(field(/^Nombres/), '12345');
+      expect(field(/^Nombres/).value).toBe('');
+    });
+
+    it('la fecha de nacimiento no deja escribir un mes mayor a 12 ni un día mayor a 31', () => {
+      setup({ adults: 1, children: 0, infants: 0 });
+      const birth = field(/^Fecha de nacimiento/);
+      change(birth, '1513');
+      expect(birth.value).toBe('15/1');
+      change(birth, '32');
+      expect(birth.value).toBe('3');
+      change(birth, '15101990');
+      expect(birth.value).toBe('15/10/1990');
+    });
+
+    it('enviar con el formulario incompleto (Enter) no lo manda ni borra lo escrito', async () => {
+      const { onDone } = setup({ adults: 1, children: 0, infants: 0 });
+      change(field(/^Apellidos/), 'Pérez');
+      fireEvent.submit(screen.getByRole('form', { name: es.purchase.passengersTitle }));
+      await waitFor(() => expect(document.activeElement).toBe(field(/^Nombres/)));
+      expect(field(/^Apellidos/).value).toBe('Pérez');
+      expect(onDone).not.toHaveBeenCalled();
+    });
   });
 
   it('valida al salir del campo (sin enviar)', async () => {

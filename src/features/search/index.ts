@@ -1,2 +1,2 @@
 export { SearchForm } from './SearchForm';
-export { queryToSearch } from './searchQuery';
+export { queryToSearch, searchToQuery } from './searchQuery';

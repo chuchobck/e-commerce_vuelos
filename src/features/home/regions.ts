@@ -13,18 +13,6 @@ export function regionOf(code: string): RegionId | undefined {
   return AIRPORTS.find((a) => a.code === code)?.region;
 }
 
-/**
- * Ciudades de salida para "Escápate este fin de semana" y sus escapadas sugeridas.
- * Cada par tiene vuelos de ida (viernes) y vuelta (domingo) en la API: ver README, sección 6.
- */
-export const ESCAPES: Record<'UIO' | 'GYE' | 'CUE', string[]> = {
-  UIO: ['GPS', 'CUE', 'MEC', 'OCC'],
-  GYE: ['GPS', 'SCY', 'UIO', 'CUE'],
-  CUE: ['GYE', 'UIO'],
-};
-
-export type EscapeOrigin = keyof typeof ESCAPES;
-
 /** Fondo de acento por región (clases fijas para que Tailwind las genere). */
 export const REGION_BG: Record<RegionId, string> = {
   galapagos: 'bg-region-galapagos',

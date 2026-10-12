@@ -1,99 +1,33 @@
-import { ArrowLeft, Ban, CalendarCheck, CalendarClock, Luggage, QrCode } from 'lucide-react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
-import { checkInStatus } from '@/features/checkin';
-import { FlightStatusCard } from '@/features/flight-status';
-import { BookingStatusBadge, TripFallback } from '@/features/trips';
-import { flightsApi, type Booking } from '@/shared/api';
+import { useAuth } from '@/features/auth';
+import { LiveFlightStatus } from '@/features/flight-status';
+import { BookingStatusBadge, TripActions, TripFallback, TripTabs, useBooking } from '@/features/trips';
+import type { Booking } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { formatMoney } from '@/shared/lib/format';
-import { useAsync } from '@/shared/lib/useAsync';
-import { Button, Card, CardTitle, ErrorState, LoadingState, TripSummary } from '@/shared/ui';
+import { Alert, Button, Card, CardTitle, TripSummary } from '@/shared/ui';
 
 const t = es.trip;
+const flight = es.aftersale.flight;
 
-/**
- * Check-in: enlace si la ventana está abierta; si no, botón deshabilitado con el motivo
- * (cuándo abre o que ya cerró) escrito al lado y asociado con aria-describedby.
- */
-function CheckInAction({ booking }: { booking: Booking }) {
-  const { available, reason } = checkInStatus(booking);
-  if (available) {
-    return (
-      <Button asChild fullWidth>
-        <Link to={routes.tripCheckIn(booking.id)}>
-          <CalendarCheck aria-hidden="true" />
-          {t.checkIn}
-        </Link>
-      </Button>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-2">
-      <Button fullWidth disabled aria-describedby="checkin-reason">
-        <CalendarCheck aria-hidden="true" />
-        {t.checkIn}
-      </Button>
-      <p id="checkin-reason" className="text-sm text-muted">
-        {reason}
-      </p>
-    </div>
-  );
+/** Tramos del viaje (ida y vuelta, con sus escalas) para consultar el estado de cada vuelo. */
+function legsOf(booking: Booking) {
+  return [booking.outbound, booking.inbound].flatMap((leg) => leg?.itinerary.segments ?? []);
 }
 
-/** Acciones de postventa disponibles según el estado de la reserva. */
-function TripActions({ booking }: { booking: Booking }) {
-  if (booking.status === 'CANCELLED') return null;
-  const links = [
-    booking.status === 'CONFIRMED' ? { to: routes.tripPasses(booking.id), label: t.passes, icon: QrCode } : null,
-    { to: routes.tripBaggage(booking.id), label: t.baggage, icon: Luggage },
-    { to: routes.tripDateChange(booking.id), label: t.dateChange, icon: CalendarClock },
-    { to: routes.tripCancel(booking.id), label: t.cancel, icon: Ban },
-  ].filter((a) => a !== null);
-
-  return (
-    <Card className="flex flex-col gap-4">
-      <CardTitle>{t.manageTitle}</CardTitle>
-      <ul className="flex flex-col gap-2">
-        {booking.status === 'CONFIRMED' ? (
-          <li>
-            <CheckInAction booking={booking} />
-          </li>
-        ) : null}
-        {links.map(({ to, label, icon: Icon }) => (
-          <li key={to}>
-            <Button asChild variant="secondary" fullWidth>
-              <Link to={to}>
-                <Icon aria-hidden="true" />
-                {label}
-              </Link>
-            </Button>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
-/** Estado del vuelo de ida con los datos del viaje: el viajero no tiene que escribir el número de vuelo. */
+/** Estado de cada vuelo del viaje, con los datos de la reserva: el viajero no escribe el número de vuelo. */
 function TripFlightStatus({ booking }: { booking: Booking }) {
-  const segment = booking.outbound.itinerary.segments[0];
-  const date = segment.departureTime.slice(0, 10);
-  const status = useAsync(() => flightsApi.getFlightStatus(segment.flightNumber, date), [segment.flightNumber, date]);
-
   return (
     <section aria-labelledby="trip-status-title" className="flex flex-col gap-4">
       <h2 id="trip-status-title" className="text-2xl">
-        {t.flightStatusTitle}
+        {flight.title}
       </h2>
-      {status.status === 'success' ? (
-        <FlightStatusCard status={status.data} />
-      ) : status.status === 'error' ? (
-        <ErrorState error={status.error} onRetry={() => void status.execute()} headingLevel="h3" />
-      ) : (
-        <LoadingState label={t.flightStatusLoading} />
-      )}
+      {legsOf(booking).map((segment) => (
+        <LiveFlightStatus key={segment.id} flightNumber={segment.flightNumber} date={segment.departureTime.slice(0, 10)} route={`${segment.origin} → ${segment.destination}`} />
+      ))}
     </section>
   );
 }
@@ -101,8 +35,10 @@ function TripFlightStatus({ booking }: { booking: Booking }) {
 /** Detalle del viaje: centro de postventa (README, sección 4). */
 export function TripPage() {
   const { id = '' } = useParams();
-  const trip = useAsync(() => flightsApi.getBooking(id), [id]);
-  const data = trip.status === 'success' ? trip.data : null;
+  const { authorized } = useAuth();
+  const trip = useBooking(id, authorized);
+  const data = trip.booking;
+  const inProgress = data && ['PENDING', 'PENDING_PAYMENT', 'TICKET_ISSUING', 'CHANGE_PENDING', 'CANCELLATION_PENDING'].includes(data.status);
 
   return (
     <Page
@@ -112,6 +48,24 @@ export function TripPage() {
     >
       {data ? (
         <>
+          <TripTabs bookingId={data.id} current="summary" />
+
+          {inProgress ? (
+            <Alert
+              variant="info"
+              live="polite"
+              title={t.status[data.status]}
+              action={
+                <Button variant="secondary" onClick={() => void trip.refresh()} loading={trip.refreshing} loadingText={es.aftersale.flight.refreshing}>
+                  <RefreshCw aria-hidden="true" />
+                  {es.aftersale.actions.refreshStatus}
+                </Button>
+              }
+            >
+              <p>{es.aftersale.actions.inProgress}</p>
+            </Alert>
+          ) : null}
+
           <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
             <Card>
               <CardTitle className="mb-6">{t.flight}</CardTitle>
@@ -128,34 +82,38 @@ export function TripPage() {
 
           <TripActions booking={data} />
 
-          {data.status !== 'CANCELLED' ? <TripFlightStatus booking={data} /> : null}
+          {data.status !== 'CANCELLED' && data.status !== 'FAILED' ? <TripFlightStatus booking={data} /> : null}
 
           <Card>
             <CardTitle className="mb-6">{t.passengers}</CardTitle>
             <ul className="flex flex-col divide-y-2 divide-border">
-              {data.passengers.map((pax) => (
-                <li key={pax.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
-                  <div className="flex flex-col">
-                    <span className="font-bold">
-                      {pax.firstName} {pax.lastName}
+              {data.passengers.map((pax) => {
+                const bags = pax.extraBaggage.reduce((n, b) => n + b.quantity, 0);
+                return (
+                  <li key={pax.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
+                    <div className="flex flex-col">
+                      <span className="font-bold">
+                        {pax.firstName} {pax.lastName}
+                      </span>
+                      <span className="text-sm text-muted">
+                        {t[`type${pax.type}`]} ·{' '}
+                        {fmt(t.document, {
+                          type: pax.documentType === 'NATIONAL_ID' ? es.documents.cedula : es.documents.passport,
+                          number: pax.documentNumber,
+                        })}
+                      </span>
+                      {bags > 0 ? <span className="text-sm text-muted">{fmt(t.extraBags, { count: bags })}</span> : null}
+                    </div>
+                    <span className="text-sm">
+                      {pax.type === 'INFANT' ? t.infantSeat : pax.seats[0] ? fmt(t.seat, { seat: pax.seats.map((s) => s.seatNumber).join(' · ') }) : t.seatAuto}
                     </span>
-                    <span className="text-sm text-muted">
-                      {t[`type${pax.type}`]} ·{' '}
-                      {fmt(t.document, {
-                        type: pax.documentType === 'NATIONAL_ID' ? es.documents.cedula : es.documents.passport,
-                        number: pax.documentNumber,
-                      })}
-                    </span>
-                  </div>
-                  <span className="text-sm">
-                    {pax.type === 'INFANT' ? t.infantSeat : pax.seats[0] ? fmt(t.seat, { seat: pax.seats.map((s) => s.seatNumber).join(' · ') }) : t.seatAuto}
-                  </span>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </Card>
 
-          <div>
+          <div className="print:hidden">
             <Button asChild variant="ghost">
               <Link to={routes.trips()}>
                 <ArrowLeft aria-hidden="true" />
@@ -165,7 +123,7 @@ export function TripPage() {
           </div>
         </>
       ) : (
-        <TripFallback state={trip} onRetry={() => void trip.execute()} />
+        <TripFallback state={trip} onRetry={() => void trip.refresh()} />
       )}
     </Page>
   );

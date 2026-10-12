@@ -19,14 +19,14 @@ import type { MockDb, StoredBooking, StoredHold } from './store';
 
 /** Como en la API: una reserva PAY-PEND- se confirma en la primera pasada del proceso de emisión. */
 export const PENDING_ISSUE_MS = 20_000;
-const PAYMENT_FORMAT = /^[A-Za-z0-9_.:-]{8,64}$/;
-const SIMULATED_PAYMENT = /^PAY-(OK|PEND|REJ)-[A-Z0-9]{4,50}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const PAYMENT_FORMAT = /^[A-Za-z0-9_.:-]{8,64}$/;
+export const SIMULATED_PAYMENT = /^PAY-(OK|PEND|REJ)-[A-Z0-9]{4,50}$/;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const problem = (status: number, code: ApiError['code'], detail: string, field?: string, reason?: string) =>
+export const problem = (status: number, code: ApiError['code'], detail: string, field?: string, reason?: string) =>
   new ApiError({ status, code, detail, fieldErrors: field ? [{ field, message: reason ?? detail }] : [] });
 
-function checkKey(key: string) {
+export function checkKey(key: string) {
   if (!key) throw problem(400, 'VALIDATION_FAILED', 'Idempotency-Key: is required', 'Idempotency-Key', 'is required');
   if (!UUID.test(key)) throw problem(400, 'VALIDATION_FAILED', 'Idempotency-Key: must be a UUID', 'Idempotency-Key', 'must be a UUID');
 }
@@ -197,7 +197,7 @@ function checkSeats(db: MockDb, offerId: string, passengers: PassengerItemDto[],
 }
 
 /** El primer asiento libre de la cabina (por fila y letra), sin contar los ya elegidos en esta reserva. */
-function firstFreeSeat(db: MockDb, offerId: string, segmentId: string, cabin: string, exclude: Set<string>): string {
+export function firstFreeSeat(db: MockDb, offerId: string, segmentId: string, cabin: string, exclude: Set<string>): string {
   const taken = takenSeats(db, segmentId);
   const seats = (mockSeatMap(offerId, segmentId).cabins ?? []).filter((c) => c.cabinClass === cabin).flatMap((c) => c.rows ?? []).flatMap((r) => r.seats ?? []);
   return seats.find((s) => s.seatNumber && !taken.has(s.seatNumber) && !exclude.has(s.seatNumber))?.seatNumber ?? '';

@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { addDays } from 'date-fns';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { RequireAuth } from '@/app/RequireAuth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { paths, routes } from '@/app/routes';
 import { AuthProvider, createLocalLock, createTokenStore, SessionManager, type AuthApi } from '@/features/auth';
@@ -16,6 +17,8 @@ import { toIsoDate, today } from '@/shared/lib/dates';
 import { CheckoutConfirmationPage } from './CheckoutConfirmationPage';
 import { CheckoutDetailsPage } from './CheckoutDetailsPage';
 import { CheckoutPaymentPage } from './CheckoutPaymentPage';
+import { LoginPage } from './LoginPage';
+import { RegisterPage } from './RegisterPage';
 import { ResultsPage } from './ResultsPage';
 
 // jsdom no trae ResizeObserver (lo usa la casilla de Radix para medir).
@@ -67,9 +70,13 @@ function renderApp(path: string, { signedIn = true } = {}) {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path={paths.results} element={<ResultsPage />} />
-          <Route path={paths.checkoutDetails} element={<CheckoutDetailsPage />} />
-          <Route path={paths.checkoutPayment} element={<CheckoutPaymentPage />} />
-          <Route path={paths.checkoutConfirmation} element={<CheckoutConfirmationPage />} />
+          <Route element={<RequireAuth />}>
+            <Route path={paths.checkoutDetails} element={<CheckoutDetailsPage />} />
+            <Route path={paths.checkoutPayment} element={<CheckoutPaymentPage />} />
+            <Route path={paths.checkoutConfirmation} element={<CheckoutConfirmationPage />} />
+          </Route>
+          <Route path={paths.login} element={<LoginPage />} />
+          <Route path={paths.register} element={<RegisterPage />} />
           <Route path={paths.trips} element={<p>MIS VIAJES</p>} />
           <Route path="/" element={<p>BUSCADOR</p>} />
         </Routes>
@@ -316,16 +323,16 @@ describe('asientos (opcional) en el paso 2', () => {
   });
 });
 
-describe('paso 2 sin sesión: cuenta incrustada', () => {
-  it('ofrece "Ya tengo cuenta" y "Crear cuenta" sin salir de la página; al ingresar, aparta el precio y pide pasajeros', async () => {
+describe('paso 2 sin sesión: va a Ingresar y vuelve sin perder nada', () => {
+  it('no muestra formularios de cuenta en el paso 2: lleva a Ingresar con el vuelo guardado y, al ingresar, vuelve y aparta el precio', async () => {
     saveSelection(selected());
     const { api } = renderApp(paths.checkoutDetails, { signedIn: false });
-    const group = await screen.findByRole('group', { name: p.accountOptions });
-    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual([p.haveAccount, p.createAccount]);
-    expect(screen.queryByLabelText(/^Nombres/)).toBeNull();
+    // Ingresar, con el vuelo elegido a la vista.
+    expect(await screen.findByRole('heading', { name: es.auth.loginHeading })).toBeTruthy();
+    expect(screen.getByRole('region', { name: p.pendingTitle })).toBeTruthy();
+    expect(screen.queryByText(/Ingresa o crea tu cuenta para continuar/)).toBeNull();
     expect(flightsApi.createHold).not.toHaveBeenCalled();
 
-    fireEvent.click(within(group).getByRole('button', { name: p.haveAccount }));
     change(await screen.findByLabelText(/^Correo electrónico/), USER.email);
     change(screen.getByLabelText(/^Contraseña/, { selector: 'input' }), 'una frase larga de prueba');
     fireEvent.click(screen.getByRole('button', { name: es.auth.submitLogin }));
@@ -338,9 +345,11 @@ describe('paso 2 sin sesión: cuenta incrustada', () => {
     expect(vi.mocked(flightsApi.createHold).mock.calls[0][0].offerId).toBe(selected().offerId);
   });
 
-  it('crear la cuenta también se hace aquí mismo', async () => {
+  it('crear la cuenta también conserva el vuelo y vuelve a la compra', async () => {
     saveSelection(selected());
     const { api } = renderApp(paths.checkoutDetails, { signedIn: false });
+    fireEvent.click(await screen.findByRole('link', { name: es.auth.createAccount }));
+    expect(await screen.findByRole('region', { name: p.pendingTitle })).toBeTruthy();
     change(await screen.findByLabelText(/^Correo electrónico/), USER.email);
     change(screen.getByLabelText(/^Crea una contraseña/, { selector: 'input' }), 'una frase larga de prueba');
     fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(es.auth.terms) }));
@@ -469,9 +478,9 @@ describe('confirmación', () => {
     expect(screen.getByRole('link', { name: p.searchAnother })).toBeTruthy();
   });
 
-  it('sin sesión pide ingresar y vuelve a la confirmación', async () => {
+  it('sin sesión va a Ingresar (RequireAuth) en vez de mostrar la reserva', async () => {
     renderApp(`/compra/confirmacion/${CONFIRMED.id}`, { signedIn: false });
-    const link = await screen.findByRole('link', { name: es.nav.login });
-    expect(decodeURIComponent(link.getAttribute('href')!)).toContain(`/compra/confirmacion/${CONFIRMED.id}`);
+    expect(await screen.findByRole('heading', { name: es.auth.loginHeading })).toBeTruthy();
+    expect(flightsApi.getBooking).not.toHaveBeenCalled();
   });
 });

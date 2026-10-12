@@ -47,13 +47,50 @@ describe('formulario de pago (simulado)', () => {
     }
   });
 
-  it('una tarjeta inválida no llega a pagarse: error en su campo', async () => {
-    const onPay = vi.fn();
-    render(<PaymentForm amount={AMOUNT} busy={false} onPay={onPay} />);
-    fill('4111111111111112');
-    fireEvent.click(screen.getByRole('button', { name: fmt(f.pay, { total: formatMoney(AMOUNT) }) }));
-    expect(await screen.findByText(es.validation.cardInvalid)).toBeTruthy();
-    expect(onPay).not.toHaveBeenCalled();
+  describe('validación en vivo', () => {
+    const pay = () => screen.getByRole('button', { name: fmt(f.pay, { total: formatMoney(AMOUNT) }) }) as HTMLButtonElement;
+    const statusText = () => document.getElementById('card-status')?.textContent ?? '';
+
+    it('al empezar «Pagar» está desactivado y dice qué falta, sin errores a la vista', () => {
+      render(<PaymentForm amount={AMOUNT} busy={false} onPay={vi.fn()} />);
+      expect(pay().disabled).toBe(true);
+      expect(statusText()).toMatch(/Falta completar:/);
+      expect(statusText()).toContain('número de tarjeta');
+      expect(screen.queryAllByRole('alert')).toHaveLength(0);
+    });
+
+    it('una tarjeta inválida no llega a pagarse: el error sale junto al campo al salir de él y el botón sigue desactivado', async () => {
+      const onPay = vi.fn();
+      render(<PaymentForm amount={AMOUNT} busy={false} onPay={onPay} />);
+      fill('4111111111111112');
+      expect(pay().disabled).toBe(true);
+      fireEvent.blur(screen.getByLabelText(new RegExp(`^${f.cardNumber}`)));
+      expect(await screen.findByText(es.validation.cardInvalid)).toBeTruthy();
+      expect(statusText()).toMatch(/Revisa: número de tarjeta/);
+      fireEvent.click(pay());
+      expect(onPay).not.toHaveBeenCalled();
+    });
+
+    it('con los cuatro datos bien, «Pagar» se activa y el estado lo dice', async () => {
+      render(<PaymentForm amount={AMOUNT} busy={false} onPay={vi.fn()} />);
+      fill(TEST_CARDS.approved);
+      await waitFor(() => expect(pay().disabled).toBe(false));
+      expect(statusText()).toContain(f.cardReady);
+    });
+
+    it('el titular solo admite letras y espacios: los números y signos no entran', () => {
+      render(<PaymentForm amount={AMOUNT} busy={false} onPay={vi.fn()} />);
+      const holder = screen.getByLabelText(new RegExp(`^${f.cardHolder}`)) as HTMLInputElement;
+      fireEvent.change(holder, { target: { value: 'ana3 pérez-1.' } });
+      expect(holder.value).toBe('ana pérez');
+    });
+
+    it('el vencimiento no deja escribir un mes mayor a 12... y el texto se ve con barra', () => {
+      render(<PaymentForm amount={AMOUNT} busy={false} onPay={vi.fn()} />);
+      const expiry = screen.getByLabelText(new RegExp(`^${f.cardExpiry}`)) as HTMLInputElement;
+      fireEvent.change(expiry, { target: { value: '0828' } });
+      expect(expiry.value).toBe('08/28');
+    });
   });
 
   it('con un pago en curso el botón queda deshabilitado (no hay doble envío)', () => {

@@ -62,6 +62,11 @@ function cryptoRandom(): number {
   return buf[0] / 2 ** 32;
 }
 
+/** Referencia nueva de la Payment API simulada con el resultado pedido: `PAY-OK-…`, `PAY-PEND-…` o `PAY-REJ-…`. */
+export function newSimulatedReference(outcome: SimulatedOutcome, random: () => number = cryptoRandom): string {
+  return `PAY-${outcome}-${referenceCode(random)}`;
+}
+
 /** Valida la tarjeta como lo haría una pasarela antes de cobrar. */
 export function isCardUsable(card: CardDetails, now: Date = new Date()): boolean {
   return (

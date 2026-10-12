@@ -23,13 +23,14 @@ export const paths = {
   checkoutDetails: `${CHECKOUT_BASE}/datos`,
   checkoutPayment: `${CHECKOUT_BASE}/pago`,
   checkoutConfirmation: `${CHECKOUT_BASE}/confirmacion/:id`,
-  trips: '/mis-viajes',
-  trip: '/mis-viajes/:id',
-  tripCheckIn: '/mis-viajes/:id/check-in',
-  tripPasses: '/mis-viajes/:id/pases',
-  tripBaggage: '/mis-viajes/:id/equipaje',
-  tripDateChange: '/mis-viajes/:id/cambiar-fecha',
-  tripCancel: '/mis-viajes/:id/cancelar',
+  trips: '/viajes',
+  trip: '/viajes/:id',
+  tripTickets: '/viajes/:id/boletos',
+  tripCheckIn: '/viajes/:id/check-in',
+  tripPasses: '/viajes/:id/pases',
+  tripBaggage: '/viajes/:id/equipaje',
+  tripDateChange: '/viajes/:id/cambiar-fecha',
+  tripCancel: '/viajes/:id/cancelar',
   flightStatus: '/estado-vuelo',
   login: '/ingresar',
   register: '/registrarse',
@@ -61,6 +62,7 @@ export const routes = {
   checkoutConfirmation: (bookingId: string) => withId(paths.checkoutConfirmation, bookingId),
   trips: () => paths.trips,
   trip,
+  tripTickets: (id: string) => withId(paths.tripTickets, id),
   tripCheckIn: (id: string) => withId(paths.tripCheckIn, id),
   tripPasses: (id: string) => withId(paths.tripPasses, id),
   tripBaggage: (id: string) => withId(paths.tripBaggage, id),
@@ -73,9 +75,17 @@ export const routes = {
   help: (section?: HelpSection) => `${paths.help}${section ? `#${section}` : ''}`,
 } as const;
 
-/** Rutas de la fase 0 que redirigen a las nuevas para que ningún enlace guardado se rompa. */
+/** Rutas viejas que redirigen a las nuevas para que ningún enlace guardado se rompa. */
 export const legacyRedirects: { from: string; to: (params: { id?: string }) => string }[] = [
   { from: '/mis-reservas', to: () => routes.trips() },
+  // Mis viajes se llamaba /mis-viajes hasta F5 (desde F6 es /viajes).
+  { from: '/mis-viajes', to: () => routes.trips() },
+  { from: '/mis-viajes/:id', to: ({ id = '' }) => routes.trip(id) },
+  { from: '/mis-viajes/:id/check-in', to: ({ id = '' }) => routes.tripCheckIn(id) },
+  { from: '/mis-viajes/:id/pases', to: ({ id = '' }) => routes.tripPasses(id) },
+  { from: '/mis-viajes/:id/equipaje', to: ({ id = '' }) => routes.tripBaggage(id) },
+  { from: '/mis-viajes/:id/cambiar-fecha', to: ({ id = '' }) => routes.tripDateChange(id) },
+  { from: '/mis-viajes/:id/cancelar', to: ({ id = '' }) => routes.tripCancel(id) },
   { from: '/reserva/:id', to: ({ id = '' }) => routes.trip(id) },
   // El check-in ya no es público: vive dentro de cada viaje.
   { from: '/check-in', to: () => routes.trips() },

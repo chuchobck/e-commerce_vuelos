@@ -1,30 +1,44 @@
-import { ChevronRight, Search, Ticket } from 'lucide-react';
+import { RefreshCw, Search, Ticket } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
-import { useAuth } from '@/features/auth';
 import { routes } from '@/app/routes';
-import { BookingStatusBadge } from '@/features/trips';
-import { flightsApi } from '@/shared/api';
+import { useAuth } from '@/features/auth';
+import { countTrips, TripCard, TripFilters, tripsFor, useTrips, useTripExtras, type TripFilter } from '@/features/trips';
+import { errorMessage } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { formatLongDate, formatTime, formatMoney } from '@/shared/lib/format';
-import { useAsync } from '@/shared/lib/useAsync';
-import { Button, EmptyState, ErrorState, LoadingState } from '@/shared/ui';
+import { toIsoDate, today } from '@/shared/lib/dates';
+import { Alert, Button, EmptyState, ErrorState, LoadingState } from '@/shared/ui';
 
 const t = es.trips;
+const l = es.aftersale.list;
 
-/** Lista de viajes del usuario. La ruta exige sesión (RequireAuth). */
+const EMPTY: Record<TripFilter, { title: string; text: string }> = {
+  upcoming: { title: l.emptyUpcomingTitle, text: l.emptyUpcomingText },
+  past: { title: l.emptyPastTitle, text: l.emptyPastText },
+  cancelled: { title: l.emptyCancelledTitle, text: l.emptyCancelledText },
+};
+
+/**
+ * Lista de viajes del usuario. La ruta exige sesión (RequireAuth). Pagina por cursor ("Cargar más") y filtra en el
+ * cliente: Próximos (el más cercano primero), Pasados y Cancelados (el más reciente primero).
+ */
 export function TripsPage() {
-  // Con sesión: si el token venció se renueva solo; si la sesión no se puede renovar, el módulo de
-  // sesión la cierra y RequireAuth pide ingresar de nuevo.
   const { authorized } = useAuth();
-  const trips = useAsync(() => authorized(() => flightsApi.listBookings()), []);
+  const trips = useTrips(authorized);
+  const [filter, setFilter] = useState<TripFilter>('upcoming');
+  const todayIso = toIsoDate(today());
+
+  const counts = useMemo(() => countTrips(trips.items, todayIso), [trips.items, todayIso]);
+  const visible = useMemo(() => tripsFor(trips.items, filter, todayIso), [trips.items, filter, todayIso]);
+  const extras = useTripExtras(visible, authorized);
 
   let content;
-  if (trips.status === 'loading' || trips.status === 'idle') {
+  if (trips.status === 'loading') {
     content = <LoadingState label={t.loading} skeletons={2} />;
   } else if (trips.status === 'error') {
-    content = <ErrorState error={trips.error} onRetry={() => void trips.execute()} />;
-  } else if (trips.data.length === 0) {
+    content = <ErrorState error={trips.error} onRetry={trips.reload} />;
+  } else if (trips.items.length === 0) {
     content = (
       <EmptyState
         title={t.emptyTitle}
@@ -42,37 +56,61 @@ export function TripsPage() {
     );
   } else {
     content = (
-      <ul aria-label={t.listLabel} className="flex flex-col gap-4">
-        {trips.data.map((bk) => {
-          const first = bk.outbound.itinerary.segments[0];
-          const last = bk.outbound.itinerary.segments[bk.outbound.itinerary.segments.length - 1];
-          return (
-            <li key={bk.id}>
-              <article className="flex flex-wrap items-center justify-between gap-4 rounded border-2 border-border bg-surface p-6 shadow-card">
-                <div className="flex flex-col gap-2">
-                  <h2 className="text-xl">
-                    {fmt(es.results.route, { origin: first.origin, destination: last.destination })}
-                    <span className="font-normal text-muted"> · {bk.code}</span>
-                  </h2>
-                  <p className="text-muted">
-                    {formatLongDate(first.departureTime)} · {formatTime(first.departureTime)} ·{' '}
-                    {fmt(t.passengersCount, { count: bk.passengers.length })} · {formatMoney(bk.total)}
-                  </p>
-                  <div>
-                    <BookingStatusBadge status={bk.status} />
-                  </div>
-                </div>
-                <Button asChild variant="secondary">
-                  <Link to={routes.trip(bk.id)}>
-                    {fmt(t.view, { code: bk.code })}
-                    <ChevronRight aria-hidden="true" />
+      <>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <TripFilters value={filter} onChange={setFilter} counts={counts} />
+          <Button variant="ghost" onClick={trips.reload}>
+            <RefreshCw aria-hidden="true" />
+            {l.refresh}
+          </Button>
+        </div>
+
+        <p role="status" className="text-sm text-muted">
+          {fmt(l.shown, { count: visible.length, total: trips.items.length })}
+        </p>
+
+        {visible.length === 0 ? (
+          <EmptyState
+            title={EMPTY[filter].title}
+            text={trips.hasMore ? l.emptyFilteredMore : EMPTY[filter].text}
+            icon={<Ticket className="size-8" />}
+            headingLevel="h2"
+            action={
+              filter === 'upcoming' && !trips.hasMore ? (
+                <Button asChild>
+                  <Link to={routes.search()}>
+                    <Search aria-hidden="true" />
+                    {es.common.searchFlights}
                   </Link>
                 </Button>
-              </article>
-            </li>
-          );
-        })}
-      </ul>
+              ) : undefined
+            }
+          />
+        ) : (
+          <ul aria-label={t.listLabel} className="flex flex-col gap-4">
+            {visible.map((trip) => (
+              <li key={trip.id}>
+                <TripCard trip={trip} extra={extras[trip.id]} />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {trips.error ? (
+          <Alert variant="error" live="assertive" title={es.states.errorTitle}>
+            <p>{errorMessage(trips.error)}</p>
+          </Alert>
+        ) : null}
+
+        {trips.hasMore ? (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-muted">{l.moreHint}</p>
+            <Button variant="secondary" onClick={trips.loadMore} loading={trips.loadingMore} loadingText={l.loadingMore}>
+              {l.loadMore}
+            </Button>
+          </div>
+        ) : null}
+      </>
     );
   }
 

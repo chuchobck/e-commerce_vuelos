@@ -35,6 +35,12 @@ describe('SearchFormSchema', () => {
     expect(errorsOf({ origin: '' }).origin).toBe(v.requiredSelect);
     expect(errorsOf({ destination: 'UIO' }).destination).toBe(v.sameAirport);
   });
+  it('ida y vuelta exige que la ruta también tenga vuelos de regreso (hay rutas de un solo sentido)', () => {
+    // CUE→GPS existe pero GPS→CUE no.
+    expect(errorsOf({ origin: 'CUE', destination: 'GPS' })).toEqual({});
+    expect(errorsOf({ tripType: 'ROUND', origin: 'CUE', destination: 'GPS', returnDate: inDays(15) }).destination).toBe(v.noReturnRoute);
+    expect(errorsOf({ tripType: 'ROUND', origin: 'UIO', destination: 'GYE', returnDate: inDays(15) })).toEqual({});
+  });
   it('fechas no pasadas y regreso ≥ salida', () => {
     expect(errorsOf({ departDate: toDisplayDate(subDays(today(), 1)) }).departDate).toBe(v.datePast);
     expect(errorsOf({ tripType: 'ROUND', returnDate: inDays(5) }).returnDate).toBe(v.returnBeforeDeparture);

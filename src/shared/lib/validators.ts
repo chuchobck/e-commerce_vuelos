@@ -25,6 +25,24 @@ export function onlyDigits(value: string): string {
 }
 
 /**
+ * Nombres de personas (pasajeros, titular de la tarjeta): solo letras (con tildes y ñ) y espacios. Lo demás se quita al
+ * teclear y al pegar, sin mensaje de error: los números y signos simplemente no entran. No empieza con espacio ni
+ * lleva espacios seguidos.
+ */
+export function onlyLetters(value: string): string {
+  return value
+    .normalize('NFC')
+    .replace(/[^\p{L}\p{M} ]+/gu, '')
+    .replace(/^ +/, '')
+    .replace(/ {2,}/g, ' ');
+}
+
+/** Número de vuelo mientras se escribe: mayúsculas, sin espacios ni signos ("la 1400" → "LA1400"). */
+export function sanitizeFlightNumber(value: string): string {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
+
+/**
  * Cédula ecuatoriana: 10 dígitos, provincia 01–24 (o 30 para ecuatorianos en el exterior),
  * tercer dígito < 6 (persona natural) y dígito verificador por módulo 10.
  */

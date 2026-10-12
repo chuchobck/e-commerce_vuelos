@@ -47,7 +47,7 @@ interface QuantityInputProps {
   onChange: (value: number) => void;
   /** Si es false, el botón + se deshabilita aunque no se haya llegado a `max` (p. ej. tope total de pasajeros). */
   canIncrease?: boolean;
-  /** id del grupo (enfocable con tabIndex -1) para enlazarlo desde el resumen de errores. */
+  /** id del grupo (enfocable con tabIndex -1) para llevar el foco allí desde fuera. */
   id?: string;
   className?: string;
 }

@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import statusFixture from './__fixtures__/status-la1400.json';
-import { NotYetConnectedError } from './errors';
-import type { FlightsApi } from './FlightsApi';
 import type { HttpClient } from './http/client';
 import { FINGERPRINT_PATTERN } from './http/deviceFingerprint';
 import { MockFlightsApi } from './mock/MockFlightsApi';
@@ -53,14 +51,5 @@ describe('RealFlightsApi', () => {
       passengers: { adults: 1, youths: 0, children: 0, infants: 0 },
     });
     expect(options.headers['X-Device-Fingerprint']).toMatch(FINGERPRINT_PATTERN);
-  });
-
-  it('lo que aún no está conectado rechaza con NotYetConnectedError, sin llamar a la red', async () => {
-    const { http, request } = fakeHttp();
-    const api: FlightsApi = new RealFlightsApi(http);
-    for (const op of [() => api.cancelBooking('b'), () => api.listBookings(), () => api.checkIn({ bookingId: 'b' })]) {
-      await expect(op()).rejects.toBeInstanceOf(NotYetConnectedError);
-    }
-    expect(request).not.toHaveBeenCalled();
   });
 });

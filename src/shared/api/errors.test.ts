@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { es, fmt } from '@/shared/i18n';
-import { ApiError, authErrorMessage, authFieldErrors, errorMessage, fieldErrorMessage, NotYetConnectedError } from './errors';
+import { abortedError, ApiError, authErrorMessage, authFieldErrors, errorMessage, fieldErrorMessage, isAbortError, NotYetConnectedError } from './errors';
 
 const e = es.errors;
 const err = (status: number, extra: Partial<ConstructorParameters<typeof ApiError>[0]> = {}) => new ApiError({ status, ...extra });
@@ -38,6 +38,16 @@ describe('mensajes de error por status (qué pasó y qué hacer)', () => {
   it('nunca muestra el detail técnico de la API', () => {
     const technical = 'itineraries[0].departureDate: must not be in the past';
     expect(errorMessage(err(400, { code: 'VALIDATION_FAILED', detail: technical }))).not.toContain('must not');
+  });
+
+  it('el backend rotula como VALIDATION_FAILED casi todo: la postventa se distingue por estado y parámetro', () => {
+    // 409 genérico = reserva que ya no está confirmada, trámite en proceso u oferta ya usada.
+    expect(errorMessage(err(409, { code: 'VALIDATION_FAILED' }))).toBe(e.bookingStateChanged);
+    // Una oferta de cambio o cotización vencida hace rato se borra: 422 con su id.
+    expect(errorMessage(err(422, { code: 'VALIDATION_FAILED', fieldErrors: [{ field: 'changeOfferId', message: 'not found' }] }))).toBe(e.changeOfferExpired);
+    expect(errorMessage(err(422, { code: 'VALIDATION_FAILED', fieldErrors: [{ field: 'quoteId', message: 'not found' }] }))).toBe(e.quoteExpired);
+    // Otro 422 sigue siendo el genérico.
+    expect(errorMessage(err(422, { code: 'VALIDATION_FAILED', fieldErrors: [{ field: 'passengerId', message: 'x' }] }))).toBe(e.validation422);
   });
 
   it('un error que no es de la API da el mensaje genérico', () => {
@@ -81,5 +91,15 @@ describe('errores de cuenta (/auth/*)', () => {
     expect(authFieldErrors(err(400, { fieldErrors: [{ field: 'password', message: 'password must be shorter than or equal to 128 characters' }] }))).toEqual({
       password: es.validation.passwordMax,
     });
+  });
+});
+
+describe('petición cancelada', () => {
+  it('es un ApiError ABORTED que se reconoce como cancelación y no como falla de red', () => {
+    expect(abortedError()).toBeInstanceOf(ApiError);
+    expect(isAbortError(abortedError())).toBe(true);
+    expect(isAbortError(new ApiError({ status: 0, code: 'NETWORK' }))).toBe(false);
+    expect(isAbortError(new Error('x'))).toBe(false);
+    expect(isAbortError(undefined)).toBe(false);
   });
 });

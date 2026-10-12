@@ -1,8 +1,9 @@
 import { addDays, format } from 'date-fns';
 import { CHECKIN_CLOSES_MINUTES, CHECKIN_OPENS_HOURS } from '@/shared/lib/checkin';
 import { stableHash } from '@/shared/lib/stableHash';
-import type { ItineraryDto } from '../contract';
-import { mockSearch } from './generators';
+import { parseMoney, toDecimalString } from '@/shared/lib/money';
+import type { ItineraryDto, PassengerItemDto } from '../contract';
+import { forceFlightDelay, mockSearch } from './generators';
 import { CLIENT_SCOPES } from './auth';
 import { DB_VERSION, type MockDb, type StoredBooking } from './store';
 
@@ -38,68 +39,144 @@ export function demoBookingId(code: string): string {
   return `00000000-0000-4000-8000-${stableHash(code).slice(-12)}`;
 }
 
-/** Reserva confirmada de la cuenta demo, como la devolvería GET /bookings/{id}. */
-function booking(code: string, itinerary: ItineraryDto, brand: string, seat: string | null): StoredBooking {
+interface DemoOptions {
+  status?: StoredBooking['dto']['status'];
+  /** Días que se corren las horas del itinerario (negativo = ya pasó). */
+  shiftDays?: number;
+  /** Adulto + infante en brazos, para probar equipaje y asientos por pasajero. */
+  withInfant?: boolean;
+  slowCancel?: boolean;
+  /** Minutos que se resta a la fecha de compra, para ordenar la lista. */
+  agoMinutes?: number;
+}
+
+const DAY_MS = 86_400_000;
+
+/** El mismo itinerario con todas las horas corridas (la reserva "pasada" de la demostración). */
+function shifted(itinerary: ItineraryDto, days: number): ItineraryDto {
+  if (days === 0) return itinerary;
+  const move = (at: string) => new Date(new Date(at).getTime() + days * DAY_MS).toISOString();
+  return {
+    ...itinerary,
+    segments: itinerary.segments.map((sg) => ({
+      ...sg,
+      departure: { ...sg.departure, at: move(sg.departure.at) },
+      arrival: { ...sg.arrival, at: move(sg.arrival.at) },
+    })),
+  };
+}
+
+/** Reserva de la cuenta demo, como la devolvería GET /bookings/{id}. */
+function booking(code: string, source: ItineraryDto, brand: string, seat: string | null, options: DemoOptions = {}): StoredBooking {
+  const itinerary = shifted(source, options.shiftDays ?? 0);
   const fare = itinerary.pricingOptions.find((f) => f.fareBrand === brand) ?? itinerary.pricingOptions[0];
-  const price = fare.pricePerPassengerType.find((x) => x.passengerType === 'ADULT')?.price ?? { currency: 'USD', total: '0.00' };
+  const priceOf = (type: string) => fare.pricePerPassengerType.find((x) => x.passengerType === type)?.price ?? { currency: 'USD', total: '0.00' };
+  const adult = priceOf('ADULT');
+  const infant = priceOf('INFANT');
+  const grandTotal = options.withInfant
+    ? { currency: adult.currency, total: toDecimalString({ cents: parseMoney(adult.total, adult.currency).cents + parseMoney(infant.total, infant.currency).cents, currency: adult.currency }) }
+    : adult;
   const bookingId = demoBookingId(code);
-  const createdAt = new Date().toISOString();
+  const createdAt = new Date(Date.now() - (options.agoMinutes ?? 0) * 60_000).toISOString();
   const segments = itinerary.segments;
+  const person = {
+    nationality: 'EC',
+    contact: { email: 'demo@quinde.ec', phone: '+593991234567' },
+    documentType: 'NATIONAL_ID' as const,
+  };
+  const passengers: PassengerItemDto[] = [
+    {
+      ...person,
+      passengerId: 'PAX1',
+      passengerType: 'ADULT',
+      firstName: 'María José',
+      lastName: 'Andrade Pérez',
+      documentNumber: '1710034065',
+      birthDate: '1990-04-18',
+      gender: 'F',
+      assignedSeats: segments.map((sg, i) => ({ segmentId: sg.segmentId, seatNumber: seat ?? `${14 + i}C` })),
+      extraBaggage: [],
+    },
+    ...(options.withInfant
+      ? [
+          {
+            ...person,
+            passengerId: 'PAX2',
+            passengerType: 'INFANT' as const,
+            associatedAdultId: 'PAX1',
+            firstName: 'Mateo',
+            lastName: 'Andrade Pérez',
+            documentNumber: '1750000001',
+            birthDate: format(addDays(new Date(), -400), 'yyyy-MM-dd'),
+            gender: 'M' as const,
+            assignedSeats: [],
+            extraBaggage: [],
+          },
+        ]
+      : []),
+  ];
   return {
     ownerId: DEMO_USER_ID,
     checkedIn: false,
+    ...(options.slowCancel ? { slowCancel: true } : {}),
     dto: {
       bookingId,
       pnr: code,
-      status: 'CONFIRMED',
-      grandTotal: price,
+      status: options.status ?? 'CONFIRMED',
+      grandTotal,
       createdAt,
       itineraries: [{ ...itinerary, pricingOptions: [{ ...fare, pricePerPassengerType: [] }] }],
-      passengers: [
-        {
-          passengerId: 'PAX1',
-          passengerType: 'ADULT',
-          firstName: 'María José',
-          lastName: 'Andrade Pérez',
-          documentType: 'NATIONAL_ID',
-          documentNumber: '1710034065',
-          nationality: 'EC',
-          birthDate: '1990-04-18',
-          gender: 'F',
-          contact: { email: 'demo@quinde.ec', phone: '+593991234567' },
-          assignedSeats: segments.map((sg, i) => ({ segmentId: sg.segmentId, seatNumber: seat ?? `${14 + i}C` })),
-          extraBaggage: [],
-        },
-      ],
-      tickets: [
-        {
-          ticketId: `${bookingId}-t1`,
-          bookingId,
-          passengerId: 'PAX1',
-          eTicketNumber: `0451${code.length}0000000${code.charCodeAt(0) % 10}`,
-          status: 'ISSUED',
-          issuedAt: createdAt,
-          segments: segments.map((sg, i) => ({ segmentId: sg.segmentId, status: 'ISSUED', couponNumber: String(i + 1) })),
-        },
-      ],
-      changes: [{ changedAt: createdAt, description: 'Booking confirmed' }],
+      passengers,
+      tickets: passengers.map((p, n) => ({
+        ticketId: `${bookingId}-t${n + 1}`,
+        bookingId,
+        passengerId: p.passengerId,
+        eTicketNumber: `0451${code.length}0000000${(code.charCodeAt(0) + n) % 10}`,
+        status: 'ISSUED' as const,
+        issuedAt: createdAt,
+        segments: segments.map((sg, i) => ({ segmentId: sg.segmentId, status: 'ISSUED' as const, couponNumber: String(i + 1) })),
+      })),
+      changes: [{ changedAt: createdAt, description: options.status === 'CANCELLED' ? 'Booking cancelled' : 'Booking confirmed' }],
     },
   };
 }
 
-const DEMO_CODES = ['QD7K2M', 'QG4P9X'];
+/**
+ * Reservas de demostración (cuenta demo). Cada una sirve para probar un caso:
+ *  - QD7K2M: dentro de la ventana de check-in (si hay vuelo), familia CLASSIC.
+ *  - QG4P9X: a 21 días, FLEX (fuera de ventana: el check-in responde 409).
+ *  - QR2V6W: a 3 días, CLASSIC con un infante y un vuelo RETRASADO 45 minutos.
+ *  - QW8M3K: a 11 días, FLEX; su cancelación queda EN PROCESO (202).
+ *  - QB5T1N: BASIC (sin cambios ni reembolso) a 14 días.
+ *  - QP1A5B: ya viajó (Pasados).
+ *  - QC9S4Z: cancelada (Cancelados).
+ */
+const DEMO_CODES = ['QD7K2M', 'QG4P9X', 'QR2V6W', 'QW8M3K', 'QB5T1N', 'QP1A5B', 'QC9S4Z'];
 
 function todayKey() {
   return format(new Date(), 'yyyy-MM-dd');
 }
 
+const inDays = (n: number) => format(addDays(new Date(), n), 'yyyy-MM-dd');
+
 function demoBookings(): StoredBooking[] {
   const bookings: StoredBooking[] = [];
-  const soon = legInCheckInWindow();
-  if (soon) bookings.push(booking('QD7K2M', soon, 'CLASSIC', null));
+  const add = (code: string, origin: string, destination: string, day: number, brand: string, seat: string | null, options?: DemoOptions) => {
+    const itinerary = legsOn(origin, destination, inDays(day))[0];
+    if (itinerary) bookings.push(booking(code, itinerary, brand, seat, options));
+    return itinerary;
+  };
 
-  const later = legsOn('UIO', 'GPS', format(addDays(new Date(), 21), 'yyyy-MM-dd'))[0];
-  if (later) bookings.push(booking('QG4P9X', later, 'FLEX', '12A'));
+  const soon = legInCheckInWindow();
+  if (soon) bookings.push(booking('QD7K2M', soon, 'CLASSIC', null, { agoMinutes: 10 }));
+  add('QG4P9X', 'UIO', 'GPS', 21, 'FLEX', '12A', { agoMinutes: 20 });
+  const delayed = add('QR2V6W', 'UIO', 'GYE', 3, 'CLASSIC', null, { withInfant: true, agoMinutes: 30 });
+  if (delayed) forceFlightDelay(delayed.segments[0].flightNumber, inDays(3), 45);
+  add('QW8M3K', 'UIO', 'GYE', 11, 'FLEX', null, { slowCancel: true, agoMinutes: 40 });
+  add('QB5T1N', 'GYE', 'UIO', 14, 'BASIC', null, { agoMinutes: 50 });
+  const past = legsOn('UIO', 'GYE', inDays(1))[0];
+  if (past) bookings.push(booking('QP1A5B', past, 'CLASSIC', null, { shiftDays: -9, agoMinutes: 60 * 24 * 12 }));
+  add('QC9S4Z', 'CUE', 'UIO', 5, 'CLASSIC', null, { status: 'CANCELLED', agoMinutes: 60 * 24 * 3 });
   return bookings;
 }
 
@@ -133,5 +210,7 @@ export function seedDb(): MockDb {
     bookings: demoBookings(),
     idempotency: [],
     paymentReferences: [],
+    changeOffers: [],
+    quotes: [],
   };
 }

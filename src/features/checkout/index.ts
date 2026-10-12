@@ -3,7 +3,8 @@
  * La lógica es una máquina de estados pura (machine.ts) que ejecuta flow.ts; las páginas la usan
  * con `checkout` (acciones) y `useCheckout()` (estado). Solo lo que se exporte aquí es público.
  */
-export { AccountBlock } from './AccountBlock';
+export { BuyingAs } from './BuyingAs';
+export { PendingTrip } from './PendingTrip';
 export { CheckoutSteps } from './CheckoutSteps';
 export { BookingCode } from './BookingCode';
 export { CheckoutAside } from './CheckoutAside';

@@ -1,22 +1,34 @@
 import { apiConfig } from '../config';
-import { ApiError, type ApiErrorCode } from '../errors';
+import { abortedError, ApiError, type ApiErrorCode } from '../errors';
 
 /** Estados de error que el mock puede simular para diseñar los estados de la interfaz. */
-export type SimulatedStatus = 409 | 422 | 429 | 503;
+export type SimulatedStatus = 403 | 409 | 422 | 429 | 503;
 
 const FORCE_KEY = 'quinde.mock.forceError';
 
 const CODES: Record<SimulatedStatus, ApiErrorCode> = {
+  403: 'VALIDATION_FAILED',
   409: 'CONFLICT',
   422: 'VALIDATION_FAILED',
   429: 'RATE_LIMIT_EXCEEDED',
   503: 'SERVICE_UNAVAILABLE',
 };
 
-/** Espera entre 300 y 800 ms para simular la red. */
-function latency(min = 300, max = 800): Promise<void> {
-  const ms = Math.floor(Math.random() * (max - min + 1)) + min;
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Espera entre 300 y 800 ms (más `extraMs`) para simular la red. Con una señal cancelada se corta y lanza ABORTED. */
+function latency(min = 300, max = 800, signal?: AbortSignal, extraMs = 0): Promise<void> {
+  const ms = Math.floor(Math.random() * (max - min + 1)) + min + extraMs;
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortedError());
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortedError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 /**
@@ -37,7 +49,7 @@ function forcedStatus(operation: string): SimulatedStatus | null {
   }
 }
 
-function simulated(status: SimulatedStatus, operation: string) {
+export function simulated(status: SimulatedStatus, operation: string) {
   // 429 y 503 llegan con Retry-After, como en la API.
   const retryAfter = status === 429 ? 10 : status === 503 ? 5 : undefined;
   return new ApiError({ status, code: CODES[status], detail: `Error simulado (${operation})`, retryAfter });
@@ -52,10 +64,27 @@ function maybeFail(operation: string, allowed: SimulatedStatus[]): void {
   throw simulated(status, operation);
 }
 
-/** Simula red: latencia + error ocasional. */
-export async function simulate(operation: string, allowed: SimulatedStatus[]): Promise<void> {
-  await latency();
-  maybeFail(operation, allowed);
+export interface SimulateOptions {
+  /** Con una señal, cancelarla corta la espera (ABORTED). */
+  signal?: AbortSignal;
+  /** `false`: sin errores aleatorios (los forzados con `setForcedError` siguen aplicando). Para peticiones que nadie espera en pantalla. */
+  randomErrors?: boolean;
+  /** Espera adicional, para simular un servidor lento (el arranque en frío de Render tarda ~50 s). */
+  extraDelayMs?: number;
+}
+
+/**
+ * Simula red: latencia + error ocasional. Cada llamada deja una marca `mock:<operación>` en `performance`, así quien mide
+ * (una prueba, el panel de red de Chrome) puede contar cuántas peticiones hizo una pantalla.
+ */
+export async function simulate(operation: string, allowed: SimulatedStatus[], { signal, randomErrors = true, extraDelayMs = 0 }: SimulateOptions = {}): Promise<void> {
+  try {
+    performance.mark(`mock:${operation}`);
+  } catch {
+    /* sin Performance API */
+  }
+  await latency(300, 800, signal, extraDelayMs);
+  maybeFail(operation, randomErrors ? allowed : []);
 }
 
 /** Operaciones de la API simulada que aceptan un error forzado. */
@@ -67,6 +96,13 @@ export const MOCK_OPERATIONS = [
   'getSeatMap',
   'createBooking',
   'listBookings',
+  'getTickets',
+  'getTicket',
+  'getBaggageOptions',
+  'addBaggage',
+  'searchDateChange',
+  'confirmDateChange',
+  'getCancellationQuote',
   'getBooking',
   'cancelBooking',
   'checkIn',
@@ -79,7 +115,7 @@ export const MOCK_OPERATIONS = [
   'me',
 ] as const;
 
-export const SIMULATED_STATUSES: SimulatedStatus[] = [409, 422, 429, 503];
+export const SIMULATED_STATUSES: SimulatedStatus[] = [403, 409, 422, 429, 503];
 
 /** Error forzado actual, p. ej. "search:503" o "*:409"; null si no hay. */
 export function getForcedError(): string | null {

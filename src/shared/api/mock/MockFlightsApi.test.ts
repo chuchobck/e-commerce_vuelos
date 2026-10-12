@@ -29,6 +29,7 @@ const DEMO = { email: 'demo@quinde.ec', password: 'quinde-demo-2026' };
 const PASSWORD = 'una frase larga de prueba';
 // Reserva de demostración a 21 días: fuera de la ventana de check-in.
 const LATER_BOOKING = demoBookingId('QG4P9X');
+const KEY = '3f2b8a6e-6a8e-4a0e-9d0e-0c6f5f6b0a11';
 
 describe('cuenta del mock (mismas reglas y errores que /auth/* de la API)', () => {
   beforeEach(() => {
@@ -90,21 +91,46 @@ describe('check-in del mock (alineado con la API)', () => {
 
   it('exige sesión', async () => {
     const { api } = await freshApi();
-    expect((await failure(api.checkIn({ bookingId: LATER_BOOKING }))).status).toBe(401);
+    expect((await failure(api.checkIn(LATER_BOOKING, KEY))).status).toBe(401);
   });
 
   it('una reserva ajena responde 404', async () => {
     const { api, auth } = await freshApi();
     await api.register({ email: 'otra@correo.com', password: PASSWORD });
     auth.token = (await api.login({ email: 'otra@correo.com', password: PASSWORD })).accessToken;
-    expect((await failure(api.checkIn({ bookingId: LATER_BOOKING }))).status).toBe(404);
+    expect((await failure(api.checkIn(LATER_BOOKING, KEY))).status).toBe(404);
   });
 
   it('fuera de la ventana responde 409 CHECK_IN_NOT_AVAILABLE (código del contrato)', async () => {
     const { api, auth } = await freshApi();
     auth.token = (await api.login(DEMO)).accessToken;
-    const error = await failure(api.checkIn({ bookingId: LATER_BOOKING }));
+    const error = await failure(api.checkIn(LATER_BOOKING, KEY));
     expect(error.status).toBe(409);
     expect(error.code).toBe('CHECK_IN_NOT_AVAILABLE');
   });
 }, 20_000);
+
+describe('búsqueda del mock: cancelar y opciones', () => {
+  const params = { origin: 'UIO', destination: 'GYE', departDate: '2026-12-01', passengers: { adults: 1, children: 0, infants: 0 }, cabin: 'ECONOMY' as const };
+
+  it('con la señal ya cancelada falla con ABORTED sin esperar la latencia simulada', async () => {
+    const { api } = await freshApi();
+    const controller = new AbortController();
+    controller.abort();
+    expect((await failure(api.search(params, { signal: controller.signal }))).code).toBe('ABORTED');
+  });
+
+  it('cancelar a mitad de la espera corta la búsqueda con ABORTED', async () => {
+    const { api } = await freshApi();
+    const controller = new AbortController();
+    const pending = failure(api.search(params, { signal: controller.signal }));
+    controller.abort();
+    expect((await pending).code).toBe('ABORTED');
+  });
+
+  it('sin señal sigue respondiendo con ofertas', async () => {
+    const { api } = await freshApi();
+    expect((await api.search({ ...params, departDate: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10) })).offers.length).toBeGreaterThan(0);
+  });
+}, 20_000);
+

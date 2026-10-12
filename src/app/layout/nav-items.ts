@@ -19,7 +19,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: routes.flightStatus(), label: es.nav.status, icon: PlaneTakeoff, activeOn: [paths.flightStatus] },
 ];
 
-/** `/` solo coincide exacto; las demás rutas incluyen sus subrutas (/mis-viajes/:id…). */
+/** `/` solo coincide exacto; las demás rutas incluyen sus subrutas (/viajes/:id…). */
 export function isNavItemActive(item: NavItem, pathname: string) {
   return item.activeOn.some((base) =>
     base === paths.home ? pathname === base : pathname === base || pathname.startsWith(`${base}/`),

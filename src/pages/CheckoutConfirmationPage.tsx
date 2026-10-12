@@ -1,4 +1,4 @@
-import { LogIn, Search, Ticket } from 'lucide-react';
+import { Search, Ticket } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
@@ -20,7 +20,7 @@ const title = p.confirmationTitle;
  */
 export function CheckoutConfirmationPage() {
   const { id = '' } = useParams();
-  const { status, user, authorized } = useAuth();
+  const { status, authorized } = useAuth();
   const state = useCheckout();
   const [loadError, setLoadError] = useState<unknown>(null);
   const authorizedRef = useRef(authorized);
@@ -42,19 +42,6 @@ export function CheckoutConfirmationPage() {
   let content;
   if (status === 'restoring') {
     content = <LoadingState label={es.session.restoring} />;
-  } else if (!user) {
-    content = (
-      <EmptyState
-        title={p.confirmationTitle}
-        text={p.confirmationLoginText}
-        icon={<LogIn className="size-8" />}
-        action={
-          <Button asChild>
-            <Link to={routes.login(routes.checkoutConfirmation(id))}>{es.nav.login}</Link>
-          </Button>
-        }
-      />
-    );
   } else if (loadError) {
     content =
       isApiError(loadError) && (loadError.status === 404 || loadError.status === 400) ? (

@@ -44,8 +44,14 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - Límite de la API: 20 búsquedas por minuto por IP. No disparar búsquedas en ráfaga (usar caché).
 - Rutas: nunca como texto suelto. Patrones en `paths`, enlaces con `routes.*` (`routes.trip(id)`),
   todo en `src/app/routes.ts`. Rutas con sesión van bajo `RequireAuth` en `routeTable.tsx`.
-- `/compra/*` no exige sesión: el ingreso ocurre dentro del paso 2. La selección del paso 1 vive
-  en `sessionStorage` (`features/checkout/selection.ts`) y el hold se crea en el paso 2 con sesión.
+- `/compra/*` exige sesión (`RequireAuth`): sin ella se va a `/ingresar?volver=/compra/datos`, donde
+  `PendingTrip` muestra el vuelo guardado, y se vuelve sin perder nada. El paso 2 no tiene formularios de
+  cuenta. La selección del paso 1 vive en `sessionStorage` (`features/checkout/selection.ts`) y el hold se
+  crea en el paso 2.
+- Buscador: origen y destino son `Combobox` (sugerencias al escribir, sin tildes); el botón de buscar está
+  desactivado hasta que los datos sean válidos y se explica qué falta. Sin vuelos nunca hay un callejón
+  sin salida: `NoFlights` ofrece fechas cercanas (máx. 6 búsquedas, memorizadas), otra cabina y otros destinos.
+  Ida y vuelta se eligen en dos pestañas (`LegTabs`).
 - Textos: todos en `src/shared/i18n/es.ts` (español de Ecuador). Colores: solo tokens.
 - Pistas de prueba del mock ("Para probar…", cuenta demo): siempre dentro de `<MockOnly>`.
 - Un componente por archivo. Al quitar o reemplazar algo, borrar todo lo que quede sin uso
@@ -81,8 +87,7 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - Tarjetas: solo en `shared/payments` y en el formulario; nunca en almacenamiento, logs ni hacia la
   API de vuelos (solo viaja `paymentReference`). Las tarjetas de prueba solo con el mock o en desarrollo.
 - Pantallas de la compra (F4b): `CheckoutLayout` (dos columnas) + `CheckoutAside` (temporizador, resumen,
-  cancelar). El panel nunca es una barra fija sobre los campos. La cuenta incrustada recibe `LoginForm` y
-  `RegisterForm` desde la página (un módulo de `features` no importa de otro). Las reglas de pasajero viven en
+  cancelar). El panel nunca es una barra fija sobre los campos. Las reglas de pasajero viven en
   `passengers.ts` y siguen el DTO del backend; la nacionalidad reservable es `BOOKABLE_COUNTRIES` (hoy, Ecuador).
 - Asientos (F5): el selector es opcional y va plegado en el paso 2 (no suma clics). La página lo compone
   con `PassengersForm` (`seats`); la elección es `passengerId → segmentId → asiento` y viaja como
@@ -93,6 +98,43 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - Mensajes de compra: catálogo único `es.purchaseErrors`, elegido por `features/checkout/messages.ts`.
 - `npm run test:api` crea holds y reservas **solo contra el backend local**; nunca contra Render.
   Límites: 30 holds y 10 reservas por minuto por IP.
+
+## Postventa y Mis viajes (desde F6)
+
+- Todo cuelga de `/viajes` (`routes.trips()`, `routes.trip(id)`, …); `/mis-viajes*` solo redirige. Las acciones que se ofrecen salen de
+  `features/trips/bookingActions.ts` (estado, salida y `changeable`); una pantalla no decide por su cuenta.
+- La F6 se hizo **solo con el mock**: nada de ella está verificado contra la API real. Lo asumido lleva `// DISCREPANCIA:` y está en
+  `docs/DISCREPANCIAS-F6.md` («Pendiente de verificación real»); los pasos de comprobación, en la sección 5c del README. Al verificar un
+  endpoint, se mueve su fila a «Lo que aprendimos de la API real» (README, sección 6) y se corrige el código.
+- Toda escritura de postventa (check-in, equipaje, cambio de fecha, cancelación) devuelve `PostSaleOutcome`: hecho (cualquier 2xx que no
+  sea 202) o pendiente (202). Lleva `Idempotency-Key` de `shared/lib/attemptKeys.ts`: una por intento; el mismo contenido reenvía la
+  misma clave, otro pago u otra cantidad es clave nueva, y al terminar bien se olvida. Nunca se reintenta una escritura sola.
+- Un 422 de pago rechazado no pierde lo elegido: se conserva la selección y la referencia se cambia por una nueva. Un 403 de permiso
+  se explica con el mensaje de permisos (`es.errors.forbidden403`), nunca como pago rechazado.
+- Equipaje: una petición por pasajero e itinerario, cada una con su referencia (`referenceFor`) y su clave; si una falla, se detiene.
+- Un hook con efecto lee `useAuth().authorized` por `ref`: cambia de identidad en cada render del proveedor y repetiría la carga.
+- El QR se dibuja en el cliente (`qrcode-generator`, solo dentro de `shared/ui/qr-image.tsx`, cargado con `lazy` desde `qr-code.tsx`;
+  nunca importarlo desde un `index.ts` de barril). Siempre negro sobre blanco: un lector no entiende un QR invertido.
+- `NotYetConnectedError` queda como mecanismo para lo que falte conectar; desde F6 ninguna operación de `FlightsApi` lo lanza.
+
+## Ofertas e inicio (desde F7)
+
+- **Una «oferta» no es un descuento.** La API no tiene promociones ni precio anterior: es la tarifa económica más baja que devolvió una búsqueda real
+  de una ruta y fecha, «Desde $X». Prohibido inventar descuentos, porcentajes, precios tachados, «últimos asientos», «otros están viendo» o contadores.
+  «Quedan N asientos» solo con `availableSeats` de la API. La moneda sale de la respuesta.
+- **Presupuesto de búsquedas** (`features/offers/loadOffers.ts`, números en `popularRoutes.ts`): máximo 8 por carga del inicio, 2 a la vez, una sola petición
+  por búsqueda (`retry: false`), caché de 10 min (memoria + `sessionStorage` con `try/catch`), un 429 detiene todo y respeta `Retry-After`, ningún error se
+  reintenta en bucle. Las rutas populares son una sola lista (`POPULAR_ROUTES`) y deben existir en `shared/api/airports.ts`.
+- Las ofertas se piden **solo cuando la sección se ve** (`Offers`/`OffersLazy` + `useInView`) y se cancelan al salir (`AbortSignal`; `ABORTED` no se muestra ni se
+  reintenta). El inicio nunca depende de ellas: sin ofertas, error o 429 el resto de la página se ve igual. «Ver vuelo» usa `searchToQuery`, no otra lógica.
+- Una búsqueda que nadie espera en pantalla pasa `background: true`: el mock no le inyecta errores aleatorios. Los casos del mock se piden con `?escenario=`
+  (`shared/api/mock/scenarios.ts`) y sus pistas van dentro de `<MockOnly>`.
+- **Contenido verdadero:** preguntas frecuentes, ayuda y términos solo dicen reglas del contrato o documentadas (README, sección 6). Si se duda, se lee el
+  backend (solo lectura) antes de escribirlo; así se encontraron dos afirmaciones falsas en Ayuda (`docs/DISCREPANCIAS-F7.md`).
+- **Sin servidores externos** (CSP estricta en F8): tipografías locales en `public/fonts` (OFL), nada de Google Fonts, CDN ni imágenes remotas; una prueba
+  vigila `index.html` e `index.css`. Metadatos por ruta con `usePageMeta` (`Page` recibe `description`). Cada página nueva es `lazy` en `routeTable.tsx`
+  (`lazyPage`); el inicio queda en el paquete principal. Librerías pesadas de uso puntual, en su propio archivo (`lazy`).
+- Antes de afirmar rendimiento, se mide (Lighthouse sobre `vite preview`) y se informa el número real, no una estimación.
 
 ## Accesibilidad: WCAG 2.2 AA
 
@@ -106,7 +148,11 @@ el mismo dato. Las excepciones a jsx-a11y se justifican en línea, nunca se apag
 
 zod en todos los formularios con las reglas de la sección 7 del README (cédula módulo 10, pasaporte,
 nombres, correo, teléfono +593, fechas por tipo de pasajero, tarjeta con Luhn, búsqueda).
-Se valida al salir del campo y al enviar, sin borrar lo escrito. Si el contrato define un límite, se usa ese.
+Se valida en vivo, sin borrar lo escrito: el error sale al salir del campo, junto a él, con tono tranquilo, y se va al corregirlo.
+**No hay resumen de errores** (cajas rojas «Revisa N campos»): el botón de enviar se activa cuando no falta nada y `FormStatus`
+(`shared/ui/form-status.tsx`) dice qué falta. Lo que no puede ser válido no se deja escribir (`onlyLetters`, `sanitizeFlightNumber`,
+`maskDateInput` con mes ≤ 12 y día ≤ 31 en `shared/lib`). `Field` ordena etiqueta → control → error → ayuda para que los campos
+queden alineados. Si el contrato define un límite, se usa ese.
 
 ## Reglas de la API que no se negocian
 

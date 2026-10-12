@@ -17,7 +17,7 @@ function Logo() {
       aria-label={es.app.logoAlt}
       className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded text-xl font-bold text-primary no-underline sm:text-2xl"
     >
-      <img src="/brand/favicon.png" alt="" width={40} height={40} className="size-8 sm:size-10" />
+      <img src="/brand/mark-80.png" alt="" width={40} height={40} decoding="async" className="size-8 sm:size-10" />
       <span>{es.app.name.toLowerCase()}</span>
     </Link>
   );
@@ -117,7 +117,7 @@ function UserMenu() {
 export function Header() {
   const { pathname } = useLocation();
   return (
-    <header className="border-b-2 border-border bg-surface">
+    <header className="border-b-2 border-border bg-surface print:hidden">
       <div className="container-page flex min-h-20 items-center justify-between gap-2 sm:gap-4">
         <Logo />
 
