@@ -17,6 +17,7 @@ import {
 } from '@/features/checkout';
 import { SeatSelector, seatSegmentsFromLegs, toAssignedSeats } from '@/features/seats';
 import { es, fmt } from '@/shared/i18n';
+import { usePerfilViajero } from '@/shared/profile';
 import { Button, EmptyState, toast } from '@/shared/ui';
 
 const p = es.purchase;
@@ -30,6 +31,8 @@ export function CheckoutDetailsPage() {
   const { status, user, authorized } = useAuth();
   const navigate = useNavigate();
   const state = useCheckout();
+  // El perfil de viajero vive en este dispositivo (el backend no tiene perfil): llena el pasajero 1 si hay datos.
+  const { profile } = usePerfilViajero(user?.id);
   const [selection] = useState(loadSelection);
   const segments = useMemo(() => (selection ? seatSegmentsFromLegs(selection.outbound, selection.inbound) : []), [selection]);
   const authorizedRef = useRef(authorized);
@@ -104,6 +107,7 @@ export function CheckoutDetailsPage() {
               }}
               draft={checkout.passengersDraft()}
               accountEmail={user?.email}
+              profile={profile}
               rejected={state.step === 'held' ? state.passengerErrors : []}
               onDraft={(passengers) => checkout.setPassengers(passengers, false)}
               onDone={(passengers) => {
