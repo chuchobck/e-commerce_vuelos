@@ -109,3 +109,28 @@ describe('check-in del mock (alineado con la API)', () => {
     expect(error.code).toBe('CHECK_IN_NOT_AVAILABLE');
   });
 }, 20_000);
+
+describe('búsqueda del mock: cancelar y opciones', () => {
+  const params = { origin: 'UIO', destination: 'GYE', departDate: '2026-12-01', passengers: { adults: 1, children: 0, infants: 0 }, cabin: 'ECONOMY' as const };
+
+  it('con la señal ya cancelada falla con ABORTED sin esperar la latencia simulada', async () => {
+    const { api } = await freshApi();
+    const controller = new AbortController();
+    controller.abort();
+    expect((await failure(api.search(params, { signal: controller.signal }))).code).toBe('ABORTED');
+  });
+
+  it('cancelar a mitad de la espera corta la búsqueda con ABORTED', async () => {
+    const { api } = await freshApi();
+    const controller = new AbortController();
+    const pending = failure(api.search(params, { signal: controller.signal }));
+    controller.abort();
+    expect((await pending).code).toBe('ABORTED');
+  });
+
+  it('sin señal sigue respondiendo con ofertas', async () => {
+    const { api } = await freshApi();
+    expect((await api.search({ ...params, departDate: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10) })).offers.length).toBeGreaterThan(0);
+  });
+}, 20_000);
+

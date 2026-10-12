@@ -14,7 +14,7 @@ export function RegisterPage() {
   const returnTo = safeReturnTo(params.get(RETURN_TO_PARAM));
 
   return (
-    <Page title={a.registerTitle} heading={a.registerHeading} lead={a.registerLead} width="narrow">
+    <Page title={a.registerTitle} description={a.registerMeta} heading={a.registerHeading} lead={a.registerLead} width="narrow">
       {returnTo?.startsWith(CHECKOUT_BASE) ? <PendingTrip /> : null}
       <Card>
         <RegisterForm

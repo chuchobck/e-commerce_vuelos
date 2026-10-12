@@ -6,6 +6,7 @@ import { es } from '@/shared/i18n';
 import { ServerWakingNotice, Toaster } from '@/shared/ui';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { NavigationProgress } from './NavigationProgress';
 import { SessionNotices } from './SessionNotices';
 
 const MAIN_ID = 'contenido';
@@ -85,6 +86,7 @@ export function RootLayout() {
         <ServerWakingNotice />
         <SessionNotices />
       </div>
+      <NavigationProgress />
       <main id={MAIN_ID} tabIndex={-1} className="flex flex-1 flex-col outline-none">
         <Outlet />
       </main>

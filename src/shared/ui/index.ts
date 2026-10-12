@@ -6,6 +6,7 @@ export { Checkbox } from './checkbox';
 export { Combobox, type ComboboxOption } from './combobox';
 export { DatePicker } from './date-picker';
 export { ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './dialog';
+export { FaqList } from './faq-list';
 export { CompactField, Field, FieldError } from './field';
 export { FormStatus } from './form-status';
 export { Input } from './input';

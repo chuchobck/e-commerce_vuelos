@@ -1,0 +1,10 @@
+Tipografías incluidas en Quinde (alojadas localmente; subconjunto latino, formato WOFF2)
+
+- Fraunces — Copyright 2020 The Fraunces Project Authors (https://github.com/undercasetype/Fraunces)
+- Plus Jakarta Sans — Copyright 2020 The Plus Jakarta Sans Project Authors (https://github.com/tokotype/PlusJakartaSans)
+
+Ambas se distribuyen bajo la licencia SIL Open Font License 1.1 (https://openfontlicense.org), que permite usarlas,
+incluirlas y redistribuirlas, también con fines comerciales, conservando este aviso.
+
+Cambios respecto de las fuentes originales (permitidos por la OFL): se recortaron al subconjunto latino y, en Fraunces, se fijó el
+tamaño óptico (48 en la normal; 60 y peso 600 en la itálica) para que el archivo pese una cuarta parte. No se renombraron.

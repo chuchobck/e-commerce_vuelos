@@ -12,8 +12,11 @@
  * - Deduplicación: dos lecturas idénticas (`retry: true`, mismo método, URL, cuerpo y token) que
  *   coinciden en vuelo comparten la misma promesa. Así el doble montaje de StrictMode o un doble
  *   clic hacen una sola petición. Las escrituras nunca se deduplican.
+ * - Cancelación: una lectura puede traer un `AbortSignal` (p. ej. al salir de una pantalla). Al cancelarse
+ *   la petición se aborta, lanza ABORTED y nunca se reintenta. Una petición con señal no se deduplica: una
+ *   cancelación de quien la pidió no debe tumbar la de otro que comparta la promesa.
  */
-import { ApiError } from '../errors';
+import { abortedError, ApiError } from '../errors';
 import { serverActivity } from './activity';
 import { problemToApiError } from './problem';
 
@@ -32,6 +35,8 @@ export interface RequestOptions {
   silent?: boolean;
   /** Petición con sesión: lleva Authorization: Bearer. Las rutas públicas nunca llevan token. */
   auth?: boolean;
+  /** Cancela la petición (y su reintento) cuando quien la pidió ya no necesita la respuesta. */
+  signal?: AbortSignal;
 }
 
 export interface HttpClientOptions {
@@ -86,6 +91,10 @@ export function createHttpClient({
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const unmarkSlow = options.silent ? undefined : startSlowWatch();
+    const cancelled = () => options.signal?.aborted === true;
+    const relay = () => controller.abort();
+    if (cancelled()) relay();
+    options.signal?.addEventListener('abort', relay, { once: true });
 
     let response: Response;
     try {
@@ -96,15 +105,23 @@ export function createHttpClient({
         signal: controller.signal,
       });
     } catch (error) {
+      if (cancelled()) throw abortedError();
       const timedOut = controller.signal.aborted;
       log(`[api] ${method} ${path}: ${timedOut ? 'tiempo agotado' : 'sin conexión'}`, error);
       throw new ApiError({ status: 0, code: timedOut ? 'TIMEOUT' : 'NETWORK', detail: String(error) });
     } finally {
       clearTimeout(timer);
       unmarkSlow?.();
+      options.signal?.removeEventListener('abort', relay);
     }
 
-    const text = await response.text();
+    let text: string;
+    try {
+      text = await response.text();
+    } catch (error) {
+      if (cancelled()) throw abortedError();
+      throw new ApiError({ status: 0, code: 'NETWORK', detail: String(error) });
+    }
     let body: unknown = undefined;
     if (text) {
       try {
@@ -142,6 +159,8 @@ export function createHttpClient({
       if (!options.retry || !retryable) throw error;
       const waitS = Math.min(error.retryAfter ?? DEFAULT_RETRY_WAIT_S, MAX_RETRY_WAIT_S);
       await sleep(waitS * 1000);
+      // Si se canceló durante la espera, no se vuelve a pedir.
+      if (options.signal?.aborted) throw abortedError();
       return attempt<T>(method, path, options);
     }
   }
@@ -149,7 +168,7 @@ export function createHttpClient({
   const inflight = new Map<string, Promise<unknown>>();
 
   function send<T>(method: string, path: string, options: RequestOptions): Promise<HttpResult<T>> {
-    if (!options.retry) return withRetry<T>(method, path, options);
+    if (!options.retry || options.signal) return withRetry<T>(method, path, options);
     const key = JSON.stringify([
       method,
       path,

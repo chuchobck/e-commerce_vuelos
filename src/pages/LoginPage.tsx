@@ -17,7 +17,7 @@ export function LoginPage() {
   const next = returnTo ?? routes.trips();
 
   return (
-    <Page title={a.loginTitle} heading={a.loginHeading} lead={a.loginLead} width="narrow">
+    <Page title={a.loginTitle} description={a.loginMeta} heading={a.loginHeading} lead={a.loginLead} width="narrow">
       {returnTo?.startsWith(CHECKOUT_BASE) ? <PendingTrip /> : null}
       {user ? (
         <Alert variant="success" title={fmt(a.alreadyIn, { email: user.email })}>

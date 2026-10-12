@@ -1,27 +1,19 @@
+import type { ComponentType } from 'react';
 import { Navigate, useParams, type RouteObject } from 'react-router-dom';
-import { CheckoutConfirmationPage } from '@/pages/CheckoutConfirmationPage';
-import { CheckoutDetailsPage } from '@/pages/CheckoutDetailsPage';
-import { CheckoutPaymentPage } from '@/pages/CheckoutPaymentPage';
-import { FlightStatusPage } from '@/pages/FlightStatusPage';
-import { HelpPage } from '@/pages/HelpPage';
 import { HomePage } from '@/pages/HomePage';
-import { LoginPage } from '@/pages/LoginPage';
-import { NotFoundPage } from '@/pages/NotFoundPage';
-import { OffersPage } from '@/pages/OffersPage';
-import { ProfilePage } from '@/pages/ProfilePage';
-import { RegisterPage } from '@/pages/RegisterPage';
-import { ResultsPage } from '@/pages/ResultsPage';
-import { TripCancelPage } from '@/pages/TripCancelPage';
-import { TripBaggagePage } from '@/pages/TripBaggagePage';
-import { TripCheckInPage } from '@/pages/TripCheckInPage';
-import { TripDateChangePage } from '@/pages/TripDateChangePage';
-import { TripPage } from '@/pages/TripPage';
-import { TripTicketsPage } from '@/pages/TripTicketsPage';
-import { TripsPage } from '@/pages/TripsPage';
 import { RootLayout } from './layout/RootLayout';
+import { RouteLoading } from './layout/RouteLoading';
 import { RouteErrorPage } from './layout/RouteErrorPage';
 import { RequireAuth } from './RequireAuth';
 import { legacyRedirects, paths } from './routes';
+
+/**
+ * Cada página va en su propio archivo JS y se descarga al entrar en su ruta (el inicio, que es la entrada habitual, va en el
+ * paquete principal). Así la primera carga no trae el código de la compra, de Mis viajes ni del resto.
+ */
+function lazyPage<K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K): Pick<RouteObject, 'lazy'> {
+  return { lazy: async () => ({ Component: (await load())[name] }) };
+}
 
 function LegacyRedirect({ to }: { to: (params: { id?: string }) => string }) {
   return <Navigate to={to(useParams())} replace />;
@@ -41,11 +33,11 @@ export function buildRoutes({ dev }: { dev: boolean }): RouteObject[] {
   const devRoutes: RouteObject[] =
     import.meta.env.DEV && dev
       ? [
-          { id: 'uiKit', path: paths.uiKit, lazy: async () => ({ Component: (await import('@/pages/UiKitPage')).UiKitPage }) },
+          { id: 'uiKit', path: paths.uiKit, ...lazyPage(() => import('@/pages/UiKitPage'), 'UiKitPage') },
           {
             id: 'uiKitSeats',
             path: paths.uiKitSeats,
-            lazy: async () => ({ Component: (await import('@/pages/SeatsDemoPage')).SeatsDemoPage }),
+            ...lazyPage(() => import('@/pages/SeatsDemoPage'), 'SeatsDemoPage'),
           },
         ]
       : [];
@@ -53,36 +45,37 @@ export function buildRoutes({ dev }: { dev: boolean }): RouteObject[] {
   return [
     {
       element: <RootLayout />,
+      HydrateFallback: RouteLoading,
       errorElement: <RouteErrorPage />,
       children: [
         { id: 'home', path: paths.home, element: <HomePage /> },
-        { id: 'results', path: paths.results, element: <ResultsPage /> },
-        { id: 'offers', path: paths.offers, element: <OffersPage /> },
+        { id: 'results', path: paths.results, ...lazyPage(() => import('@/pages/ResultsPage'), 'ResultsPage') },
+        { id: 'offers', path: paths.offers, ...lazyPage(() => import('@/pages/OffersPage'), 'OffersPage') },
         {
           element: <RequireAuth />,
           children: [
-            { id: 'checkoutDetails', path: paths.checkoutDetails, element: <CheckoutDetailsPage /> },
-            { id: 'checkoutPayment', path: paths.checkoutPayment, element: <CheckoutPaymentPage /> },
-            { id: 'checkoutConfirmation', path: paths.checkoutConfirmation, element: <CheckoutConfirmationPage /> },
-            { id: 'trips', path: paths.trips, element: <TripsPage /> },
-            { id: 'trip', path: paths.trip, element: <TripPage /> },
-            { id: 'tripTickets', path: paths.tripTickets, element: <TripTicketsPage /> },
-            { id: 'tripCheckIn', path: paths.tripCheckIn, element: <TripCheckInPage /> },
+            { id: 'checkoutDetails', path: paths.checkoutDetails, ...lazyPage(() => import('@/pages/CheckoutDetailsPage'), 'CheckoutDetailsPage') },
+            { id: 'checkoutPayment', path: paths.checkoutPayment, ...lazyPage(() => import('@/pages/CheckoutPaymentPage'), 'CheckoutPaymentPage') },
+            { id: 'checkoutConfirmation', path: paths.checkoutConfirmation, ...lazyPage(() => import('@/pages/CheckoutConfirmationPage'), 'CheckoutConfirmationPage') },
+            { id: 'trips', path: paths.trips, ...lazyPage(() => import('@/pages/TripsPage'), 'TripsPage') },
+            { id: 'trip', path: paths.trip, ...lazyPage(() => import('@/pages/TripPage'), 'TripPage') },
+            { id: 'tripTickets', path: paths.tripTickets, ...lazyPage(() => import('@/pages/TripTicketsPage'), 'TripTicketsPage') },
+            { id: 'tripCheckIn', path: paths.tripCheckIn, ...lazyPage(() => import('@/pages/TripCheckInPage'), 'TripCheckInPage') },
             // Los pases cargan aparte (trae el dibujo del QR): nadie los necesita antes del check-in.
-            { id: 'tripPasses', path: paths.tripPasses, lazy: async () => ({ Component: (await import('@/pages/TripPassesPage')).TripPassesPage }) },
-            { id: 'tripBaggage', path: paths.tripBaggage, element: <TripBaggagePage /> },
-            { id: 'tripDateChange', path: paths.tripDateChange, element: <TripDateChangePage /> },
-            { id: 'tripCancel', path: paths.tripCancel, element: <TripCancelPage /> },
-            { id: 'profile', path: paths.profile, element: <ProfilePage /> },
+            { id: 'tripPasses', path: paths.tripPasses, ...lazyPage(() => import('@/pages/TripPassesPage'), 'TripPassesPage') },
+            { id: 'tripBaggage', path: paths.tripBaggage, ...lazyPage(() => import('@/pages/TripBaggagePage'), 'TripBaggagePage') },
+            { id: 'tripDateChange', path: paths.tripDateChange, ...lazyPage(() => import('@/pages/TripDateChangePage'), 'TripDateChangePage') },
+            { id: 'tripCancel', path: paths.tripCancel, ...lazyPage(() => import('@/pages/TripCancelPage'), 'TripCancelPage') },
+            { id: 'profile', path: paths.profile, ...lazyPage(() => import('@/pages/ProfilePage'), 'ProfilePage') },
           ],
         },
-        { id: 'flightStatus', path: paths.flightStatus, element: <FlightStatusPage /> },
-        { id: 'login', path: paths.login, element: <LoginPage /> },
-        { id: 'register', path: paths.register, element: <RegisterPage /> },
-        { id: 'help', path: paths.help, element: <HelpPage /> },
+        { id: 'flightStatus', path: paths.flightStatus, ...lazyPage(() => import('@/pages/FlightStatusPage'), 'FlightStatusPage') },
+        { id: 'login', path: paths.login, ...lazyPage(() => import('@/pages/LoginPage'), 'LoginPage') },
+        { id: 'register', path: paths.register, ...lazyPage(() => import('@/pages/RegisterPage'), 'RegisterPage') },
+        { id: 'help', path: paths.help, ...lazyPage(() => import('@/pages/HelpPage'), 'HelpPage') },
         ...legacyRoutes(),
         ...devRoutes,
-        { id: 'notFound', path: '*', element: <NotFoundPage /> },
+        { id: 'notFound', path: '*', ...lazyPage(() => import('@/pages/NotFoundPage'), 'NotFoundPage') },
       ],
     },
   ];

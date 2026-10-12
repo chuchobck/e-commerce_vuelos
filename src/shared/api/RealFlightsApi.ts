@@ -67,6 +67,7 @@ import type {
   Hold,
   ListBookingsParams,
   PostSaleOutcome,
+  SearchOptions,
   SearchParams,
   SearchResult,
   SeatMap,
@@ -84,12 +85,13 @@ const CURRENCY = 'USD';
 export class RealFlightsApi implements FlightsApi {
   constructor(private readonly http: HttpClient) {}
 
-  async search(params: SearchParams): Promise<SearchResult> {
+  async search(params: SearchParams, options: SearchOptions = {}): Promise<SearchResult> {
     // POST de solo lectura: admite el reintento de lecturas.
     const dto = await this.http.request<SearchResponseDto>('POST', '/search', {
       body: toSearchRequest(params),
       headers: { 'X-Device-Fingerprint': deviceFingerprint() },
-      retry: true,
+      retry: options.retry ?? true,
+      signal: options.signal,
     });
     return mapSearchResponse(dto, params);
   }

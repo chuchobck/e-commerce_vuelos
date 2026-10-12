@@ -63,7 +63,7 @@ export function FlightStatusPage() {
   };
 
   return (
-    <Page title={t.pageTitle} heading={t.heading} lead={t.lead} width="narrow">
+    <Page title={t.pageTitle} description={t.metaDescription} heading={t.heading} lead={t.lead} width="narrow">
       <Card>
         <form noValidate onSubmit={handleSubmit(onValid)} className="flex flex-col gap-6">
           <MockOnly>

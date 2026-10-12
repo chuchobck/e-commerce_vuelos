@@ -180,6 +180,7 @@ export function ResultsPage() {
   return (
     <Page
       title={r.pageTitle}
+      description={r.metaDescription}
       heading={heading}
       lead={summary}
       aside={
