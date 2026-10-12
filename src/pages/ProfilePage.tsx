@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
 import { useAuth } from '@/features/auth';
+import { ProfileForm } from '@/features/profile';
 import { flightsApi } from '@/shared/api';
 import { es } from '@/shared/i18n';
 import { formatLongDate } from '@/shared/lib/format';
@@ -16,7 +17,7 @@ const p = es.profile;
  * que aquí no se ofrece. La ruta exige sesión (RequireAuth).
  */
 export function ProfilePage() {
-  const { authorized, logout } = useAuth();
+  const { authorized, logout, user: sessionUser } = useAuth();
   const navigate = useNavigate();
   const me = useAsync(() => authorized(() => flightsApi.me()), []);
 
@@ -40,6 +41,7 @@ export function ProfilePage() {
     ];
     content = (
       <Card className="flex flex-col gap-6">
+        <h2 className="text-2xl">{p.accountTitle}</h2>
         <dl className="flex flex-col divide-y-2 divide-border">
           {rows.map((row) => (
             <div key={row.label} className="flex flex-col gap-1 py-4 first:pt-0 sm:flex-row sm:gap-4">
@@ -69,8 +71,17 @@ export function ProfilePage() {
   }
 
   return (
-    <Page title={p.pageTitle} heading={p.heading} lead={p.lead} width="narrow">
-      {content}
+    <Page title={p.pageTitle} heading={p.heading} lead={p.lead}>
+      <div className="mx-auto flex w-full max-w-[48rem] flex-col gap-8">
+        {content}
+        {/* Los datos de viajero viven en este dispositivo y no dependen de la API: se ven aunque /auth/me tarde o falle. */}
+        {sessionUser ? (
+          <Card className="flex flex-col gap-6">
+            <h2 className="text-2xl">{p.travelerTitle}</h2>
+            <ProfileForm userId={sessionUser.id} accountEmail={sessionUser.email} />
+          </Card>
+        ) : null}
+      </div>
     </Page>
   );
 }

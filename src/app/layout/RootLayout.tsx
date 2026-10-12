@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { paths, routes, SEARCH_ANCHOR_ID } from '@/app/routes';
+import { CHECKOUT_BASE, paths, routes, SEARCH_ANCHOR_ID } from '@/app/routes';
+import { useAuth } from '@/features/auth';
 import { useReleaseOnExit } from '@/features/checkout';
+import { ProfileNotice } from '@/features/profile';
 import { es } from '@/shared/i18n';
 import { ServerWakingNotice, Toaster } from '@/shared/ui';
 import { Footer } from './Footer';
@@ -64,10 +66,15 @@ function useSearchShortcut() {
   }, [navigate, location.pathname]);
 }
 
+/** Donde el aviso «Completa tu perfil» estorbaría: la compra (ahí el pasajero 1 ya se prellena), Mi perfil y las pantallas de cuenta. */
+const NO_PROFILE_NOTICE: readonly string[] = [paths.profile, paths.login, paths.register];
+
 export function RootLayout() {
   useRouteFocus();
   useSearchShortcut();
-  useReleaseOnExit(useLocation().pathname);
+  const { pathname } = useLocation();
+  useReleaseOnExit(pathname);
+  const { status, user } = useAuth();
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -85,6 +92,7 @@ export function RootLayout() {
       <div className="print:hidden">
         <ServerWakingNotice />
         <SessionNotices />
+        <ProfileNotice userId={status === 'authenticated' ? user?.id : undefined} hidden={NO_PROFILE_NOTICE.includes(pathname) || pathname.startsWith(CHECKOUT_BASE)} />
       </div>
       <NavigationProgress />
       <main id={MAIN_ID} tabIndex={-1} className="flex flex-1 flex-col outline-none">

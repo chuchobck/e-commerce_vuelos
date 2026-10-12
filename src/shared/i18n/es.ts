@@ -765,7 +765,7 @@ export const es = {
   profile: {
     pageTitle: 'Mi perfil',
     heading: 'Mi perfil',
-    lead: 'Los datos de tu cuenta tal como los guarda Quinde.',
+    lead: 'Tu cuenta y tus datos de viajero.',
     email: 'Correo electrónico',
     createdAt: 'Cuenta creada',
     roles: 'Tipo de cuenta',

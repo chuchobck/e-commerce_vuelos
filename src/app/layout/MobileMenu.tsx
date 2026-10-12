@@ -1,11 +1,13 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { LogIn, LogOut, Menu, UserPlus, UserRound, X } from 'lucide-react';
+import { LogIn, LogOut, Menu, Trash2, UserPlus, UserRound, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth';
+import { ForgetProfileDialog } from '@/features/profile';
 import { routes, safeReturnTo } from '@/app/routes';
 import { es } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
+import { usePerfilViajero } from '@/shared/profile';
 import { Button, toast } from '@/shared/ui';
 import { isNavItemActive, NAV_ITEMS } from './nav-items';
 
@@ -16,7 +18,9 @@ import { isNavItemActive, NAV_ITEMS } from './nav-items';
  */
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
+  const [forgetOpen, setForgetOpen] = useState(false);
   const { status, user, logout } = useAuth();
+  const { saved: hasSavedData } = usePerfilViajero(user?.id);
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const returnTo = safeReturnTo(pathname + search) ?? undefined;
@@ -85,6 +89,19 @@ export function MobileMenu() {
                     {es.nav.profile}
                   </Link>
                 </Button>
+                {hasSavedData ? (
+                  <Button
+                    variant="ghost"
+                    fullWidth
+                    onClick={() => {
+                      close();
+                      setForgetOpen(true);
+                    }}
+                  >
+                    <Trash2 aria-hidden="true" />
+                    {es.nav.forgetData}
+                  </Button>
+                ) : null}
                 <Button
                   variant="secondary"
                   fullWidth
@@ -119,6 +136,8 @@ export function MobileMenu() {
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
+      {/* Fuera del panel del menú: se cierra el menú y el diálogo de confirmación sigue ahí. */}
+      <ForgetProfileDialog open={forgetOpen} onOpenChange={setForgetOpen} userId={user?.id} />
     </DialogPrimitive.Root>
   );
 }
