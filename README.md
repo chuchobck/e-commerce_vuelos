@@ -14,10 +14,10 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 
 ---
 
-## 1. Estado actual (2026-10-10, F6 y F7 hechas en mock y pendientes de verificación real)
+## 1. Estado actual (2026-10-12, fases 1 a 7 fusionadas en `main`; F6 y F7 aún sin verificar contra la API real)
 
-- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 5; la F6 está en la rama `fase-6-viajes` (PR abierto, sin fusionar) y las mejoras de formularios en `mejora-ux-formularios`; la F7 está en `feat/f7-ofertas-inicio` (PR apilado sobre `mejora-ux-formularios`, sin fusionar ni tag). 338 archivos en `src`, unas 32.100 líneas de TypeScript (sin contar los tipos generados).
-- 806 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
+- Repositorio en GitHub (`chuchobck/e-commerce_vuelos`): `main` trae las fases 1 a 7 (tags `fase-1` a `fase-7`) y las mejoras de formularios. El registro con datos de viajero y el perfil local están en la rama `feat/registro-perfil-viajero` (PR contra `main`, sin fusionar ni tag; sección 5f). 360 archivos en `src`, unas 34.200 líneas de TypeScript (sin contar los tipos generados).
+- 899 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
 - **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, estado de vuelo, la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas) **y la compra** (hold, reserva, pago simulado y confirmación); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
 - Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para `/auth/*`, `contracts/backend-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
 - **Sesión** (sección 6, "Modelo de seguridad de la sesión"): access token solo en memoria, renovación única entre pestañas, cierre de sesión que se propaga a las demás pestañas, restauración al recargar sin parpadeo.
@@ -28,7 +28,8 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 - Camino feliz con sesión: **3 clics** desde "Elegir tarifa" hasta la confirmación (Elegir, Continuar al pago, Pagar), más escribir los datos del pasajero y de la tarjeta. Sin sesión se suman los de la cuenta.
 - Mis viajes (`/viajes`): lista con pestañas y paginación, detalle con acciones según el estado y el estado del vuelo en vivo, boletos, check-in (ventana 48 h / 60 min), pases de abordar con QR e impresión, equipaje extra, cambio de fecha y cancelación con cotización. Las escrituras llevan `Idempotency-Key` por intento y distinguen 200/201 (hecho), 202 (en proceso, se puede actualizar) y 422 (pago rechazado: se reintenta con otro pago sin perder lo elegido).
 - **Ofertas y pulido del inicio (F7, sección 5e): hecho con el mock y NO verificado contra la API real** (el backend local no respondió). Una «oferta» es la tarifa económica más baja de una búsqueda real de las rutas populares, sin descuentos ni precios anteriores inventados; una carga del inicio hace como máximo 8 búsquedas (6 en el mock), de 2 en 2, solo cuando la sección se ve. Lo pendiente está en `docs/DISCREPANCIAS-F7.md` y los pasos en «Verificación F7 contra API real» (sección 5e).
-- Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
+- **Registro con datos de viajero y perfil local (sección 5f):** «Crea tu cuenta» pide, además del correo y la contraseña, los datos de quien viaja (nombres, documento, nacimiento, nacionalidad, sexo, contacto). **El backend no tiene perfil:** a `POST /auth/register` siguen yendo solo correo y contraseña, y esos datos se guardan **solo en este dispositivo** (`localStorage`, una entrada por usuario, servicio `perfilViajero` en `shared/profile`). Llenan el pasajero 1 (adulto) de la compra, se editan o se borran desde Mi perfil y el menú del usuario. **No se ha verificado contra la API real** (el cuerpo del registro no cambió; lo cubren pruebas).
+- Mi perfil muestra la cuenta (de `GET /auth/me`, solo lectura: la API no permite editarla) y los datos de viajero locales (editables).
 - **Asientos (F5, secciones 5b y 6):** el selector (`features/seats`) está dentro del paso 2 como un bloque **opcional y plegado** ("Asignaremos tus asientos automáticamente. Elegir asientos (opcional)"): sin abrirlo no se pide ningún mapa y el camino sigue en 3 clics. Elige un asiento por pasajero en **cada tramo** (ida, vuelta y escalas) y viaja como `assignedSeats`; el panel lateral, la revisión del pago y la confirmación muestran los asientos de cada pasajero. Verificado con la API real (sección 6, "Lo que aprendimos de asientos").
 - **Mejora de buscar y comprar (rama `mejora-ihc-busqueda-compra`, sección 5d):** el buscador usa campos con sugerencias (se escribe y se predice al instante, con clic o teclado), el botón de buscar espera a que los datos estén completos y se corrige en tiempo real; si no hay vuelos esa fecha se ofrecen fechas cercanas con su precio, la otra cabina y otros destinos; los resultados separan Ida y Vuelta en dos pestañas centradas (elegir la ida pasa sola a la vuelta), con orden y "Solo directos"; y la cuenta salió del paso 2: sin sesión se va a Ingresar con el vuelo guardado y se vuelve sin perder nada.
 
@@ -106,6 +107,7 @@ src/
    ├─ api/                    FlightsApi, contract.ts (nombres de los tipos generados), mapping.ts (contrato → interfaz),
    │                          http/ (cliente: único lugar con fetch), RealFlightsApi, mock/, airports.ts (catálogo estático)
    ├─ payments/               pago simulado (PaymentProvider reemplazable por la Payment API real)
+   ├─ profile/                datos de quien viaja: reglas del documento y del adulto, servicio `perfilViajero` (localStorage por usuario) y `TravelerFields`
    ├─ i18n/                   todos los textos en español
    ├─ lib/                    fechas, dinero en centavos, formatos, validadores, esquemas, caché, ventana de check-in, hooks
    └─ ui/                     componentes base (incluye el resumen de viaje y MockOnly)
@@ -135,6 +137,7 @@ Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `np
 | `trips` | Mis viajes: lista (filtros, paginación), detalle, acciones según el estado, boletos | Hecho en mock; sin verificar con la API real (F6) |
 | `checkin` | Check-in dentro del viaje y pases de abordar con QR | Hecho en mock; sin verificar con la API real (F6) |
 | `aftersale` | Equipaje, cambio de fecha, cancelación con cotización, pago simulado de postventa, 200/202/422 | Hecho en mock; sin verificar con la API real (F6) |
+| `profile` | Mi perfil de viajero: formulario editable, «Borrar mis datos guardados» y el aviso «Completa tu perfil» (los datos viven en `shared/profile`, solo en este dispositivo) | Hecho (mock y API real) |
 | `flight-status` | Estado de vuelo (público y dentro del viaje, con insignia de retraso) | Hecho (mock y API real) |
 | `offers` | Ofertas: tarifa económica más baja de las rutas populares (búsquedas reales con presupuesto, caché, carga al verse, tarjetas, filtros y estados) | Hecho en mock; sin verificar con la API real (F7) |
 
@@ -167,8 +170,8 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo** (Mis via
 | `/viajes/:id/cambiar-fecha` | Cambio de fecha | Sesión | `POST .../date-change/search`, `POST .../date-change` | Hecho en mock; sin verificar con la API real |
 | `/viajes/:id/cancelar` | Cancelación | Sesión | `GET .../cancellation-quote`, `POST .../cancel` | Hecho en mock; sin verificar con la API real |
 | `/estado-vuelo` | Estado de un vuelo | Público | `GET /flights/{n}/status` | Hecho (mock y API real) |
-| `/ingresar`, `/registrarse` | Cuenta (vuelven a `?volver=`) | Público | `POST /auth/login`, `POST /auth/register` | Hecho (mock y API real) |
-| `/perfil` | Mis datos (solo lectura) y cerrar sesión | Sesión | `GET /auth/me`, `POST /auth/logout` | Hecho (mock y API real) |
+| `/ingresar`, `/registrarse` | Cuenta (vuelven a `?volver=`); el registro pide además los datos de viajero | Público | `POST /auth/login`, `POST /auth/register` (solo correo y contraseña) | Hecho (mock y API real); los datos de viajero son locales |
+| `/perfil` | Tu cuenta (solo lectura), tus datos de viajero (editables y borrables, solo en este dispositivo) y cerrar sesión | Sesión | `GET /auth/me`, `POST /auth/logout` (los datos de viajero no usan la API) | Hecho (mock y API real) |
 | `/ayuda` | Ayuda y textos legales | Público | Ninguna | Hecho |
 | `/componentes` | Catálogo interno | Solo desarrollo (404 en producción) | Ninguna | Hecho |
 | `/componentes/asientos` | Demo del selector de asientos (1 adulto, familia con niño y bebé, escala, ATR) | Solo desarrollo (404 en producción) | `GET /offers/{id}/seatmap` | Hecho (F5) |
@@ -497,6 +500,58 @@ Al verificar un punto, se pasa su fila de `docs/DISCREPANCIAS-F7.md` (sección 4
 
 ---
 
+## 5f. Registro con datos de viajero y perfil local
+
+### La regla
+
+**Los datos de perfil son solo locales; el backend no tiene perfil.** `POST /auth/register` recibe únicamente `{ email, password }` (contrato y backend sin cambios) y nada de los datos de viajero viaja a ningún servidor. Una prueba falla si el cuerpo lleva algo más (`shared/api/register.test.ts`, también con el mock). Si algún día se quiere moverlo al backend: `docs/PERFIL-VIAJERO-PROPUESTA-B.md`.
+
+### El registro (`features/auth/RegisterForm.tsx`)
+
+- Dos secciones: **Tu cuenta** (correo, contraseña de 12 a 128, «Mantener mi sesión iniciada») y **Tus datos de viajero** (nombres, apellidos, documento y número, nacionalidad, sexo, fecha de nacimiento, vencimiento del pasaporte si el documento es pasaporte, correo de contacto y celular +593), más los términos. Todo es obligatorio: en el paso de pasajeros nada de esto es opcional.
+- Los mismos campos y **el mismo orden de pares** que el pasajero 1 de la compra (`TravelerFields`, compartido con Mi perfil): nombres solo letras, cédula con módulo 10 o pasaporte de 5 a 20 caracteres, fechas con máscara que no deja escribir un mes 13, celular de 9 dígitos. El error sale al salir del campo y se va al corregirlo; no hay caja roja global: junto al botón, `FormStatus` dice «Falta completar: …» o «Revisa: …». El botón queda activo (excepción de ingreso y registro: un gestor de contraseñas puede rellenar sin avisar al formulario); al enviar con datos incompletos, cada error sale en su campo y el foco va al primero.
+- El correo de contacto es el de la cuenta hasta que la persona lo cambia.
+- Una línea clara avisa: «Estos datos se guardan solo en este dispositivo, no en nuestros servidores. Puedes borrarlos cuando quieras desde el menú de tu cuenta.»
+- **Flujo:** primero `POST /auth/register` con solo correo y contraseña (como antes), luego el ingreso automático; **solo si ambos salen bien** se guarda el perfil con el id del usuario. Si el registro falla (409 de correo repetido, 429, etc.) no se guarda nada y se conserva todo lo escrito, con el error junto a su campo. Si la cuenta se crea pero el ingreso falla, se explica y tampoco se guarda (no hay sesión ni id de usuario): al ingresar después aparece el aviso de completar el perfil. Si el navegador no deja guardar, la cuenta queda igual y se avisa.
+
+### El servicio `perfilViajero` (`shared/profile/perfilViajero.ts`)
+
+Único lugar que toca el almacenamiento del perfil (capa de datos: los componentes no usan `localStorage`). `read`, `save`, `remove`, `subscribe` y el aviso descartado.
+
+- **Una entrada por usuario:** `quinde.perfil.v1:<id de usuario>` (el `id` de `GET /auth/me`, que es el `sub` del token: en el backend `sub` es `usuario.id`, leído del código; el mock hace igual). Quien comparte el navegador no ve ni pisa los datos de otro.
+- **Todo en `try/catch`:** sin almacenamiento (modo privado, cuota llena, bloqueado) la app funciona igual; `save` y `remove` devuelven `false`. Lo guardado no se da por bueno: JSON dañado, otra versión o campos que no son texto razonable se descartan.
+- **Lista cerrada de campos** (`TRAVELER_KEYS`): contraseñas y tokens no pueden entrar, aunque alguien los pase por error.
+- **Cerrar sesión NO lo borra** (se pidió así). Se borra con «Borrar mis datos guardados» (con confirmación): en el menú del usuario (escritorio y móvil, solo si hay datos) y en Mi perfil.
+
+### Mi perfil, el aviso y el prellenado
+
+- **Mi perfil** (`/perfil`, con sesión): «Tu cuenta» (de `GET /auth/me`, solo lectura) y «Tus datos de viajero» (editables, con las mismas reglas). Solo se guarda cuando no falta nada; si lo guardado está incompleto se ve igual y se marca lo que falta. Los datos de viajero se ven aunque `/auth/me` falle (no dependen de la API).
+- **Usuarios que ya existían sin perfil:** al ingresar no se bloquea nada; un aviso discreto «Completa tu perfil para comprar más rápido» lleva a Mi perfil. Se puede descartar («Ahora no», hasta la próxima sesión del navegador) y no aparece en la compra, en Mi perfil ni en ingresar o registrarse.
+- **Prellenado (paso 2 de la compra):** solo el **pasajero 1, si es adulto**, con la etiqueta «Prellenado con tus datos» y todo editable. **Nunca** se llena a niños, infantes ni a otros adultos. Si el borrador ya trae datos de ese pasajero, no se pisa nada; si el perfil está incompleto o inválido se llena lo válido y lo que falta se nombra («Falta completar o revisar: …») hasta que se completa. Con una nacionalidad con la que aún no se puede comprar, no se llena lo que depende de ella.
+
+### Decisiones donde el encargo era ambiguo
+
+- **Dónde vive el código:** `shared/profile` (reglas, servicio, `TravelerFields`) porque lo usan el registro (`features/auth`), Mi perfil (`features/profile`) y la compra (`features/checkout`), y un módulo de `features` no importa de otro. Las reglas del documento salieron de `features/checkout/passengers.ts` a `shared/profile/documents.ts` para que el perfil y el pasajero usen **las mismas** (sin copiarlas).
+- **Mayoría de edad:** el perfil exige 18 años o más hoy (el pasajero 1 es adulto). Con pasaporte, el vencimiento debe ser posterior a hoy; la compra sigue exigiendo que venza después del último vuelo del viaje.
+- **Nacionalidad:** se acepta cualquier país real; que se pueda comprar con él (`BOOKABLE_COUNTRIES`, hoy Ecuador) es otra regla. Así quien no es ecuatoriano puede crear su cuenta y guardar sus datos; la pantalla le explica que por ahora no podrá comprar con esa nacionalidad.
+- **«Correo de contacto»** (del viajero) es distinto del correo de la cuenta (el del ingreso); por defecto coinciden.
+- **El aviso de completar perfil** se descarta por sesión del navegador (`sessionStorage`), no para siempre: sigue siendo útil hasta que se complete.
+- **Riesgo aceptado:** datos personales en claro en `localStorage` (sección 6, «Modelo de seguridad»).
+
+### Cómo probar con el mock (`VITE_API_URL` vacía)
+
+1. `/registrarse`: llena todo (cédula de prueba válida `1710034065`, fecha `15/03/1990`, celular `991234567`) y crea la cuenta. En DevTools → Aplicación → Almacenamiento local debe haber **una** clave `quinde.perfil.v1:<id>` con los campos de viajero y **sin** contraseña ni tokens.
+2. `/perfil`: se ven los datos; edita el celular y guarda.
+3. Busca un vuelo, elige tarifa y entra al paso 2: el **Adulto 1** sale con «Prellenado con tus datos»; con más pasajeros, los demás salen vacíos.
+4. Menú del usuario → «Borrar mis datos guardados» → confirmar: la clave desaparece y aparece el aviso «Completa tu perfil…».
+5. Con la cuenta demo (`demo@quinde.ec`, sin perfil) el aviso aparece al ingresar.
+
+### Verificación contra la API real
+
+**No se hizo** (el backend local no respondió). Lo único que toca la API es `POST /auth/register`, con el mismo cuerpo `{ email, password }` de antes, así que no se espera ninguna diferencia; para comprobarlo: registrarse con `VITE_API_URL=http://localhost:3010/flights/v1` (solo backend **local**, nunca Render ni la cuenta de administrador), mirar en la pestaña Red que el cuerpo de `POST /auth/register` sea solo `{"email":…,"password":…}`, y recorrer los pasos 2 a 4 de arriba.
+
+---
+
 ## 6. Reglas de la API que el frontend respeta
 
 - **Rutas públicas:** búsqueda, mapa de asientos y estado de vuelo. Todo lo demás exige sesión.
@@ -541,7 +596,7 @@ Las respuestas de búsqueda, mapa de asientos, estado de vuelo y los ProblemDeta
 Verificado con curl y `npm run test:api` contra el **backend local** (en Render no se crean usuarios):
 
 - **El registro no inicia sesión.** `POST /auth/register` responde 201 con el usuario y **sin tokens**; el frontend ingresa justo después con `POST /auth/login`. Si ese ingreso falla (por ejemplo, un 429), la cuenta ya existe y la pantalla lo dice así, sin anunciar que el registro falló.
-- **La cuenta es solo correo y contraseña.** No hay nombre, teléfono ni documento, y no hay endpoint para editar: Mi perfil es de solo lectura (`GET /auth/me`: correo, fecha de alta, roles y permisos).
+- **La cuenta es solo correo y contraseña.** No hay nombre, teléfono ni documento, y no hay endpoint para editar ni para guardar un perfil: la parte de cuenta de Mi perfil es de solo lectura (`GET /auth/me`: correo, fecha de alta, roles y permisos). Los datos de viajero que pide el registro **no salen del navegador** (sección 5f).
 - **El rol lo decide el backend:** todo registro queda como `cliente`. El frontend nunca envía un rol.
 - **Reglas de los datos** (las mismas que los DTO del backend, en `shared/lib/credentials.ts`): el correo se recorta, se normaliza (NFC) y va en minúsculas, máximo 254 caracteres, con dominio y TLD, sin IP, sin nombre visible, sin caracteres de control, invisibles ni etiquetas HTML. La contraseña tiene de 12 a 128 caracteres medidos tras NFKC, **sin recortar** y sin reglas de composición (una frase sirve).
 - **Tokens:** el access token es un JWT (`expires_in` 900); el refresh token es opaco (43 caracteres base64url). Los campos van en snake_case (`access_token`, `refresh_token`, `expires_in`).
@@ -643,12 +698,14 @@ Fuente: lo que probó el dueño contra el backend local (pases) y la lectura del
 | Refresh token | `sessionStorage` por defecto; `localStorage` solo con "Mantener mi sesión iniciada" | Recargar la página no cierra la sesión. Sin la casilla, cerrar la pestaña la termina. |
 | Huellas de tokens ya rotados | `localStorage` (`quinde.auth.rotated`, hash FNV-1a, nunca el token) | Una pestaña duplicada con una copia vieja en su `sessionStorage` no la envía (evita que la API lo tome por un robo). |
 | Tokens nuevos tras renovar | `BroadcastChannel` entre pestañas del mismo origen | Las demás pestañas adoptan el token rotado en vez de renovar otra vez. |
+| Perfil de viajero (nombres, documento, nacimiento, contacto) | `localStorage`, clave `quinde.perfil.v1:<id de usuario>`; el aviso descartado, `sessionStorage` | **Son datos personales en claro en el navegador** (ver la contrapartida de abajo). Nunca guarda contraseñas ni tokens (lista cerrada de campos). Cerrar sesión NO lo borra; se borra a pedido de la persona. El backend no lo recibe. |
 
 - **Una sola renovación a la vez:** una promesa compartida dentro de la pestaña y Web Locks (`quinde-auth-refresh`) entre pestañas; con el candado tomado se vuelve a leer el almacén por si otra pestaña ya renovó. Sin Web Locks se usa un candado local.
 - **Proactiva y reactiva:** se renueva poco antes de vencer (con el `expires_in` relativo, para que un reloj desfasado no provoque renovaciones en bucle) y, ante un 401, se renueva una vez y se reintenta la petición una vez; un segundo 401 cierra la sesión.
 - **Si la renovación es rechazada** (401/403): se borra todo, se avisa "Tu sesión se cerró por seguridad. Ingresa de nuevo." y se va a `/ingresar?volver=…`. La selección de compra no se pierde.
 - **Si la restauración falla por conexión** (sin red, tiempo agotado, 503), la sesión no se da por cerrada: el token sigue guardado y las rutas con sesión muestran "No pudimos recuperar tu sesión" con "Intentar de nuevo" (respeta `Retry-After`), en vez de mandar a ingresar.
 - **Cerrar sesión** llama a `POST /auth/logout`, borra los tokens y avisa a las demás pestañas; si la llamada falla, la sesión se cierra igual en el navegador.
+- **Contrapartida del perfil de viajero:** el documento, la fecha de nacimiento y el contacto quedan legibles en `localStorage` y sobreviven a cerrar sesión: quien use el mismo navegador (una computadora compartida) o un script inyectado (XSS) los puede leer. Se mitiga con el aviso claro del registro («se guardan solo en este dispositivo»), la opción «Borrar mis datos guardados» (menú del usuario y Mi perfil), la clave por usuario y la CSP estricta de F8. Mover el perfil al backend (`docs/PERFIL-VIAJERO-PROPUESTA-B.md`) cambiaría esta contrapartida por otra (datos personales en un servidor).
 - **Contrapartida aceptada:** un script inyectado (XSS) podría leer el refresh token de `sessionStorage`/`localStorage` mientras la página está abierta. Lo mitigan React (no se inserta HTML sin escapar), la ausencia de `dangerouslySetInnerHTML` y que no se cargan scripts de terceros. **F8 debe agregar una Content-Security-Policy estricta** al publicar (`script-src 'self'`, `connect-src` limitado a la API, sin `unsafe-inline`). Una cookie `HttpOnly` sería mejor, pero la API no la ofrece.
 
 ### Aeropuertos y rutas (verificado contra la API el 2026-10-07)
@@ -726,7 +783,7 @@ Si el contrato define un límite, se usa exactamente ese.
 
 ## 8. Pruebas
 
-- **Hoy:** 806 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva. Desde F4b, las pantallas: formulario de pasajeros por tipo, temporizador con avisos a 5 y 2 minutos, tarjeta, y la ruta completa de la compra con sesión, que cuenta los clics y falla si pasan de 3 (no hay Playwright instalado: es una prueba de componentes de las cuatro pantallas), con la cuenta incrustada, volver atrás, los errores del pago y los estados de la confirmación. Desde F6, la postventa: las reglas del mock con los mismos códigos del contrato (lista por cursor, boletos, check-in, pases, equipaje, cambio de fecha, cancelación), `RealFlightsApi` contra un cliente HTTP falso (rutas, cabeceras, 200/201/202 y dinero en centavos), las acciones habilitadas por estado, los filtros de la lista, los totales de equipaje, la compra de equipaje con 200/201/202/422, las claves de idempotencia (generación, reutilización y clave nueva al cambiar el pago), los hooks de check-in y cambio de fecha, el QR y las pantallas de lista, pases, equipaje y cancelación. Además, las pruebas del buscador con sugerencias, los resultados con pestañas, las fechas cercanas y el paso de cuenta (rama de mejoras de interacción). Desde F7: la tarifa más baja de una búsqueda (orden, desempates, moneda), el tope de 6 tarjetas, el presupuesto de 8 búsquedas y la concurrencia de 2, la caché con vencimiento, cancelar al salir, el 429 con `Retry-After`, las rutas sin vuelos y las fallas parciales; la cancelación y el reintento en el cliente HTTP y el mock; las tarjetas, los filtros, los estados de carga, vacío, error, falla parcial y 429 y el clic hasta `/resultados`; el inicio (jerarquía y textos de ayuda), los metadatos por ruta, `index.html` (sin servidores externos, tipografías y `robots.txt`), los escenarios del mock y que el mock cubra las seis rutas populares cualquiera que sea el día de la semana.
+- **Hoy:** 899 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva. Desde F4b, las pantallas: formulario de pasajeros por tipo, temporizador con avisos a 5 y 2 minutos, tarjeta, y la ruta completa de la compra con sesión, que cuenta los clics y falla si pasan de 3 (no hay Playwright instalado: es una prueba de componentes de las cuatro pantallas), con la cuenta incrustada, volver atrás, los errores del pago y los estados de la confirmación. Desde F6, la postventa: las reglas del mock con los mismos códigos del contrato (lista por cursor, boletos, check-in, pases, equipaje, cambio de fecha, cancelación), `RealFlightsApi` contra un cliente HTTP falso (rutas, cabeceras, 200/201/202 y dinero en centavos), las acciones habilitadas por estado, los filtros de la lista, los totales de equipaje, la compra de equipaje con 200/201/202/422, las claves de idempotencia (generación, reutilización y clave nueva al cambiar el pago), los hooks de check-in y cambio de fecha, el QR y las pantallas de lista, pases, equipaje y cancelación. Además, las pruebas del buscador con sugerencias, los resultados con pestañas, las fechas cercanas y el paso de cuenta (rama de mejoras de interacción). Desde F7: la tarifa más baja de una búsqueda (orden, desempates, moneda), el tope de 6 tarjetas, el presupuesto de 8 búsquedas y la concurrencia de 2, la caché con vencimiento, cancelar al salir, el 429 con `Retry-After`, las rutas sin vuelos y las fallas parciales; la cancelación y el reintento en el cliente HTTP y el mock; las tarjetas, los filtros, los estados de carga, vacío, error, falla parcial y 429 y el clic hasta `/resultados`; el inicio (jerarquía y textos de ayuda), los metadatos por ruta, `index.html` (sin servidores externos, tipografías y `robots.txt`), los escenarios del mock y que el mock cubra las seis rutas populares cualquiera que sea el día de la semana. Con el perfil de viajero: las reglas del adulto y del documento, el servicio `perfilViajero` (clave por usuario, lista cerrada de campos, JSON dañado, almacenamiento que lanza, borrado), el registro completo (validación al salir del campo, errores que no quedan pegados, que a `/auth/register` solo van correo y contraseña —también en `RealFlightsApi` y el mock—, que se guarda solo con la cuenta creada y la sesión iniciada, y que si falla se conserva lo escrito), Mi perfil, borrar, el aviso, y el prellenado del pasajero 1 (nunca niños, infantes ni otros adultos).
 - **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. La de compra, también solo local: búsqueda real, hold y `GET`, `PAY-OK` 201 con boletos y el mismo envío dos veces con la misma clave = **una sola reserva** (`Idempotent-Replayed: true`), `PAY-REJ` 422 con el hold aún `HELD`, `PAY-PEND` 202 seguido hasta `CONFIRMED`, y liberar el hold. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 y reservas 10 por minuto).
 - **E2E:** `e2e/seats-demo.mjs` (selector de asientos, mock, 320/768/1280 px).
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
@@ -747,6 +804,7 @@ Si el contrato define un límite, se usa exactamente ese.
 | F5 | Selector de asientos (mapa en forma de avión, lista, filtros, conflictos 409/422), integrado en el paso 2 y verificado con la API real | Hecha (tag `fase-5`) |
 | F6 | Mis viajes: lista, detalle, boletos, check-in, pases con QR, equipaje, cambio de fecha, cancelación | Hecha en mock (rama `fase-6-viajes`); **sin verificar con la API real** |
 | F7 | Ofertas y pulido del inicio | Hecha en mock (rama `feat/f7-ofertas-inicio`); **sin verificar con la API real**; LCP 3,0–3,1 s, meta 2,5 s no cumplida |
+| — | Registro con datos de viajero y perfil local (rama `feat/registro-perfil-viajero`, sección 5f) | Hecho en mock; **sin verificar con la API real** |
 | F8 | Calidad y entrega: pruebas de extremo a extremo, accesibilidad, despliegue | Pendiente |
 
 Desde F2, cada fase se cierra funcionando **con el mock y con la API real**.

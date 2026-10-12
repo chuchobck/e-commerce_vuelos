@@ -71,7 +71,7 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
   `api.refresh` fuera de `SessionManager`: un refresh token rotado que se reusa revoca la sesión.
 - El vencimiento se calcula con `expires_in` (relativo), no con el `exp` del JWT: un reloj desfasado
   no debe provocar renovaciones en bucle.
-- El frontend nunca envía un rol. La cuenta es solo correo y contraseña; Mi perfil es de solo lectura.
+- El frontend nunca envía un rol. La cuenta es solo correo y contraseña; en Mi perfil la cuenta es de solo lectura (los datos de viajero son locales: ver más abajo).
 - `npm run test:api` crea usuarios `@example.test` **solo contra el backend local**; nunca contra
   Render ni con la cuenta de administrador sembrada. Esperar un minuto entre corridas (ingreso 5/min).
 - Modelo de seguridad y contrapartida XSS: sección 6 del README. F8 debe agregar una CSP estricta.
@@ -116,6 +116,23 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - El QR se dibuja en el cliente (`qrcode-generator`, solo dentro de `shared/ui/qr-image.tsx`, cargado con `lazy` desde `qr-code.tsx`;
   nunca importarlo desde un `index.ts` de barril). Siempre negro sobre blanco: un lector no entiende un QR invertido.
 - `NotYetConnectedError` queda como mecanismo para lo que falte conectar; desde F6 ninguna operación de `FlightsApi` lo lanza.
+
+## Perfil de viajero (solo local)
+
+- **Datos de perfil solo locales; el backend no tiene perfil.** `POST /auth/register` recibe únicamente `{ email, password }`: nunca se le agregan datos de viajero
+  ni nada más (lo vigila `shared/api/register.test.ts`). Los datos de quien viaja (nombres, documento, nacimiento, nacionalidad, sexo, contacto) viven **solo en este
+  dispositivo**, en el servicio único `perfilViajero` (`shared/profile/perfilViajero.ts`). Los componentes no tocan `localStorage`.
+- Una entrada por usuario (`quinde.perfil.v1:<id>`, el `id` de la sesión), todo en `try/catch` (sin almacenamiento la app funciona igual), solo la lista cerrada
+  `TRAVELER_KEYS`: **nunca** contraseñas ni tokens. Cerrar sesión NO lo borra; se borra con «Borrar mis datos guardados» (menú del usuario y Mi perfil, con confirmación).
+- Se guarda solo cuando la cuenta ya se creó **y** la sesión ya inició; si el registro falla se conserva todo lo escrito y no se guarda nada. El registro avisa que los datos se guardan
+  solo en este dispositivo.
+- Las reglas del viajero son **las mismas** del pasajero (documento en `shared/profile/documents.ts`, usado por el perfil y por `passengersSchema`); no se copian reglas. El perfil mide la
+  mayoría de edad y el pasaporte contra hoy; la compra, contra el viaje.
+- **Prellenado:** solo el pasajero 1 y solo si es adulto (`features/checkout/prefill.ts`); nunca niños, infantes ni otros adultos; el borrador con datos manda; solo se llena lo válido
+  y lo que falta se nombra. Todo sigue siendo editable y lleva la etiqueta «Prellenado con tus datos».
+- Los campos de datos de viajero son `TravelerFields` (mismo orden de pares que el paso de pasajeros). Al limpiar lo que se teclea (solo letras, máscara de fecha) y el campo ya muestra un
+  error, se vuelve a validar (`shouldValidate`): un error nunca queda pegado a algo que ya está bien.
+- Mover el perfil al backend sería otra decisión: `docs/PERFIL-VIAJERO-PROPUESTA-B.md`.
 
 ## Ofertas e inicio (desde F7)
 
