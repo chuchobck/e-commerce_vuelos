@@ -7,14 +7,13 @@ import { es, fmt } from '@/shared/i18n';
 import { countries, isBookableCountry } from '@/shared/lib/countries';
 import { maskDateInput } from '@/shared/lib/dates';
 import { onlyDigits, onlyLetters } from '@/shared/lib/validators';
+import { isEcuadorianId, sanitizeDocument } from '@/shared/profile';
 import { Button, Checkbox, Field, FormStatus, Input, Select } from '@/shared/ui';
 import {
   initialPassengerValues,
-  isEcuadorianId,
   passengerIdAt,
   passengersSchema,
   passengerTypes,
-  sanitizeDocument,
   toBookingPassengers,
   tripDates,
   withSharedContact,

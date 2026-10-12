@@ -2,9 +2,10 @@ import { z } from 'zod';
 import type { BookingPassenger, PassengerCount } from '@/shared/api';
 import { es } from '@/shared/i18n';
 import { isBookableCountry } from '@/shared/lib/countries';
-import { displayToIso, isoToDisplay, parseDisplayDate } from '@/shared/lib/dates';
+import { displayToIso, isoToDisplay } from '@/shared/lib/dates';
 import { birthDateMessage, emailField, nameField, phoneField, type PassengerType } from '@/shared/lib/schemas';
-import { compactDocument, isValidCedula, onlyDigits, PASSPORT_PATTERN } from '@/shared/lib/validators';
+import { compactDocument } from '@/shared/lib/validators';
+import { documentIssues } from '@/shared/profile';
 import type { CheckoutSelection } from './selection';
 
 const v = es.validation;
@@ -81,14 +82,6 @@ export function tripDates(selection: Pick<CheckoutSelection, 'outbound' | 'inbou
   return { first: day(selection.outbound.itinerary.segments[0].departureTime), last: day(lastLeg.itinerary.segments[lastLeg.itinerary.segments.length - 1].departureTime) };
 }
 
-/** ¿La cédula aplica? Solo con documento nacional de Ecuador (el backend valida el módulo 10 solo ahí). */
-export const isEcuadorianId = (p: Pick<PassengerFormValue, 'documentType' | 'nationality'>) => p.documentType === 'NATIONAL_ID' && p.nationality === 'EC';
-
-/** Lo que se acepta teclear o pegar en el número de documento (bloquea el resto). */
-export function sanitizeDocument(p: Pick<PassengerFormValue, 'documentType' | 'nationality'>, raw: string): string {
-  return isEcuadorianId(p) ? onlyDigits(raw).slice(0, 10) : compactDocument(raw).replace(/[^A-Z0-9]/g, '').slice(0, 20);
-}
-
 export function passengersSchema({ first, last }: { first: Date; last: Date }) {
   const passenger = z
     .object({
@@ -108,19 +101,7 @@ export function passengersSchema({ first, last }: { first: Date; last: Date }) {
     .superRefine((p, ctx) => {
       const issue = (path: string, message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
       if (!isBookableCountry(p.nationality)) issue('nationality', v.nationalityUnavailable);
-      const number = compactDocument(p.documentNumber);
-      if (isEcuadorianId(p)) {
-        if (number.length !== 10) issue('documentNumber', v.cedulaLength);
-        else if (!isValidCedula(number)) issue('documentNumber', v.cedulaInvalid);
-      } else if (number && !PASSPORT_PATTERN.test(number)) {
-        issue('documentNumber', v.passportInvalid);
-      }
-      if (p.documentType === 'PASSPORT') {
-        const expiry = parseDisplayDate(p.documentExpiryDate);
-        if (!p.documentExpiryDate) issue('documentExpiryDate', v.required);
-        else if (!expiry) issue('documentExpiryDate', v.dateInvalid);
-        else if (expiry <= last) issue('documentExpiryDate', v.passportExpiresBeforeTrip);
-      }
+      for (const found of documentIssues(p, { after: last, message: v.passportExpiresBeforeTrip })) issue(found.path, found.message);
       const birth = p.birthDate ? birthDateMessage(p.birthDate, p.type, first, last) : null;
       if (birth) issue('birthDate', birth);
       if (p.type === 'INFANT' && p.adultIndex === '') issue('adultIndex', v.requiredSelect);

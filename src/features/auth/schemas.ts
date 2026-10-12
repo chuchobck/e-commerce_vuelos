@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { es } from '@/shared/i18n';
 import { emailField, passwordField } from '@/shared/lib/schemas';
+import { travelerSchema } from '@/shared/profile';
 
 const v = es.validation;
 
 /**
- * La cuenta de la API es solo correo y contraseña (sin nombre, documento ni teléfono: esos datos
- * se piden por pasajero en la compra). Las reglas son las del backend: ver shared/lib/credentials.ts.
+ * La cuenta de la API es solo correo y contraseña (sin nombre, documento ni teléfono: el backend no tiene perfil). Las reglas
+ * son las del backend: ver shared/lib/credentials.ts.
  */
 export const LoginSchema = z.object({
   email: emailField,
@@ -16,7 +17,13 @@ export const LoginSchema = z.object({
 });
 export type LoginInput = z.input<typeof LoginSchema>;
 
-export const RegisterSchema = LoginSchema.extend({
-  terms: z.boolean().refine((b) => b, v.termsRequired),
-});
-export type RegisterInput = z.input<typeof RegisterSchema>;
+/**
+ * Registro: la cuenta (correo y contraseña, lo único que recibe la API) más los datos de quien viaja, que NO viajan a la API: se
+ * guardan en este dispositivo (`perfilViajero`). `reference` es el «hoy» con el que se miden la mayoría de edad y el pasaporte.
+ */
+export const registerSchema = (reference?: Date) =>
+  LoginSchema.extend({
+    terms: z.boolean().refine((b) => b, v.termsRequired),
+    traveler: travelerSchema(reference),
+  });
+export type RegisterInput = z.input<ReturnType<typeof registerSchema>>;
