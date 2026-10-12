@@ -260,6 +260,19 @@ describe('RegisterForm', () => {
     await waitFor(() => expect(document.activeElement).toBe(email()));
   });
 
+  it('tras enviar vacío, los errores se van al corregir cada campo: también en los que se limpian al teclear (nombres, fecha) y en el contacto que sigue a la cuenta', async () => {
+    setup('register');
+    submit(a.submitRegister);
+    expect((await screen.findAllByText(es.validation.required)).length).toBeGreaterThan(5);
+    fireEvent.change(email(), { target: { value: 'ana@example.test' } });
+    type(/^Nombres/, 'Ana2 María'); // el dígito no entra: queda «Ana María»
+    type(/^Fecha de nacimiento/, '15031990'); // la máscara pone las barras
+    await waitFor(() => expect(field(/^Nombres/).getAttribute('aria-invalid')).toBeNull());
+    await waitFor(() => expect(field(/^Fecha de nacimiento/).getAttribute('aria-invalid')).toBeNull());
+    await waitFor(() => expect(field(new RegExp(`^${t.contactEmail}`)).getAttribute('aria-invalid')).toBeNull());
+    expect(field(new RegExp(`^${t.contactEmail}`)).value).toBe('ana@example.test');
+  });
+
   describe('validación de los datos de viajero (al salir del campo)', () => {
     it('los nombres no admiten números ni signos: no entran', () => {
       setup('register');

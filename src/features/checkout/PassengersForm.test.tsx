@@ -261,6 +261,18 @@ describe('formulario de pasajeros', () => {
   });
 });
 
+describe('errores pegados', () => {
+  it('tras un envío con errores, los campos que limpian lo que se teclea (nombres, fecha) dejan de marcarse al corregirlos', async () => {
+    setup({ adults: 1, children: 0, infants: 0 });
+    fireEvent.submit(screen.getByRole('form', { name: es.purchase.passengersTitle }));
+    await waitFor(() => expect(field(/^Nombres/).getAttribute('aria-invalid')).toBe('true'));
+    change(field(/^Nombres/), 'Ana2 María');
+    change(field(/^Fecha de nacimiento/), '15041990');
+    await waitFor(() => expect(field(/^Nombres/).getAttribute('aria-invalid')).toBeNull());
+    await waitFor(() => expect(field(/^Fecha de nacimiento/).getAttribute('aria-invalid')).toBeNull());
+  });
+});
+
 describe('prellenado con el perfil de viajero', () => {
   const PROFILE: TravelerValues = { firstName: 'Ana', lastName: 'Pérez', documentType: 'NATIONAL_ID', documentNumber: '1710034065', nationality: 'EC', gender: 'F', birthDate: '15/03/1990', documentExpiryDate: '', email: 'contacto@example.test', phone: '991234567' };
   const label = () => screen.queryAllByText(f.prefilled);

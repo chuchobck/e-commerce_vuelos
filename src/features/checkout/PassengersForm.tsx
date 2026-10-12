@@ -136,6 +136,10 @@ export function PassengersForm({ selection, seats, draft, accountEmail, profile,
     shouldFocusError: true,
   });
   const values = useWatch({ control }) as PassengersFormValues;
+  // Al limpiar lo que se teclea (solo letras, máscara de fecha…) el valor cambia por debajo de la validación: si el campo ya mostraba un
+  // error, se vuelve a validar con el valor limpio para que el mensaje no quede pegado a algo que ya está bien.
+  const clean = (i: number, name: 'firstName' | 'lastName' | 'documentNumber' | 'birthDate' | 'documentExpiryDate' | 'phone', value: string) =>
+    setValue(`passengers.${i}.${name}` as `passengers.0.firstName`, value, { shouldValidate: !!errors.passengers?.[i]?.[name] });
 
   // Borrador: con una pausa corta tras escribir, y al salir de la pantalla (salvo al continuar).
   const latest = useRef(values);
@@ -214,10 +218,10 @@ export function PassengersForm({ selection, seats, draft, accountEmail, profile,
             ) : null}
             <div className="grid items-start gap-4 sm:grid-cols-2">
               <Field id={id('first')} label={f.firstName} error={own?.firstName?.message} required>
-                <Input autoComplete={i === 0 ? 'given-name' : 'off'} maxLength={60} {...register(`passengers.${i}.firstName`, { onChange: (e) => setValue(`passengers.${i}.firstName`, onlyLetters(e.target.value)) })} />
+                <Input autoComplete={i === 0 ? 'given-name' : 'off'} maxLength={60} {...register(`passengers.${i}.firstName`, { onChange: (e) => clean(i, 'firstName', onlyLetters(e.target.value)) })} />
               </Field>
               <Field id={id('last')} label={f.lastName} error={own?.lastName?.message} required>
-                <Input autoComplete={i === 0 ? 'family-name' : 'off'} maxLength={60} {...register(`passengers.${i}.lastName`, { onChange: (e) => setValue(`passengers.${i}.lastName`, onlyLetters(e.target.value)) })} />
+                <Input autoComplete={i === 0 ? 'family-name' : 'off'} maxLength={60} {...register(`passengers.${i}.lastName`, { onChange: (e) => clean(i, 'lastName', onlyLetters(e.target.value)) })} />
               </Field>
               <Field id={id('doctype')} label={f.documentType} required>
                 <Select
@@ -235,7 +239,7 @@ export function PassengersForm({ selection, seats, draft, accountEmail, profile,
                   autoComplete="off"
                   inputMode={current && isEcuadorianId(current) ? 'numeric' : 'text'}
                   maxLength={current && isEcuadorianId(current) ? 10 : 20}
-                  {...register(`passengers.${i}.documentNumber`, { onChange: (e) => setValue(`passengers.${i}.documentNumber`, sanitizeDocument(current ?? { documentType: 'NATIONAL_ID', nationality: 'EC' }, e.target.value)) })}
+                  {...register(`passengers.${i}.documentNumber`, { onChange: (e) => clean(i, 'documentNumber', sanitizeDocument(current ?? { documentType: 'NATIONAL_ID', nationality: 'EC' }, e.target.value)) })}
                 />
               </Field>
               <Field id={id('nat')} label={f.nationality} error={own?.nationality?.message} required>
@@ -263,7 +267,7 @@ export function PassengersForm({ selection, seats, draft, accountEmail, profile,
                   inputMode="numeric"
                   autoComplete={i === 0 ? 'bday' : 'off'}
                   maxLength={10}
-                  {...register(`passengers.${i}.birthDate`, { onChange: (e) => setValue(`passengers.${i}.birthDate`, maskDateInput(e.target.value)) })}
+                  {...register(`passengers.${i}.birthDate`, { onChange: (e) => clean(i, 'birthDate', maskDateInput(e.target.value)) })}
                 />
               </Field>
               {passport ? (
@@ -272,7 +276,7 @@ export function PassengersForm({ selection, seats, draft, accountEmail, profile,
                     inputMode="numeric"
                     autoComplete="off"
                     maxLength={10}
-                    {...register(`passengers.${i}.documentExpiryDate`, { onChange: (e) => setValue(`passengers.${i}.documentExpiryDate`, maskDateInput(e.target.value)) })}
+                    {...register(`passengers.${i}.documentExpiryDate`, { onChange: (e) => clean(i, 'documentExpiryDate', maskDateInput(e.target.value)) })}
                   />
                 </Field>
               ) : null}
@@ -299,7 +303,7 @@ export function PassengersForm({ selection, seats, draft, accountEmail, profile,
                     autoComplete={i === 0 ? 'tel-national' : 'off'}
                     prefix="+593"
                     maxLength={9}
-                    {...register(`passengers.${i}.phone`, { onChange: (e) => setValue(`passengers.${i}.phone`, onlyDigits(e.target.value).slice(0, 9)) })}
+                    {...register(`passengers.${i}.phone`, { onChange: (e) => clean(i, 'phone', onlyDigits(e.target.value).slice(0, 9)) })}
                   />
                 </Field>
                 {i === 0 && types.length > 1 ? (

@@ -77,9 +77,10 @@ export function RegisterForm({ idPrefix = 'reg', onSuccess }: RegisterFormProps)
   // El correo de contacto sigue al de la cuenta hasta que la persona lo cambie (por defecto es el mismo).
   const accountEmail = values?.email ?? '';
   const contactEdited = !!dirtyFields.traveler?.email;
+  const contactInvalid = !!errors.traveler?.email;
   useEffect(() => {
-    if (!contactEdited) setValue('traveler.email', accountEmail, { shouldDirty: false });
-  }, [accountEmail, contactEdited, setValue]);
+    if (!contactEdited) setValue('traveler.email', accountEmail, { shouldDirty: false, shouldValidate: contactInvalid });
+  }, [accountEmail, contactEdited, contactInvalid, setValue]);
 
   // Qué falta, en vivo (no hay resumen de errores: el estado junto al botón lo dice con tono tranquilo).
   const parsed = schema.safeParse(values);

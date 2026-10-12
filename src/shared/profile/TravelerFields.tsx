@@ -49,7 +49,9 @@ export function TravelerFields<T extends FieldValues>({ register, setValue, cont
   const path = (key: TravelerKey) => (name ? `${name}.${key}` : key) as Path<T>;
   const id = (key: TravelerKey) => `${idPrefix}-${ID_SUFFIX[key]}`;
   const message = (key: TravelerKey) => (get(errors, path(key)) as { message?: string } | undefined)?.message;
-  const set = (key: TravelerKey, value: string) => setValue(path(key), value as PathValue<T, Path<T>>);
+  // Al limpiar lo que se teclea (solo letras, máscara de fecha…) el valor cambia por debajo de la validación: si el campo ya mostraba un
+  // error, se vuelve a validar con el valor limpio para que el mensaje no quede pegado a algo que ya está bien.
+  const set = (key: TravelerKey, value: string) => setValue(path(key), value as PathValue<T, Path<T>>, { shouldValidate: !!message(key) });
 
   const documentType = (useWatch({ control, name: path('documentType') }) as DocumentType | undefined) ?? 'NATIONAL_ID';
   const nationality = (useWatch({ control, name: path('nationality') }) as string | undefined) ?? 'EC';
