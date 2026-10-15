@@ -57,12 +57,13 @@ export function TripDateChangePage() {
   const [resolved, setResolved] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Con la reserva cargada se empieza con la ida y una fecha sugerida (el día siguiente), para no partir en blanco.
-  useEffect(() => {
-    if (!booking || itineraryId) return;
+  // Con la reserva cargada se empieza con la ida y una fecha sugerida (el día siguiente), para no partir en blanco. Se fija
+  // durante el render (React lo reejecuta antes de pintar), no en un efecto: con un efecto, el primer render con la reserva
+  // mostraba un instante el campo vacío y el botón de buscar desactivado.
+  if (booking && !itineraryId) {
     setItineraryId(booking.outbound.itinerary.id);
     setDateText(toDisplayDate(suggestedDate(booking.outbound.itinerary)));
-  }, [booking, itineraryId]);
+  }
 
   const legs = booking ? legsOf(booking) : [];
   const leg = legs.find((l) => l.itinerary.id === itineraryId) ?? legs[0];
