@@ -87,12 +87,39 @@ otro único lugar con `fetch`; la regla de ESLint de `src/shared/api/**` no se a
 | Qué | Dónde |
 |---|---|
 | Esquema del BFF (copia exacta) y su origen | `contracts/bff-schema.graphql`, `contracts/PROCEDENCIA.md` |
-| Sincronizar y avisar si cambió | `npm run schema:sync` / `npm run schema:check` |
+| Sincronizar y avisar si cambió | `npm run schema:sync` / `npm run schema:check` (fuente con `BFF_SCHEMA_REF`, ver 6.1) |
 | Consultas (una por archivo, constantes) | `src/shared/api/graphql/{searchFlights,seatMap,flightStatus}.ts` |
 | Forma de `data` y mapeo a los DTO de REST | `src/shared/api/graphql/{types,mapping}.ts` |
 | Implementación de `FlightsApi` | `src/shared/api/GraphqlFlightsApi.ts` |
 | Cliente y errores | `src/shared/api/http/{graphqlClient,graphqlErrors}.ts` |
 | Selector de modos | `src/shared/api/{config,select}.ts` |
+
+### 6.1 Sincronizar el esquema con el BFF (`BFF_SCHEMA_REF`)
+
+`npm run schema:sync` descarga `src/graphql/schema.graphql` del repositorio `chuchobck/bff_vuelos` y lo guarda en
+`contracts/bff-schema.graphql`; `npm run schema:check` solo compara. La referencia del BFF sale de la variable
+**`BFF_SCHEMA_REF`** (rama, etiqueta o commit) y por defecto es **`main`**. `BFF_SCHEMA_URL` reemplaza la URL completa.
+
+**Estado hoy:** la copia es la de la rama `feat/r2-bff`, commit `2bee8a28734ae5debb2baf0e76783e42baea9726` (SHA-256 `0e501f1a…d276`,
+en `contracts/PROCEDENCIA.md`). Como el PR del BFF aún no se fusionó, `main` no trae el archivo y el comando por defecto responde 404
+(código de salida 2) con una pista. Mientras tanto se verifica contra la rama:
+
+```bash
+BFF_SCHEMA_REF=feat/r2-bff npm run schema:check      # «El esquema no cambió» = la copia sigue al día
+```
+
+**Cuando el PR del BFF esté fusionado** (la copia no se cambia antes de eso):
+
+1. `npm run schema:check` (sin variable: lee `main`). Código 0: el esquema es idéntico (lo normal si el PR se fusionó sin cambios, aunque
+   haya cambiado el commit por un *squash*) y solo falta el paso 4. Código 1: el esquema cambió. Código 2: `main` todavía no lo tiene.
+2. Si cambió: `npm run schema:sync` y revisar `git diff contracts/bff-schema.graphql`. El BFF nunca quita ni renombra: agrega y marca
+   `@deprecated`, así que lo normal es que las consultas actuales sigan válidas; si no, la prueba de contrato lo dirá.
+3. Si hay cambios que importan, ajustar consultas y mapeos (la prueba de paridad REST↔GraphQL debe seguir en verde).
+4. Actualizar la tabla de `contracts/PROCEDENCIA.md`: rama `main`, el commit de `main` que trae el archivo
+   (`git ls-remote https://github.com/chuchobck/bff_vuelos main`, o `git log -1 -- src/graphql/schema.graphql` en el BFF), el SHA-256
+   (`sha256sum contracts/bff-schema.graphql`) y la fecha. La prueba `schemaCopy.test.ts` falla si el SHA-256 anotado no es el del archivo.
+5. `npm run lint`, `npm run typecheck`, `npm test` y `npm run build` en verde, y un commit
+   `chore(contratos): esquema del BFF desde main`.
 
 Las consultas piden **solo los campos que usa el mapeo** (más `totalOffers` y `operatingCarrier`, que el DTO de REST exige) y las variables
 son tipadas (`SearchInput!`, `ID!`, `Date!`): nada se interpola en el texto de la consulta.

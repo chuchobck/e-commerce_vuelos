@@ -55,7 +55,7 @@ npm run dev               # http://localhost:5173
 | `npm run typecheck` | Revisión de tipos |
 | `npm run lint` | ESLint: accesibilidad (jsx-a11y) y reglas de arquitectura de la sección 3 |
 | `npm run api:types` | Regenera los tipos del contrato en `src/shared/api/generated/` |
-| `npm run schema:sync` | Descarga el esquema GraphQL del BFF a `contracts/bff-schema.graphql` y **avisa si cambió** (revisar las consultas y correr las pruebas). `npm run schema:check` solo compara y sale con código 1 si difiere |
+| `npm run schema:sync` | Descarga el esquema GraphQL del BFF (rama, etiqueta o commit de `BFF_SCHEMA_REF`, por defecto `main`) a `contracts/bff-schema.graphql` y **avisa si cambió** (revisar las consultas y correr las pruebas). `npm run schema:check` solo compara y sale con código 1 si difiere |
 | `npm run test:api` | Integración contra la API real: búsqueda, asientos, estado y errores validados contra el contrato con Ajv y, **solo con un backend local**, la cuenta y la compra (crea un usuario `@example.test`, holds y reservas). No es parte de `npm run test` |
 
 ### Contrato y tipos generados

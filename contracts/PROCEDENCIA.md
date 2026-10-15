@@ -46,7 +46,10 @@ con graphql-js).
 | Copiado | 2026-10-15 |
 
 `npm run schema:sync` vuelve a descargarlo y avisa si cambió; `npm run schema:check` solo compara
-(sale con código 1 si difiere) y sirve de aviso en CI o antes de empezar a trabajar. Una prueba
+(sale con código 1 si difiere) y sirve de aviso en CI o antes de empezar a trabajar. La referencia del BFF
+sale de `BFF_SCHEMA_REF` (rama, etiqueta o commit; por defecto `main`): mientras el PR del BFF no esté
+fusionado, `BFF_SCHEMA_REF=feat/r2-bff npm run schema:check` comprueba la copia actual y el comando sin
+variable responde 404. Pasos para resincronizar con `main`: `docs/GRAPHQL-CLIENTE.md`, sección 6.1. Una prueba
 (`src/shared/api/graphql/schemaCopy.test.ts`) comprueba que la copia local no se editó a mano: su
 SHA-256 debe ser el de esta tabla. Si el esquema cambia: `npm run schema:sync`, revisar las consultas,
 actualizar commit y SHA-256 aquí y correr `npm test`.

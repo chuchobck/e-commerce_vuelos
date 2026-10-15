@@ -5,15 +5,21 @@
  *   npm run schema:sync            descarga el esquema, lo guarda y AVISA si cambió
  *   npm run schema:sync -- --check solo compara: no escribe y termina con código 1 si difiere
  *
- * La fuente se puede cambiar con BFF_SCHEMA_URL (por ejemplo, otra rama). Tras un cambio hay que
- * revisar las consultas de src/shared/api/graphql, correr las pruebas y actualizar contracts/PROCEDENCIA.md.
+ * La fuente es `src/graphql/schema.graphql` del repositorio del BFF en la rama, etiqueta o commit que diga
+ * BFF_SCHEMA_REF (por defecto `main`). Mientras el PR del BFF no esté fusionado, `main` no trae el archivo:
+ * usa BFF_SCHEMA_REF=feat/r2-bff. BFF_SCHEMA_URL reemplaza la URL completa (otro repositorio o un espejo).
+ * Tras un cambio hay que revisar las consultas de src/shared/api/graphql, correr las pruebas y actualizar
+ * contracts/PROCEDENCIA.md.
  */
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const DEFAULT_URL = 'https://raw.githubusercontent.com/chuchobck/bff_vuelos/feat/r2-bff/src/graphql/schema.graphql';
-const url = process.env.BFF_SCHEMA_URL || DEFAULT_URL;
+const DEFAULT_REF = 'main';
+const ref = process.env.BFF_SCHEMA_REF || DEFAULT_REF;
+const url =
+  process.env.BFF_SCHEMA_URL ||
+  `https://raw.githubusercontent.com/chuchobck/bff_vuelos/${encodeURIComponent(ref).replaceAll('%2F', '/')}/src/graphql/schema.graphql`;
 const target = fileURLToPath(new URL('../contracts/bff-schema.graphql', import.meta.url));
 const checkOnly = process.argv.includes('--check');
 
@@ -22,6 +28,11 @@ const sha = (text) => createHash('sha256').update(text).digest('hex');
 const response = await fetch(url);
 if (!response.ok) {
   console.error(`No se pudo descargar el esquema (${response.status}) desde ${url}`);
+  if (response.status === 404 && !process.env.BFF_SCHEMA_URL) {
+    console.error(
+      `La referencia "${ref}" del BFF no tiene src/graphql/schema.graphql. Si el PR del BFF aún no se fusionó, usa BFF_SCHEMA_REF=feat/r2-bff.`,
+    );
+  }
   process.exit(2);
 }
 const remote = await response.text();
