@@ -100,18 +100,14 @@ otro único lugar con `fetch`; la regla de ESLint de `src/shared/api/**` no se a
 `contracts/bff-schema.graphql`; `npm run schema:check` solo compara. La referencia del BFF sale de la variable
 **`BFF_SCHEMA_REF`** (rama, etiqueta o commit) y por defecto es **`main`**. `BFF_SCHEMA_URL` reemplaza la URL completa.
 
-**Estado hoy:** la copia es la de la rama `feat/r2-bff`, commit `2bee8a28734ae5debb2baf0e76783e42baea9726` (SHA-256 `0e501f1a…d276`,
-en `contracts/PROCEDENCIA.md`). Como el PR del BFF aún no se fusionó, `main` no trae el archivo y el comando por defecto responde 404
-(código de salida 2) con una pista. Mientras tanto se verifica contra la rama:
+**Estado hoy:** el PR del BFF ya está fusionado en `main` (commit `faa703f243d23101a198553cdf2a56d297fb7ede`). La copia es idéntica al esquema de
+`main` (SHA-256 `0e501f1a…d276`; el último commit que lo cambió es `2bee8a28734ae5debb2baf0e76783e42baea9726`, ya dentro de `main`) y
+`BFF_SCHEMA_REF=main npm run schema:sync` lo confirmó el 2026-10-15 sin cambiar el archivo. `contracts/PROCEDENCIA.md` apunta a `main`.
 
-```bash
-BFF_SCHEMA_REF=feat/r2-bff npm run schema:check      # «El esquema no cambió» = la copia sigue al día
-```
+**Para volver a sincronizar** (por ejemplo, cuando el BFF agregue campos):
 
-**Cuando el PR del BFF esté fusionado** (la copia no se cambia antes de eso):
-
-1. `npm run schema:check` (sin variable: lee `main`). Código 0: el esquema es idéntico (lo normal si el PR se fusionó sin cambios, aunque
-   haya cambiado el commit por un *squash*) y solo falta el paso 4. Código 1: el esquema cambió. Código 2: `main` todavía no lo tiene.
+1. `npm run schema:check` (sin variable: lee `main`). Código 0: el esquema es idéntico y solo falta, si cambió el commit de `main`, el paso 4.
+   Código 1: el esquema cambió. Código 2: no se pudo descargar (por ejemplo, la referencia no tiene el archivo).
 2. Si cambió: `npm run schema:sync` y revisar `git diff contracts/bff-schema.graphql`. El BFF nunca quita ni renombra: agrega y marca
    `@deprecated`, así que lo normal es que las consultas actuales sigan válidas; si no, la prueba de contrato lo dirá.
 3. Si hay cambios que importan, ajustar consultas y mapeos (la prueba de paridad REST↔GraphQL debe seguir en verde).

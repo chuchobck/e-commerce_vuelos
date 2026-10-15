@@ -6,8 +6,7 @@
  *   npm run schema:sync -- --check solo compara: no escribe y termina con código 1 si difiere
  *
  * La fuente es `src/graphql/schema.graphql` del repositorio del BFF en la rama, etiqueta o commit que diga
- * BFF_SCHEMA_REF (por defecto `main`). Mientras el PR del BFF no esté fusionado, `main` no trae el archivo:
- * usa BFF_SCHEMA_REF=feat/r2-bff. BFF_SCHEMA_URL reemplaza la URL completa (otro repositorio o un espejo).
+ * BFF_SCHEMA_REF (por defecto `main`). BFF_SCHEMA_URL reemplaza la URL completa (otro repositorio o un espejo).
  * Tras un cambio hay que revisar las consultas de src/shared/api/graphql, correr las pruebas y actualizar
  * contracts/PROCEDENCIA.md.
  */
@@ -30,7 +29,7 @@ if (!response.ok) {
   console.error(`No se pudo descargar el esquema (${response.status}) desde ${url}`);
   if (response.status === 404 && !process.env.BFF_SCHEMA_URL) {
     console.error(
-      `La referencia "${ref}" del BFF no tiene src/graphql/schema.graphql. Si el PR del BFF aún no se fusionó, usa BFF_SCHEMA_REF=feat/r2-bff.`,
+      `La referencia "${ref}" del BFF no tiene src/graphql/schema.graphql. Revisa BFF_SCHEMA_REF (rama, etiqueta o commit del repositorio del BFF).`,
     );
   }
   process.exit(2);
