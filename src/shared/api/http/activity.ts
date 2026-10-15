@@ -32,3 +32,15 @@ export const serverActivity = {
     };
   },
 };
+
+/** Marca la petición como lenta si pasan `afterMs` sin respuesta; devuelve la función que la desmarca. */
+export function watchSlow(afterMs: number): () => void {
+  let unmark: (() => void) | undefined;
+  const timer = setTimeout(() => {
+    unmark = serverActivity.markSlow();
+  }, afterMs);
+  return () => {
+    clearTimeout(timer);
+    unmark?.();
+  };
+}

@@ -67,6 +67,27 @@ describe('pantalla de cambio de fecha: la nueva fecha se valida en vivo', () => 
     expect(statusText()).toContain(t.ready);
   });
 
+  it('el campo nunca se ve vacío: la fecha sugerida ya está en el primer render que lo muestra', async () => {
+    // Observa el DOM en cada cambio: si la fecha se pusiera en un efecto, el primer render con la reserva mostraría el campo
+    // vacío (y el botón de buscar desactivado) hasta el siguiente. Antes eso hacía que la prueba anterior fallara de vez en cuando.
+    const lookup = () => screen.queryByLabelText(new RegExp(`^${t.newDate}`)) as HTMLInputElement | null;
+    const values: string[] = [];
+    const observer = new MutationObserver(() => {
+      const input = lookup();
+      if (input) values.push(input.value);
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    try {
+      renderPage();
+      await dateInput();
+      await waitFor(() => expect(searchButton().disabled).toBe(false));
+    } finally {
+      observer.disconnect();
+    }
+    expect(values.length).toBeGreaterThan(0);
+    expect(new Set(values)).toEqual(new Set([format(addDays(departure, 1), 'dd/MM/yyyy')]));
+  });
+
   it('sin fecha, el botón está desactivado y dice qué falta; no hay error a la vista', async () => {
     renderPage();
     fireEvent.change(await dateInput(), { target: { value: '' } });

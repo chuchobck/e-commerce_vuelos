@@ -1,18 +1,77 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import statusFixture from './__fixtures__/status-la1400.json';
+import { GraphqlFlightsApi } from './GraphqlFlightsApi';
 import type { HttpClient } from './http/client';
 import { FINGERPRINT_PATTERN } from './http/deviceFingerprint';
 import { MockFlightsApi } from './mock/MockFlightsApi';
 import { RealFlightsApi } from './RealFlightsApi';
 import { apiModeFor, createFlightsApi } from './select';
 
+const REST = 'http://localhost:3010/flights/v1';
+const BFF = 'http://localhost:4000/graphql';
+
 describe('selección de implementación', () => {
   it('URL vacía (o solo espacios) = mock; con valor = real', () => {
     expect(apiModeFor('')).toBe('mock');
     expect(apiModeFor('   ')).toBe('mock');
-    expect(apiModeFor('http://localhost:3010/flights/v1')).toBe('real');
+    expect(apiModeFor(REST)).toBe('real');
     expect(createFlightsApi('')).toBeInstanceOf(MockFlightsApi);
-    expect(createFlightsApi('http://localhost:3010/flights/v1')).toBeInstanceOf(RealFlightsApi);
+    expect(createFlightsApi(REST)).toBeInstanceOf(RealFlightsApi);
+  });
+
+  describe('las tres combinaciones de VITE_API_URL y VITE_GRAPHQL_URL', () => {
+    it('API vacía: mock completo, VITE_GRAPHQL_URL se ignora (no se mezclan)', () => {
+      expect(apiModeFor('', BFF)).toBe('mock');
+      expect(createFlightsApi('', { graphqlUrl: BFF })).toBeInstanceOf(MockFlightsApi);
+      expect(createFlightsApi('  ', { graphqlUrl: BFF })).not.toBeInstanceOf(RealFlightsApi);
+    });
+
+    it('solo VITE_API_URL: todo por REST, exactamente la implementación de respaldo de siempre', () => {
+      for (const empty of ['', '   ']) {
+        expect(apiModeFor(REST, empty)).toBe('real');
+        const api = createFlightsApi(REST, { graphqlUrl: empty });
+        expect(api).toBeInstanceOf(RealFlightsApi);
+        expect(api).not.toBeInstanceOf(GraphqlFlightsApi);
+      }
+    });
+
+    it('las dos: búsqueda, mapa de asientos y estado de vuelo por GraphQL; el resto, por REST', () => {
+      expect(apiModeFor(REST, BFF)).toBe('graphql');
+      const api = createFlightsApi(REST, { graphqlUrl: BFF });
+      expect(api).toBeInstanceOf(GraphqlFlightsApi);
+      // Sigue siendo un RealFlightsApi: cuenta, compra y postventa son los métodos REST heredados, sin tocar.
+      expect(api).toBeInstanceOf(RealFlightsApi);
+      for (const method of ['search', 'getSeatMap', 'getFlightStatus'] as const) {
+        expect(Object.getOwnPropertyNames(GraphqlFlightsApi.prototype)).toContain(method);
+      }
+      expect(Object.getOwnPropertyNames(GraphqlFlightsApi.prototype).sort()).toEqual(['constructor', 'getFlightStatus', 'getSeatMap', 'search']);
+    });
+  });
+});
+
+describe('apiConfig lee las variables de entorno', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  async function configWith(api: string, graphql: string) {
+    vi.stubEnv('VITE_API_URL', api);
+    vi.stubEnv('VITE_GRAPHQL_URL', graphql);
+    vi.resetModules();
+    return (await import('./config')).apiConfig;
+  }
+
+  it('con API real, toma y recorta VITE_GRAPHQL_URL', async () => {
+    expect(await configWith(REST, ` ${BFF} `)).toMatchObject({ apiUrl: REST, graphqlUrl: BFF, usingMock: false });
+  });
+
+  it('con la API vacía (mock) VITE_GRAPHQL_URL queda vacía aunque tenga valor', async () => {
+    expect(await configWith('', BFF)).toMatchObject({ apiUrl: '', graphqlUrl: '', usingMock: true });
+  });
+
+  it('sin VITE_GRAPHQL_URL queda vacía (todo por REST)', async () => {
+    expect(await configWith(REST, '')).toMatchObject({ graphqlUrl: '', usingMock: false });
   });
 });
 
