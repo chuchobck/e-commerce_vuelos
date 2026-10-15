@@ -1,5 +1,5 @@
 /**
- * Cliente HTTP de la API de vuelos: el ÚNICO lugar del frontend que llama a `fetch`.
+ * Cliente HTTP de la API de vuelos (REST). Con `graphqlClient.ts` es el único lugar del frontend que llama a `fetch`.
  *
  * - JSON con `Accept: application/json` y tiempo máximo de 45 s (el arranque en frío de Render
  *   puede tardar cerca de un minuto en la primera petición).
@@ -17,13 +17,13 @@
  *   cancelación de quien la pidió no debe tumbar la de otro que comparta la promesa.
  */
 import { abortedError, ApiError } from '../errors';
-import { serverActivity } from './activity';
+import { watchSlow } from './activity';
 import { problemToApiError } from './problem';
 
-const REQUEST_TIMEOUT_MS = 45_000;
+export const REQUEST_TIMEOUT_MS = 45_000;
 export const SLOW_AFTER_MS = 3_000;
 export const MAX_RETRY_WAIT_S = 10;
-const DEFAULT_RETRY_WAIT_S = 1;
+export const DEFAULT_RETRY_WAIT_S = 1;
 
 export interface RequestOptions {
   query?: Record<string, string>;
@@ -90,7 +90,7 @@ export function createHttpClient({
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const unmarkSlow = options.silent ? undefined : startSlowWatch();
+    const unmarkSlow = options.silent ? undefined : watchSlow(slowAfterMs);
     const cancelled = () => options.signal?.aborted === true;
     const relay = () => controller.abort();
     if (cancelled()) relay();
@@ -137,17 +137,6 @@ export function createHttpClient({
       throw error;
     }
     return { status: response.status, body: body as T | undefined };
-  }
-
-  function startSlowWatch() {
-    let unmark: (() => void) | undefined;
-    const timer = setTimeout(() => {
-      unmark = serverActivity.markSlow();
-    }, slowAfterMs);
-    return () => {
-      clearTimeout(timer);
-      unmark?.();
-    };
   }
 
   async function withRetry<T>(method: string, path: string, options: RequestOptions): Promise<HttpResult<T>> {
