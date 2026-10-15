@@ -19,8 +19,8 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - Un módulo de `features` no importa de otro. Lo común sube a `shared`.
 - Desde fuera, un módulo se importa por su `index.ts` (`@/features/trips`), nunca por rutas internas.
   Dentro del módulo se usan imports relativos.
-- Solo `src/shared/api` habla con la red (`fetch`, `XMLHttpRequest`, axios prohibidos fuera); el único
-  `fetch` real está en `shared/api/http/client.ts`. La UI conoce solo la interfaz `FlightsApi`;
+- Solo `src/shared/api` habla con la red (`fetch`, `XMLHttpRequest`, axios prohibidos fuera); los únicos
+  `fetch` reales están en `shared/api/http/client.ts` (REST) y `shared/api/http/graphqlClient.ts` (GraphQL). La UI conoce solo la interfaz `FlightsApi`;
   nunca se inventan endpoints.
 
 ## Contrato y API real (desde F2)
@@ -36,6 +36,15 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - Con la API real no se inventan datos (textos, rutas, duraciones, precios): salen de las respuestas.
 - Modos: `VITE_API_URL` vacía = mock completo; con valor = API real. No se mezclan. Lo que aún no está
   conectado lanza `NotYetConnectedError` y la UI lo explica.
+- **GraphQL (Reto 2).** `VITE_GRAPHQL_URL` solo cuenta con `VITE_API_URL` con valor (con la API vacía se ignora). Solo `VITE_API_URL`
+  = todo por REST (el respaldo: debe seguir funcionando igual). Las dos = `GraphqlFlightsApi`: **solo** búsqueda, mapa de asientos y
+  estado de vuelo van por GraphQL al BFF; cuenta, compra y postventa siguen por REST directo al core, con Bearer e Idempotency-Key
+  (nunca por el BFF). El cliente es propio (`http/graphqlClient.ts`, un POST con `fetch`; sin Apollo/urql): solo `Content-Type`,
+  `X-Request-Id` y, solo en la búsqueda, `X-Device-Fingerprint`; jamás `Authorization`. Las consultas son constantes en
+  `shared/api/graphql/` (una por archivo, solo los campos que usa el mapeo, variables tipadas, la búsqueda sin `FlightSegment.seatMap`),
+  se validan contra `contracts/bff-schema.graphql` (copia exacta del BFF; `npm run schema:sync` / `schema:check`) y se convierten al
+  MISMO DTO de REST para reutilizar `mapping.ts`. `extensions.code` → `ApiError` en `http/graphqlErrors.ts`; el `message` nunca se muestra.
+  Antes de cambiar una consulta o un mapeo, la prueba de paridad REST↔GraphQL debe seguir en verde. Detalle: `docs/GRAPHQL-CLIENTE.md`.
 - Reintentos automáticos solo en lecturas (una vez: red, tiempo agotado o 503, con Retry-After ≤ 10 s);
   nunca en escrituras.
 - El detalle técnico de un error (`detail`) nunca se muestra: se mapea a mensajes de `shared/i18n`.

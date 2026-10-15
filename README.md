@@ -18,7 +18,8 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 
 - Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 5; la F6 está en la rama `fase-6-viajes` (PR abierto, sin fusionar) y las mejoras de formularios en `mejora-ux-formularios`; la F7 está en `feat/f7-ofertas-inicio` (PR apilado sobre `mejora-ux-formularios`, sin fusionar ni tag). 338 archivos en `src`, unas 32.100 líneas de TypeScript (sin contar los tipos generados).
 - 806 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
-- **Dos modos sin mezclas** (sección 2): mock completo, o API real. Con la API real funcionan **búsqueda, resultados, estado de vuelo, la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas) **y la compra** (hold, reserva, pago simulado y confirmación); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
+- **Tres modos sin mezclas** (sección 2): mock completo, API real por REST (el respaldo) o API real con las tres lecturas públicas por GraphQL (Reto 2, abajo). Con la API real funcionan **búsqueda, resultados, estado de vuelo, la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas) **y la compra** (hold, reserva, pago simulado y confirmación); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
+- **GraphQL (Reto 2, semana 7):** con `VITE_GRAPHQL_URL` además de `VITE_API_URL`, **búsqueda, mapa de asientos y estado de vuelo** se piden al BFF por GraphQL (un `POST /graphql` por operación, cliente propio sin librerías); cuenta, compra y postventa **no cambian**: REST directo al core, con Bearer e `Idempotency-Key`. Sin `VITE_GRAPHQL_URL` todo funciona como antes (el respaldo). Esquema copiado en `contracts/bff-schema.graphql`; las diferencias REST↔GraphQL, los errores y la verificación están en `docs/GRAPHQL-CLIENTE.md`.
 - Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para `/auth/*`, `contracts/backend-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
 - **Sesión** (sección 6, "Modelo de seguridad de la sesión"): access token solo en memoria, renovación única entre pestañas, cierre de sesión que se propaga a las demás pestañas, restauración al recargar sin parpadeo.
 - **Compra (F4a y F4b, sección 5):** máquina de estados pura (`features/checkout/machine.ts`), hold una sola vez por selección, tiempo del servidor, claves de idempotencia por intención, pago simulado reemplazable (`shared/payments`), seguimiento de reservas en proceso y, desde F4b, las pantallas finales: un bloque por pasajero, panel lateral con temporizador y resumen, tarjeta simulada y confirmación con el código de reserva copiable.
@@ -54,6 +55,7 @@ npm run dev               # http://localhost:5173
 | `npm run typecheck` | Revisión de tipos |
 | `npm run lint` | ESLint: accesibilidad (jsx-a11y) y reglas de arquitectura de la sección 3 |
 | `npm run api:types` | Regenera los tipos del contrato en `src/shared/api/generated/` |
+| `npm run schema:sync` | Descarga el esquema GraphQL del BFF a `contracts/bff-schema.graphql` y **avisa si cambió** (revisar las consultas y correr las pruebas). `npm run schema:check` solo compara y sale con código 1 si difiere |
 | `npm run test:api` | Integración contra la API real: búsqueda, asientos, estado y errores validados contra el contrato con Ajv y, **solo con un backend local**, la cuenta y la compra (crea un usuario `@example.test`, holds y reservas). No es parte de `npm run test` |
 
 ### Contrato y tipos generados
@@ -69,6 +71,15 @@ Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
 - **`VITE_API_URL`** elige el modo, sin mezclas:
   - **Vacía → mock completo.** Todo funciona sin backend y se ven las pistas "Para probar".
   - **Con valor → API real.** Todo va a la API, incluidos Mis viajes y la postventa de F6 (escritos con las formas del contrato pero **aún sin verificar contra el backend**: pasos en la sección 5c). Las pistas "Para probar" (incluida la cuenta demo del mock) no se ven; las tarjetas de prueba del pago simulado se ven con el mock o en desarrollo.
+- **`VITE_GRAPHQL_URL`** (opcional, Reto 2): endpoint GraphQL del BFF (`http://localhost:4000/graphql`). **Solo cuenta si `VITE_API_URL` tiene valor**; con la API vacía (mock) se ignora.
+
+  | `VITE_API_URL` | `VITE_GRAPHQL_URL` | Modo |
+  |---|---|---|
+  | vacía | (se ignora) | Mock completo |
+  | con valor | vacía | Todo por REST al core — **el respaldo**, igual que antes del Reto 2 |
+  | con valor | con valor | Búsqueda, mapa de asientos y estado de vuelo por GraphQL (BFF); cuenta, compra y postventa por REST al core |
+
+  El BFF debe tener `CORS_ORIGINS=http://localhost:5173`.
 - **`VITE_LAST_FLIGHT_DATE`**: último día con salidas de la semilla del backend (la semilla genera 90 días desde su carga y esa ventana es fija). El buscador no deja elegir fechas posteriores; vacía = hoy + 89 días.
 - **`VITE_MOCK_ERROR_RATE`**: frecuencia de errores simulados. Solo afecta al mock; sirve para diseñar los estados de error. Las ofertas del inicio (búsquedas «de fondo») no los reciben: para ellas existen los escenarios de la sección 5e.
 
@@ -77,6 +88,7 @@ Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
 | Backend | URL | Para qué |
 |---|---|---|
 | Local (recomendado en desarrollo) | `http://localhost:3010/flights/v1` | Navegador y `npm run test:api` (incluidas la cuenta y la compra). El backend debe tener `CORS_ORIGINS=http://localhost:5173`. Con el backend en WSL, desde Windows funciona `localhost` (no `127.0.0.1`). |
+| BFF GraphQL (local) | `http://localhost:4000/graphql` | Solo con `VITE_GRAPHQL_URL`, además de la API REST. Se levanta como dice `docs/VERIFICACION-LOCAL.md` del BFF (`bff_vuelos`). |
 | Render | `https://quinde-vuelos-api.onrender.com/flights/v1` | Solo verificación de lectura con `npm run test:api` (corre en Node, no necesita CORS); las suites de cuenta y compra se omiten solas porque escriben. **No se crean usuarios, holds ni reservas en Render.** Su CORS no incluye `localhost`. Duerme tras 15 min: la primera petición tarda cerca de un minuto. |
 
 `npm run test:api` toma la URL de `API_TEST_URL` o, si no está, de `VITE_API_URL` del `.env`. Ejemplo contra Render: `API_TEST_URL=https://quinde-vuelos-api.onrender.com/flights/v1 npm run test:api`.
@@ -104,7 +116,7 @@ src/
 │  └─ flight-status/  offers/
 └─ shared/
    ├─ api/                    FlightsApi, contract.ts (nombres de los tipos generados), mapping.ts (contrato → interfaz),
-   │                          http/ (cliente: único lugar con fetch), RealFlightsApi, mock/, airports.ts (catálogo estático)
+   │                          http/ (clientes REST y GraphQL: los únicos con fetch), RealFlightsApi, GraphqlFlightsApi, graphql/ (consultas y mapeos), mock/, airports.ts (catálogo estático)
    ├─ payments/               pago simulado (PaymentProvider reemplazable por la Payment API real)
    ├─ i18n/                   todos los textos en español
    ├─ lib/                    fechas, dinero en centavos, formatos, validadores, esquemas, caché, ventana de check-in, hooks
@@ -115,7 +127,7 @@ Reglas de dependencia (para no perderse). Las de los puntos 1 a 3 las revisa `np
 
 1. `pages` usa `app`, `features` y `shared`. `features` usa `shared` y, como única excepción, `app/routes.ts` (no importa nada) para enlazar sin escribir rutas sueltas. `shared` no usa a nadie.
 2. Un módulo de `features` no importa de otro módulo de `features`, y desde fuera se importa solo por su `index.ts` (`@/features/trips`, nunca `@/features/trips/Archivo`). Lo común sube a `shared`.
-3. **Solo `shared/api` habla con la red** (en la práctica, `shared/api/http/client.ts`). `fetch`, `XMLHttpRequest` y axios están prohibidos fuera de ahí.
+3. **Solo `shared/api` habla con la red** (en la práctica, `shared/api/http/client.ts` y `graphqlClient.ts`). `fetch`, `XMLHttpRequest` y axios están prohibidos fuera de ahí.
 8. **Las formas de datos salen del contrato.** Los tipos se generan (`npm run api:types`) y nunca se copian a mano; si la interfaz necesita otra forma (dinero en centavos, hora local), la conversión vive en `shared/api/mapping.ts` con pruebas. Con la API real no se inventa ningún dato: textos, rutas, duraciones y precios salen de las respuestas.
 4. Ningún texto visible va escrito en el componente: todo sale de `shared/i18n`.
 5. Ningún color fuera de los tokens de `index.css`.

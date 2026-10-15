@@ -1,9 +1,16 @@
 const apiUrl = (import.meta.env.VITE_API_URL ?? '').trim();
+// Sin API real no hay BFF: con la API vacía (mock completo) VITE_GRAPHQL_URL se ignora, nunca se mezclan.
+const graphqlUrl = apiUrl === '' ? '' : (import.meta.env.VITE_GRAPHQL_URL ?? '').trim();
 
 /** Configuración de la capa de datos leída de variables de entorno de Vite. */
 export const apiConfig = {
   /** URL base de la API real. Vacía = usar el mock. */
   apiUrl,
+  /**
+   * Endpoint GraphQL del BFF. Con valor (y con la API real), búsqueda, mapa de asientos y estado de vuelo van por GraphQL;
+   * vacío = todo por REST. Siempre vacío en modo mock.
+   */
+  graphqlUrl,
   /** Sin URL de la API se usa el mock (y se muestran las pistas "Para probar"). */
   usingMock: apiUrl === '',
   /** Probabilidad de error aleatorio en el mock (0 a 1). */

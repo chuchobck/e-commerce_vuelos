@@ -1,24 +1,33 @@
 import type { FlightsApi } from './FlightsApi';
 import { currentAccessToken } from './authBridge';
+import { GraphqlFlightsApi } from './GraphqlFlightsApi';
 import { createHttpClient } from './http/client';
+import { createGraphqlClient } from './http/graphqlClient';
 import { MockFlightsApi } from './mock/MockFlightsApi';
 import { RealFlightsApi } from './RealFlightsApi';
 
-export type ApiMode = 'mock' | 'real';
+/**
+ * - `mock`: todo simulado.
+ * - `real`: todo por REST al core (el modo de respaldo).
+ * - `graphql`: búsqueda, mapa de asientos y estado de vuelo por GraphQL al BFF; cuenta, compra y postventa por REST.
+ */
+export type ApiMode = 'mock' | 'real' | 'graphql';
 
-/** VITE_API_URL vacía = mock completo; con valor = API real. Nunca se mezclan en un mismo modo. */
-export function apiModeFor(apiUrl: string): ApiMode {
-  return apiUrl.trim() === '' ? 'mock' : 'real';
+/**
+ * VITE_API_URL vacía = mock completo (VITE_GRAPHQL_URL se ignora); solo VITE_API_URL = API real por REST;
+ * las dos = lecturas públicas por GraphQL. Nunca se mezclan el mock y lo real.
+ */
+export function apiModeFor(apiUrl: string, graphqlUrl = ''): ApiMode {
+  if (apiUrl.trim() === '') return 'mock';
+  return graphqlUrl.trim() === '' ? 'real' : 'graphql';
 }
 
-export function createFlightsApi(apiUrl: string, { dev = false } = {}): FlightsApi {
-  if (apiModeFor(apiUrl) === 'mock') return new MockFlightsApi(currentAccessToken);
-  return new RealFlightsApi(
-    createHttpClient({
-      baseUrl: apiUrl.trim(),
-      getAccessToken: currentAccessToken,
-      // El detalle técnico de los errores solo va a la consola de desarrollo, nunca a la pantalla.
-      log: dev ? (message, detail) => console.warn(message, detail) : undefined,
-    }),
-  );
+export function createFlightsApi(apiUrl: string, { dev = false, graphqlUrl = '' } = {}): FlightsApi {
+  const mode = apiModeFor(apiUrl, graphqlUrl);
+  if (mode === 'mock') return new MockFlightsApi(currentAccessToken);
+  // El detalle técnico de los errores solo va a la consola de desarrollo, nunca a la pantalla.
+  const log = dev ? (message: string, detail?: unknown) => console.warn(message, detail) : undefined;
+  const http = createHttpClient({ baseUrl: apiUrl.trim(), getAccessToken: currentAccessToken, log });
+  if (mode === 'real') return new RealFlightsApi(http);
+  return new GraphqlFlightsApi(http, createGraphqlClient({ url: graphqlUrl.trim(), log }));
 }
