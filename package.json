@@ -11,6 +11,8 @@
     "test": "vitest run",
     "lint": "eslint . --max-warnings 0",
     "api:types": "openapi-typescript contracts/vuelos-openapi.yaml --default-non-nullable false -o src/shared/api/generated/vuelos.ts && openapi-typescript contracts/backend-openapi.json --default-non-nullable false -o src/shared/api/generated/backend.ts",
+    "schema:sync": "node scripts/schema-sync.mjs",
+    "schema:check": "node scripts/schema-sync.mjs --check",
     "test:api": "vitest run --config vitest.api.config.ts"
   },
   "dependencies": {
@@ -55,6 +57,7 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
+    "graphql": "^16.14.2",
     "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.29",
