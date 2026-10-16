@@ -15,19 +15,30 @@ más las que encontramos en el frontend (README, sección 6).
 
 Para actualizarlo: descargar de nuevo el archivo, actualizar esta tabla y correr `npm run api:types`.
 
-## OpenAPI del backend (`backend-openapi.json`)
+## OpenAPI de identity (`identity-openapi.json`)
 
-El contrato del equipo no trae la cuenta (`/auth/*`). Sus formas salen del documento que publica el
-propio backend (NestJS/Swagger), copiado sin cambios:
+El contrato del core no trae la cuenta. Desde la fase 6c del Reto 2 la cuenta (`/identity/v1/auth/*`) la sirve
+identity, y sus formas salen de **su** contrato, copiado sin cambios. Reemplaza a `backend-openapi.json` (el
+`/api/docs-json` del core, con `/flights/v1/auth/*`), que ya no se usa y se borró.
 
 | Dato | Valor |
 |---|---|
-| Fuente | `GET http://localhost:3010/api/docs-json` (backend local) |
-| Versión (`info.version`) | 1.0.0 |
-| Copiado | 2026-10-07 |
+| Repositorio | https://github.com/chuchobck/identity_vuelos |
+| Rama | `main` |
+| Archivo | `contracts/identity-openapi.json` |
+| Commit que lo cambió por última vez | `0a61de18038f0d7f7a10e3a9e61576b59ba143e2` (2026-10-16) |
+| Commit de `main` al copiarlo | `e856f911790d31fca17e45fdd14aab86a7e70dfc` |
+| Versión (`info.version`) | 0.2.0 |
+| SHA-256 de la copia | `acd43cf2fd6620a927e7a7ccf26902bd9d72418993092f97ef4ba7c770b6cbb8` |
+| Copiado | 2026-10-16 |
 
-`npm run api:types` genera `src/shared/api/generated/backend.ts`; `src/shared/api/contract.ts` solo
-les pone nombre (`RegisterRequestDto`, `TokenResponseDto`, `UserResponseDto`…).
+`npm run api:types` genera `src/shared/api/generated/identity.ts`; `src/shared/api/contract.ts` solo les pone
+nombre (`RegisterRequestDto`, `TokenResponseDto`, `UserResponseDto`…). Frente al contrato anterior del core, los
+cuerpos de `register`, `login`, `refresh` y `logout` y las respuestas de `register`, `login`, `refresh` y `me` son
+idénticos campo por campo; solo cambia el texto de la descripción de `refresh_token`. Una prueba
+(`src/shared/api/identityContract.test.ts`) valida lo que el cliente envía y las rutas contra este archivo y
+comprueba que el SHA-256 de esta tabla es el de la copia. Para actualizarlo: copiar el archivo de identity, anotar
+commit y SHA-256 aquí, correr `npm run api:types` y después `npm run typecheck`.
 
 ## Esquema GraphQL del BFF (`bff-schema.graphql`)
 
