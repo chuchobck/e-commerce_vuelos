@@ -55,9 +55,10 @@ describe('apiConfig lee las variables de entorno', () => {
     vi.resetModules();
   });
 
-  async function configWith(api: string, graphql: string) {
+  async function configWith(api: string, graphql: string, identity = '') {
     vi.stubEnv('VITE_API_URL', api);
     vi.stubEnv('VITE_GRAPHQL_URL', graphql);
+    vi.stubEnv('VITE_IDENTITY_URL', identity);
     vi.resetModules();
     return (await import('./config')).apiConfig;
   }
@@ -72,6 +73,19 @@ describe('apiConfig lee las variables de entorno', () => {
 
   it('sin VITE_GRAPHQL_URL queda vacía (todo por REST)', async () => {
     expect(await configWith(REST, '')).toMatchObject({ graphqlUrl: '', usingMock: false });
+  });
+
+  it('VITE_IDENTITY_URL explícita: la cuenta usa esa base', async () => {
+    expect(await configWith(REST, '', ' https://id.test/identity/v1/ ')).toMatchObject({ identityUrl: 'https://id.test/identity/v1' });
+  });
+
+  it('VITE_IDENTITY_URL vacía: se deriva de VITE_API_URL (/flights/v1 → /identity/v1)', async () => {
+    expect(await configWith('https://gw.test/flights/v1', BFF)).toMatchObject({ identityUrl: 'https://gw.test/identity/v1' });
+    expect(await configWith(REST, '')).toMatchObject({ identityUrl: 'http://localhost:3010/identity/v1' });
+  });
+
+  it('con la API vacía (mock) la cuenta también es del mock: VITE_IDENTITY_URL se ignora', async () => {
+    expect(await configWith('', BFF, 'https://id.test/identity/v1')).toMatchObject({ identityUrl: '', usingMock: true });
   });
 });
 
