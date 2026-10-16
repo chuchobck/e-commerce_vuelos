@@ -126,6 +126,14 @@ describe.skipIf(!IS_LOCAL)(`cuenta contra identity (local): ${IS_LOCAL ? IDENTIT
     expect(calls.refresh - before).toBe(1);
   });
 
+  it('401 del CORE (en el borde del gateway o en el core) con un token inválido: UNA renovación en identity y UN reintento', async () => {
+    const before = calls.refresh;
+    forcedAccessToken = 'no.es.valido';
+    // /bookings es del core: su 401 llega con el token de identity rechazado, no desde identity.
+    await expect(manager.authorized(() => api.listBookings({ limit: 1 }))).resolves.toMatchObject({ items: expect.any(Array) });
+    expect(calls.refresh - before).toBe(1);
+  });
+
   it('rotación: el refresh token viejo ya no sirve; reusarlo revoca toda la sesión', async () => {
     const old = sessionStore.getItem('quinde.auth.refresh')!;
     await manager.refresh();
