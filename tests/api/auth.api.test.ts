@@ -1,10 +1,13 @@
 /**
- * Integración de la cuenta contra el backend LOCAL (`npm run test:api`). Escribe datos (crea un
+ * Integración de la cuenta contra identity, LOCAL (`npm run test:api`). Escribe datos (crea un
  * usuario con un correo único @example.test), así que NUNCA corre contra Render.
  * No usa la cuenta de administrador sembrada.
  *
- * Límites del backend por IP: login 5/min (los fallidos cuentan), registro 10 cada 10 min,
- * refresh 30/min. Esta prueba usa 2 registros, 2 ingresos correctos y, al final, los intentos
+ * La cuenta va a identity: API_TEST_IDENTITY_URL (o VITE_IDENTITY_URL) o, si no están, la que se deriva de
+ * API_TEST_URL cambiando /flights/v1 por /identity/v1 (así es detrás del gateway: http://localhost:8080/flights/v1).
+ *
+ * Límites de identity por IP: login 5/min (los fallidos cuentan), registro 10 cada 10 min,
+ * refresh 30/min (el gateway agrega un límite estricto de 20/min en login y registro). Esta prueba usa 2 registros, 2 ingresos correctos y, al final, los intentos
  * fallidos justos para ver un 429.
  */
 import { loadEnv } from 'vite';
@@ -15,9 +18,11 @@ import { createTokenStore, type StorageLike } from '../../src/features/auth/toke
 import { ApiError } from '../../src/shared/api/errors';
 import { createHttpClient } from '../../src/shared/api/http/client';
 import { RealFlightsApi } from '../../src/shared/api/RealFlightsApi';
+import { identityUrlFor } from '../../src/shared/api/urls';
 
 const env = loadEnv('development', process.cwd(), '');
 const BASE = (process.env.API_TEST_URL || env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+const IDENTITY = identityUrlFor(BASE, process.env.API_TEST_IDENTITY_URL || env.VITE_IDENTITY_URL || '');
 const IS_LOCAL = !!BASE && !/onrender\.com/i.test(BASE);
 
 function memoryStorage(): StorageLike {
@@ -34,7 +39,7 @@ async function failure(promise: Promise<unknown>): Promise<ApiError> {
   throw new Error('se esperaba un error');
 }
 
-describe.skipIf(!IS_LOCAL)(`cuenta contra el backend local: ${IS_LOCAL ? BASE : '(omitida: sin URL local)'}`, () => {
+describe.skipIf(!IS_LOCAL)(`cuenta contra identity (local): ${IS_LOCAL ? IDENTITY : '(omitida: sin URL local)'}`, () => {
   const stamp = Date.now();
   const email = `quinde-test-${stamp}@example.test`;
   const password = `una frase larga de prueba ${stamp}`;
@@ -48,7 +53,7 @@ describe.skipIf(!IS_LOCAL)(`cuenta contra el backend local: ${IS_LOCAL ? BASE : 
     baseUrl: BASE,
     getAccessToken: () => forcedAccessToken ?? manager.getAccessToken(),
   });
-  const api = new RealFlightsApi(http);
+  const api = new RealFlightsApi(http, IDENTITY);
   const calls = { refresh: 0, refreshErrors: [] as number[] };
   const countedApi = {
     register: api.register.bind(api),
