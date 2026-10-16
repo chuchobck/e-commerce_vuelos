@@ -10,7 +10,7 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "lint": "eslint . --max-warnings 0",
-    "api:types": "openapi-typescript contracts/vuelos-openapi.yaml --default-non-nullable false -o src/shared/api/generated/vuelos.ts && openapi-typescript contracts/backend-openapi.json --default-non-nullable false -o src/shared/api/generated/backend.ts",
+    "api:types": "openapi-typescript contracts/vuelos-openapi.yaml --default-non-nullable false -o src/shared/api/generated/vuelos.ts && openapi-typescript contracts/identity-openapi.json --default-non-nullable false -o src/shared/api/generated/identity.ts",
     "schema:sync": "node scripts/schema-sync.mjs",
     "schema:check": "node scripts/schema-sync.mjs --check",
     "test:api": "vitest run --config vitest.api.config.ts"

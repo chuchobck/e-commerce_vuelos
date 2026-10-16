@@ -21,8 +21,9 @@ export class GraphqlFlightsApi extends RealFlightsApi implements FlightsApi {
   constructor(
     http: HttpClient,
     private readonly graphql: GraphqlClient,
+    identityUrl?: string,
   ) {
-    super(http);
+    super(http, identityUrl);
   }
 
   override async search(params: SearchParams, options: SearchOptions = {}): Promise<SearchResult> {

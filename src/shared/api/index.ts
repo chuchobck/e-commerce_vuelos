@@ -7,7 +7,7 @@ import { createFlightsApi } from './select';
  * Punto único de acceso a los datos. VITE_API_URL vacía = mock; con valor = API real; con VITE_GRAPHQL_URL
  * además, las tres lecturas públicas van por GraphQL (ver select.ts). La interfaz solo conoce FlightsApi.
  */
-export const flightsApi: FlightsApi = createFlightsApi(apiConfig.apiUrl, { dev: import.meta.env.DEV, graphqlUrl: apiConfig.graphqlUrl });
+export const flightsApi: FlightsApi = createFlightsApi(apiConfig.apiUrl, { dev: import.meta.env.DEV, graphqlUrl: apiConfig.graphqlUrl, identityUrl: apiConfig.identityUrl });
 
 /**
  * En modo real, al cargar la app se hace un GET /health silencioso para despertar el servidor

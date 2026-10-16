@@ -18,17 +18,33 @@ errores y cómo verificarlo.
 - `GraphqlFlightsApi` **extiende** `RealFlightsApi` y solo reemplaza `search`, `getSeatMap` y
   `getFlightStatus`. Todo lo demás es el código REST de siempre, sin tocar.
 - El BFF debe tener `CORS_ORIGINS=http://localhost:5173` (permite `content-type`, `x-request-id` y
-  `x-device-fingerprint`, y expone `x-request-id` y `retry-after`).
+  `x-device-fingerprint`, y expone `x-request-id` y `retry-after`). Detrás del gateway, el CORS lo pone el gateway.
+- En los dos modos reales la cuenta va a identity (fase 6c): `VITE_IDENTITY_URL` o, si está vacía, la derivada de `VITE_API_URL`
+  (`/flights/v1` → `/identity/v1`); con la API vacía (mock) se ignora. GraphQL no cambia eso.
 
 ## 2. Qué se queda en REST y por qué
 
-Cuenta (`/auth/*`), compra (hold, reserva, pago) y postventa (check-in, equipaje, cambio de fecha,
-cancelación, boletos, pases) siguen **directo al core por REST**, con `Authorization: Bearer` e
-`Idempotency-Key`. Razones (las mismas del BFF, `docs/GRAPHQL.md`): son escrituras con efectos (cupo,
+La cuenta (`/auth/*`, que desde la fase 6c sirve **identity**), la compra (hold, reserva, pago) y la postventa
+(check-in, equipaje, cambio de fecha, cancelación, boletos, pases, que sirve el **core**) **no pasan por el BFF**: van por
+REST, con `Authorization: Bearer` e `Idempotency-Key`. Razones (las mismas del BFF, `docs/GRAPHQL.md`): son escrituras con efectos (cupo,
 dinero, boletos) que dependen de `Idempotency-Key` y de un token con alcances; el HTTP significa algo
 (`201`, `202` pendiente, `409`, `422` pago rechazado) y GraphQL lo esconde bajo un `200` con `errors`; y
 reintentar una escritura con seguridad es más difícil que repetir un `POST` idempotente. Por eso el BFF
 solo expone lecturas públicas y el cliente **nunca** manda `Authorization` a `/graphql`.
+
+### Qué ruta va a qué servicio (detrás del gateway)
+
+| Qué | Ruta | Servicio | Cliente |
+|---|---|---|---|
+| `register`, `login`, `refresh`, `logout`, `me` | `/identity/v1/auth/*` (`VITE_IDENTITY_URL`) | identity | REST; `logout` y `me` con Bearer |
+| `searchFlights`, `seatMap`, `flightStatus` | `/graphql` (`VITE_GRAPHQL_URL`) | BFF → core | GraphQL; `X-Device-Fingerprint` solo en la búsqueda |
+| Hold y reserva | `/flights/v1/offers/hold`, `/flights/v1/bookings` (`VITE_API_URL`) | core | REST con Bearer e `Idempotency-Key` |
+| Postventa | `/flights/v1/bookings/**` | core | REST con Bearer (escrituras con `Idempotency-Key`) |
+| Respaldo de las lecturas | `/flights/v1/search`, `/offers/{id}/seatmap`, `/flights/{n}/status` | core | REST (sin `VITE_GRAPHQL_URL`) |
+
+El gateway (`gateway_vuelos`) es la única entrada pública: `/flights/v1/**` → core, `/identity/v1/**` y `/oauth2/token` → identity,
+`/graphql` → BFF. Un token de identity sirve igual para el core: el gateway lo valida en el borde (401 si falta o es inválido, 403
+si falta un scope) y el core lo vuelve a verificar con el JWKS de identity.
 
 ## 3. Diferencias REST ↔ GraphQL (y qué hace el cliente)
 
@@ -172,10 +188,26 @@ Nunca contra Render ni con usuarios, holds o reservas en Render.
   nombres de campo que REST), `NOT_FOUND` de oferta vencida, `TOO_MANY_REQUESTS` (`Retry-After: 55` y `extensions.retryAfter`) y
   `SERVICE_UNAVAILABLE` con el core detenido (`retryAfter: 5`).
 
+### Por el gateway: cuenta en identity (fase 6c, 2026-10-16)
+
+- Los cinco servicios (identity, core con `AUTH_MODE=external`, notifier, BFF) y el gateway, todos en `main`, con `scripts/e2e-local.sh` del
+  gateway (PostgreSQL 16 local): su recorrido de 13 pasos terminó en «todo bien». **Ojo:** el script solo mira su primer argumento; para dejar
+  los servicios arriba hay que llamarlo solo con `--dejar-arriba` (con `--preparar --dejar-arriba` los apaga al terminar).
+- `API_TEST_URL=http://localhost:8080/flights/v1 API_TEST_GRAPHQL_URL=http://localhost:8080/graphql npm run test:api`: **26 pruebas en 4 archivos**
+  (contrato 9, GraphQL 3, cuenta 9, compra 5). En los logs del gateway: registro, ingreso, renovación, cierre de sesión y `me` con `upstream: identity`,
+  ninguna llamada a `/flights/v1/auth`, las lecturas por `/graphql` y ninguna contraseña en los registros de los seis procesos.
+- Chromium con `npm run dev` (`VITE_API_URL=http://localhost:8080/flights/v1`, `VITE_GRAPHQL_URL=http://localhost:8080/graphql`, identity derivada):
+  registrarse (201, ingreso y `me` por identity), buscar (un `POST /graphql` `SearchFlights` por clic), mapa de asientos (un `SeatMap` solo al abrirlo),
+  retención (`POST /flights/v1/offers/hold` con Bearer e `Idempotency-Key`), reserva (`POST /flights/v1/bookings`, código de reserva y boleto en
+  pantalla), Mis viajes (la reserva «Confirmada»), cerrar sesión (`POST /identity/v1/auth/logout` 204) e ingresar de nuevo. Sin errores ni avisos en la
+  consola y sin errores de CORS. En modo mock, la cuenta demo ingresa sin ninguna petición externa.
+- Un token de acceso inválido en una ruta del core: 401 del gateway (en el borde, 1 ms), una sola renovación en identity y un solo reintento.
+
 ### Lo que NO se verificó
 
-- El BFF con gRPC y la rama gRPC del core; PostgreSQL 18 con Docker.
+- El BFF con gRPC y la rama gRPC del core (salvo el gRPC que usa el script del gateway entre BFF y core); PostgreSQL 18 con Docker.
+- El gateway y los servicios desplegados (solo se probó en local).
 - `GATEWAY_TIMEOUT`, `QUERY_TOO_EXPENSIVE` y `QUERY_TOO_DEEP` contra el BFF real (se probaron con las formas documentadas del BFF).
 - El BFF desplegado (Render/Azure): no se tocó; Render no admite `localhost` en su CORS.
 - Rendimiento comparado REST vs GraphQL: no se midió.
-- El `warmUpServer` solo despierta el core (`GET /health`), no el BFF.
+- El `warmUpServer` despierta el core y identity (`GET /health` a cada uno), no el BFF.

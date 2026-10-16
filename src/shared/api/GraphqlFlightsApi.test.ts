@@ -164,6 +164,8 @@ describe('lo que NO cambia: cuenta, compra y postventa siguen por REST', () => {
     request.mockResolvedValue({ access_token: 'a', refresh_token: 'r', expires_in: 900, scope: '' });
     await api.login({ email: 'a@example.test', password: 'x' });
     expect(request).toHaveBeenCalledWith('POST', '/auth/login', expect.anything());
+    // Sin identity configurada, la cuenta queda en la base del cliente (la API): `base` no se manda.
+    expect(request.mock.calls[0][2]).toMatchObject({ base: undefined });
     request.mockResolvedValue({ holdId: 'h', status: 'HELD', expiresAt: 'x', ttlMinutes: 15, lockedPrice: { currency: 'USD', total: '1.00' } });
     await api.createHold({ offerId: 'o', itinerarySelections: [], passengers: { adults: 1, children: 0, infants: 0 } }, 'key-1');
     expect(request).toHaveBeenCalledWith('POST', '/offers/hold', expect.objectContaining({ auth: true, headers: { 'Idempotency-Key': 'key-1' } }));

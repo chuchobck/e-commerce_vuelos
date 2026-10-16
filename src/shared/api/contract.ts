@@ -2,7 +2,7 @@
  * Formas del contrato (generadas desde contracts/vuelos-openapi.yaml con `npm run api:types`).
  * Este archivo solo les pone nombre: nunca se redefinen a mano.
  */
-import type { components as backend } from './generated/backend';
+import type { components as identity } from './generated/identity';
 import type { components } from './generated/vuelos';
 
 type Schemas = components['schemas'];
@@ -48,15 +48,15 @@ export type FlightStatusCode = FlightStatusDto['status'];
 export type ProblemCode = ProblemDetailsDto['code'];
 
 /**
- * Cuenta (/auth/*). No está en el contrato del equipo: los tipos se generan del OpenAPI que publica
- * el backend (`GET /api/docs-json` del backend local → contracts/backend-openapi.json → generated/backend.ts).
+ * Cuenta (`/identity/v1/auth/*`). No está en el contrato del core: los tipos se generan del OpenAPI de identity
+ * (contracts/identity-openapi.json → generated/identity.ts). Tienen la misma forma que tenían en el core.
  */
-type BackendSchemas = backend['schemas'];
-export type RegisterRequestDto = BackendSchemas['RegistroDto'];
-export type LoginRequestDto = BackendSchemas['LoginDto'];
-export type RefreshRequestDto = BackendSchemas['RefrescoDto'];
-export type TokenResponseDto = BackendSchemas['TokenRespuestaDto'];
-export type UserResponseDto = BackendSchemas['UsuarioRespuestaDto'];
+type IdentitySchemas = identity['schemas'];
+export type RegisterRequestDto = IdentitySchemas['RegistroDto'];
+export type LoginRequestDto = IdentitySchemas['LoginDto'];
+export type RefreshRequestDto = IdentitySchemas['RefrescoDto'];
+export type TokenResponseDto = IdentitySchemas['TokenRespuestaDto'];
+export type UserResponseDto = IdentitySchemas['UsuarioRespuestaDto'];
 
 /**
  * Tipos de pasajero que devuelve la API en `pricePerPassengerType` (el contrato los deja como

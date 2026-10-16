@@ -1,9 +1,10 @@
 /**
- * Integración de la compra (hold, reserva y pago simulado) contra el backend LOCAL
+ * Integración de la compra (hold, reserva y pago simulado) contra el core LOCAL
  * (`npm run test:api`). Escribe datos (usuario nuevo @example.test, holds y reservas), así que
- * NUNCA corre contra Render. No usa la cuenta de administrador sembrada.
+ * NUNCA corre contra Render. No usa la cuenta de administrador sembrada. La cuenta se crea en identity
+ * (ver auth.api.test.ts) y su token viaja al core, directo o por el gateway.
  *
- * Límites del backend por IP: 30 holds y 10 reservas por minuto (más 100 peticiones en total).
+ * Límites del core por IP: 30 holds y 10 reservas por minuto (más 100 peticiones en total).
  * Esta prueba usa 1 búsqueda, 3 holds y 5 POST /bookings.
  */
 import { loadEnv } from 'vite';
@@ -13,10 +14,12 @@ import { ApiError } from '../../src/shared/api/errors';
 import { createHttpClient } from '../../src/shared/api/http/client';
 import { toBookingRequest } from '../../src/shared/api/mapping';
 import { RealFlightsApi } from '../../src/shared/api/RealFlightsApi';
+import { identityUrlFor } from '../../src/shared/api/urls';
 import type { BookingPassenger, CreateHoldRequest } from '../../src/shared/api/types';
 
 const env = loadEnv('development', process.cwd(), '');
 const BASE = (process.env.API_TEST_URL || env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+const IDENTITY = identityUrlFor(BASE, process.env.API_TEST_IDENTITY_URL || env.VITE_IDENTITY_URL || '');
 const IS_LOCAL = !!BASE && !/onrender\.com/i.test(BASE);
 
 async function failure(promise: Promise<unknown>): Promise<ApiError> {
@@ -37,7 +40,7 @@ describe.skipIf(!IS_LOCAL)(`compra contra el backend local: ${IS_LOCAL ? BASE : 
   const password = `una frase larga de compra ${stamp}`;
   let token: string | undefined;
   const http = createHttpClient({ baseUrl: BASE, getAccessToken: () => token });
-  const api = new RealFlightsApi(http);
+  const api = new RealFlightsApi(http, IDENTITY);
   let request: CreateHoldRequest;
 
   const passengers: BookingPassenger[] = [
