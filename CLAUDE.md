@@ -45,6 +45,15 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
   se validan contra `contracts/bff-schema.graphql` (copia exacta del BFF; `npm run schema:sync` / `schema:check`) y se convierten al
   MISMO DTO de REST para reutilizar `mapping.ts`. `extensions.code` → `ApiError` en `http/graphqlErrors.ts`; el `message` nunca se muestra.
   Antes de cambiar una consulta o un mapeo, la prueba de paridad REST↔GraphQL debe seguir en verde. Detalle: `docs/GRAPHQL-CLIENTE.md`.
+- **La cuenta es de identity (Reto 2, fase 6c).** `register`, `login`, `refresh`, `logout` y `me` van a `{identity}/auth/*` y **nada más**: compra, postventa, check-in, equipaje y el
+  respaldo REST de las lecturas siguen en `VITE_API_URL` (core); GraphQL, en `VITE_GRAPHQL_URL`. `VITE_IDENTITY_URL` vacía se **deriva** de `VITE_API_URL` cambiando el sufijo
+  `/flights/v1` por `/identity/v1` (`identityUrlFor`, `shared/api/urls.ts`); si la API no termina en `/flights/v1`, la cuenta queda en la API (login propio del core). Con la API vacía
+  (mock) la cuenta también es del mock y `VITE_IDENTITY_URL` se ignora: nunca se mezclan. Una base distinta por llamada es `RequestOptions.base` del cliente HTTP: no se duplica
+  la lógica de errores, reintentos ni Bearer, y la clave de deduplicación la incluye. `RealFlightsApi`/`GraphqlFlightsApi` reciben `identityUrl`; solo los cinco métodos de la cuenta
+  la usan. El Bearer de identity viaja igual al core por el gateway; un 401 de una ruta del core es sesión vencida (`SessionManager.authorized`: UNA renovación en identity y UN
+  reintento; el segundo 401 cierra la sesión). Los tipos de la cuenta salen de `contracts/identity-openapi.json` → `generated/identity.ts` (copia exacta; origen y SHA-256 en
+  `contracts/PROCEDENCIA.md`); la forma es la del core, así que el mapeo no se adapta. Ningún token ni contraseña va a la consola ni a un registro (lo vigila una prueba).
+  Tabla «qué ruta va a qué servicio»: README, sección 2.
 - Reintentos automáticos solo en lecturas (una vez: red, tiempo agotado o 503, con Retry-After ≤ 10 s);
   nunca en escrituras.
 - El detalle técnico de un error (`detail`) nunca se muestra: se mapea a mensajes de `shared/i18n`.
@@ -68,8 +77,8 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 
 ## Cuenta y sesión (desde F3)
 
-- `/auth/*` no está en `vuelos-openapi.yaml`: sus tipos salen de `contracts/backend-openapi.json`
-  (`/api/docs-json` del backend) → `generated/backend.ts`. Las reglas de correo y contraseña son las
+- `/auth/*` no está en `vuelos-openapi.yaml`: desde la fase 6c es de identity y sus tipos salen de `contracts/identity-openapi.json`
+  → `generated/identity.ts`. Las reglas de correo y contraseña son las
   de los DTO del backend (`shared/lib/credentials.ts`); no se inventan reglas propias.
 - Toda la sesión vive en `features/auth` (`SessionManager` + `AuthProvider`/`useAuth`). Las páginas
   usan `useAuth()`; las llamadas con sesión van envueltas en `authorized(() => flightsApi.…())`.
@@ -81,7 +90,7 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 - El vencimiento se calcula con `expires_in` (relativo), no con el `exp` del JWT: un reloj desfasado
   no debe provocar renovaciones en bucle.
 - El frontend nunca envía un rol. La cuenta es solo correo y contraseña; Mi perfil es de solo lectura.
-- `npm run test:api` crea usuarios `@example.test` **solo contra el backend local**; nunca contra
+- `npm run test:api` crea usuarios `@example.test` **solo contra un entorno local** (identity y core, directos o por el gateway); nunca contra
   Render ni con la cuenta de administrador sembrada. Esperar un minuto entre corridas (ingreso 5/min).
 - Modelo de seguridad y contrapartida XSS: sección 6 del README. F8 debe agregar una CSP estricta.
 
@@ -105,7 +114,7 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
   usuario lo revise (el paso 3 no debe marcar los datos como listos mientras exista).
   El 409 no dice qué asiento falló y el `detail` no se interpreta: se compara contra un mapa nuevo.
 - Mensajes de compra: catálogo único `es.purchaseErrors`, elegido por `features/checkout/messages.ts`.
-- `npm run test:api` crea holds y reservas **solo contra el backend local**; nunca contra Render.
+- `npm run test:api` crea holds y reservas **solo contra el core local** (directo o por el gateway); nunca contra Render.
   Límites: 30 holds y 10 reservas por minuto por IP.
 
 ## Postventa y Mis viajes (desde F6)

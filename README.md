@@ -17,10 +17,11 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 ## 1. Estado actual (2026-10-15, F6 y F7 hechas en mock y pendientes de verificación real; Reto 2: lecturas por GraphQL)
 
 - Repositorio en GitHub (`chuchobck/e-commerce_vuelos`), `main` con las fases 1 a 5; la F6 está en la rama `fase-6-viajes` (PR abierto, sin fusionar) y las mejoras de formularios en `mejora-ux-formularios`; la F7 está en `feat/f7-ofertas-inicio` (PR apilado sobre `mejora-ux-formularios`, sin fusionar ni tag). 338 archivos en `src`, unas 32.100 líneas de TypeScript (sin contar los tipos generados).
-- 884 pruebas en verde con `npm run test` y 22 de integración con `npm run test:api` (9 de lectura, contra el backend local y Render; 8 de cuenta y 5 de compra, solo contra el backend local). Lint, typecheck y build sin errores.
+- 920 pruebas en verde con `npm run test` y 26 de integración con `npm run test:api` (9 de contrato de las lecturas, contra un entorno local o Render; 3 de GraphQL, 9 de cuenta y 5 de compra, solo contra un entorno local, que puede ser el gateway). Lint, typecheck y build sin errores. El repositorio **no tiene CI**: las verificaciones se corren a mano.
 - **Tres modos sin mezclas** (sección 2): mock completo, API real por REST (el respaldo) o API real con las tres lecturas públicas por GraphQL (Reto 2, abajo). Con la API real funcionan **búsqueda, resultados, estado de vuelo, la cuenta** (registro, ingreso, renovación de sesión, cierre de sesión, Mi perfil y rutas protegidas) **y la compra** (hold, reserva, pago simulado y confirmación); el mapa de asientos tiene cliente y pruebas (la pantalla es de F5).
 - **GraphQL (Reto 2, semana 7):** con `VITE_GRAPHQL_URL` además de `VITE_API_URL`, **búsqueda, mapa de asientos y estado de vuelo** se piden al BFF por GraphQL (un `POST /graphql` por operación, cliente propio sin librerías); cuenta, compra y postventa **no cambian**: REST directo al core, con Bearer e `Idempotency-Key`. Sin `VITE_GRAPHQL_URL` todo funciona como antes (el respaldo). Esquema copiado en `contracts/bff-schema.graphql`; las diferencias REST↔GraphQL, los errores y la verificación están en `docs/GRAPHQL-CLIENTE.md`. **Verificado en local** con el core real (PostgreSQL 16) y el BFF por REST: una búsqueda = un `POST /graphql`, el mapa de asientos solo al abrirlo, sin errores de CORS y el respaldo sin cambios; **no verificado**: el BFF por gRPC, PostgreSQL 18 y el BFF desplegado (detalle en el documento).
-- Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para `/auth/*`, `contracts/backend-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
+- **La cuenta pasa del core a identity (Reto 2, fase 6c):** `register`, `login`, `refresh`, `logout` y `me` van a `{VITE_IDENTITY_URL}/auth/*` (si está vacía, se deriva de `VITE_API_URL` cambiando `/flights/v1` por `/identity/v1`); compra, postventa y el respaldo REST siguen en `VITE_API_URL`, y las lecturas por GraphQL en `VITE_GRAPHQL_URL`. El Bearer de identity viaja igual al core por el gateway; un 401 de una ruta del core se trata como sesión vencida (una renovación y un reintento). Los tipos de la cuenta salen de `contracts/identity-openapi.json` (misma forma que tenía en el core: no hubo que adaptar el mapeo). Tabla «qué ruta va a qué servicio» en la sección 2. **Verificado en local** con los cinco servicios y el gateway (`scripts/e2e-local.sh` del gateway): `npm run test:api` por el gateway (26 pruebas) y un recorrido real en Chromium (registrarse, buscar por GraphQL, mapa de asientos, retención, reserva, Mis viajes, cerrar sesión e ingresar); **no verificado**: el gateway y los servicios desplegados, y PostgreSQL 18 (detalle en la sección 6 y en `docs/GRAPHQL-CLIENTE.md`).
+- Las formas de datos salen de los contratos (`contracts/vuelos-openapi.yaml` y, para la cuenta, `contracts/identity-openapi.json` → tipos generados) y el mock produce exactamente esa forma.
 - **Sesión** (sección 6, "Modelo de seguridad de la sesión"): access token solo en memoria, renovación única entre pestañas, cierre de sesión que se propaga a las demás pestañas, restauración al recargar sin parpadeo.
 - **Compra (F4a y F4b, sección 5):** máquina de estados pura (`features/checkout/machine.ts`), hold una sola vez por selección, tiempo del servidor, claves de idempotencia por intención, pago simulado reemplazable (`shared/payments`), seguimiento de reservas en proceso y, desde F4b, las pantallas finales: un bloque por pasajero, panel lateral con temporizador y resumen, tarjeta simulada y confirmación con el código de reserva copiable.
 - **Nacionalidad:** la lista de países sale en español, pero la API solo conoce **Ecuador** (su tabla `pais` solo trae `EC`; otro código da 422). Los demás países se ven como "(aún no disponible)" hasta que el backend los cargue (`BOOKABLE_COUNTRIES` en `shared/lib/countries.ts`).
@@ -56,12 +57,12 @@ npm run dev               # http://localhost:5173
 | `npm run lint` | ESLint: accesibilidad (jsx-a11y) y reglas de arquitectura de la sección 3 |
 | `npm run api:types` | Regenera los tipos del contrato en `src/shared/api/generated/` |
 | `npm run schema:sync` | Descarga el esquema GraphQL del BFF (rama, etiqueta o commit de `BFF_SCHEMA_REF`, por defecto `main`) a `contracts/bff-schema.graphql` y **avisa si cambió** (revisar las consultas y correr las pruebas). `npm run schema:check` solo compara y sale con código 1 si difiere |
-| `npm run test:api` | Integración contra la API real: búsqueda, asientos, estado y errores validados contra el contrato con Ajv y, **solo con un backend local**, la cuenta y la compra (crea un usuario `@example.test`, holds y reservas). No es parte de `npm run test` |
+| `npm run test:api` | Integración contra la API real: búsqueda, asientos, estado y errores validados contra el contrato con Ajv y, **solo en local**, las lecturas por GraphQL, la cuenta (en identity) y la compra (crea un usuario `@example.test`, holds y reservas). Se puede correr por el gateway (ver «A qué API apuntar»). No es parte de `npm run test` |
 
 ### Contrato y tipos generados
 
-- `contracts/vuelos-openapi.yaml` es una copia del contrato del backend; su origen y fecha están en `contracts/PROCEDENCIA.md`. Ese contrato no describe `/auth/*`: para la cuenta se usa `contracts/backend-openapi.json`, el documento que el backend publica en `/api/docs-json` (mismo `PROCEDENCIA.md`).
-- `npm run api:types` genera `src/shared/api/generated/vuelos.ts` y `generated/backend.ts` con `openapi-typescript`. Ese archivo **se versiona** y no se edita a mano: es el único lugar que define las formas del contrato.
+- `contracts/vuelos-openapi.yaml` es una copia del contrato del backend; su origen y fecha están en `contracts/PROCEDENCIA.md`. Ese contrato no describe la cuenta: para ella se usa `contracts/identity-openapi.json`, el contrato de identity (`/identity/v1/auth/*`; mismo `PROCEDENCIA.md`). El `backend-openapi.json` de antes ya no se usa y se borró.
+- `npm run api:types` genera `src/shared/api/generated/vuelos.ts` y `generated/identity.ts` con `openapi-typescript`. Ese archivo **se versiona** y no se edita a mano: es el único lugar que define las formas del contrato.
 - Si el contrato cambia: descargar el YAML nuevo, actualizar `PROCEDENCIA.md`, correr `npm run api:types` y después `npm run typecheck`. El mock está tipado contra esos tipos, así que cualquier diferencia hace fallar la compilación hasta que se corrija.
 
 ### Variables de entorno
@@ -80,18 +81,34 @@ Están descritas en `.env.example`. Nunca se sube un `.env` al repositorio.
   | con valor | con valor | Búsqueda, mapa de asientos y estado de vuelo por GraphQL (BFF); cuenta, compra y postventa por REST al core |
 
   El BFF debe tener `CORS_ORIGINS=http://localhost:5173`.
+- **`VITE_IDENTITY_URL`** (opcional, fase 6c): base de identity, donde van `register`, `login`, `refresh`, `logout` y `me` (`{base}/auth/*`). **Solo cuenta si `VITE_API_URL` tiene valor**; con la API vacía (mock) la cuenta también es del mock y esta variable se ignora. **Regla de derivación:** si está vacía, se toma `VITE_API_URL` y se cambia el sufijo `/flights/v1` por `/identity/v1` (`https://gw/flights/v1` → `https://gw/identity/v1`, también con barra final); si se escribe, se usa tal cual (sin barras finales). Si `VITE_API_URL` no termina en `/flights/v1` y no hay explícita, no hay de dónde derivarla y la cuenta queda en `VITE_API_URL` (el login propio del core, `AUTH_MODE=local`); ponerla igual a `VITE_API_URL` es la forma explícita de ese modo.
 - **`VITE_LAST_FLIGHT_DATE`**: último día con salidas de la semilla del backend (la semilla genera 90 días desde su carga y esa ventana es fija). El buscador no deja elegir fechas posteriores; vacía = hoy + 89 días.
 - **`VITE_MOCK_ERROR_RATE`**: frecuencia de errores simulados. Solo afecta al mock; sirve para diseñar los estados de error. Las ofertas del inicio (búsquedas «de fondo») no los reciben: para ellas existen los escenarios de la sección 5e.
+
+#### Qué ruta va a qué servicio
+
+| Qué | Ruta (detrás del gateway) | Servicio | Cómo la pide el marketplace |
+|---|---|---|---|
+| Cuenta: `register`, `login`, `refresh`, `logout`, `me` | `/identity/v1/auth/*` (`VITE_IDENTITY_URL`) | identity | REST; `logout` y `me` con Bearer |
+| Búsqueda, mapa de asientos y estado de vuelo | `/graphql` (`VITE_GRAPHQL_URL`) | BFF (→ core) | GraphQL; solo la búsqueda lleva `X-Device-Fingerprint`; nunca `Authorization` |
+| Compra: hold y reserva | `/flights/v1/offers/hold`, `/flights/v1/bookings` (`VITE_API_URL`) | core | REST con Bearer e `Idempotency-Key` |
+| Postventa: Mis viajes, boletos, check-in, equipaje, cambio de fecha, cancelación | `/flights/v1/bookings/**` | core | REST con Bearer (las escrituras, con `Idempotency-Key`) |
+| Respaldo de las lecturas (sin `VITE_GRAPHQL_URL`) | `/flights/v1/search`, `/offers/{id}/seatmap`, `/flights/{n}/status` | core | REST |
+| Salud (calentamiento) | `/flights/v1/health` y `/identity/v1/health` | core e identity | `GET` silencioso |
+
+El gateway (`gateway_vuelos`) es la única entrada pública: `/flights/v1/**` → core, `/identity/v1/**` y `/oauth2/token` → identity, `/graphql` → BFF. Webhooks y administración existen en el gateway pero el marketplace no los usa.
 
 #### A qué API apuntar
 
 | Backend | URL | Para qué |
 |---|---|---|
-| Local (recomendado en desarrollo) | `http://localhost:3010/flights/v1` | Navegador y `npm run test:api` (incluidas la cuenta y la compra). El backend debe tener `CORS_ORIGINS=http://localhost:5173`. Con el backend en WSL, desde Windows funciona `localhost` (no `127.0.0.1`). |
+| Gateway local (recomendado) | `VITE_API_URL=http://localhost:8080/flights/v1` y `VITE_GRAPHQL_URL=http://localhost:8080/graphql` (identity se deriva: `http://localhost:8080/identity/v1`) | Los cinco servicios y el gateway con `scripts/e2e-local.sh --dejar-arriba` del repo `gateway_vuelos` (su `CORS_ORIGINS` ya incluye `http://localhost:5173`; el script apaga todo si su primer argumento no es `--dejar-arriba`). `API_TEST_URL=http://localhost:8080/flights/v1 API_TEST_GRAPHQL_URL=http://localhost:8080/graphql npm run test:api` corre toda la integración por el gateway. |
+| Servicios locales sin gateway | `VITE_API_URL=http://localhost:3000/flights/v1`, `VITE_IDENTITY_URL=http://localhost:3001/identity/v1`, `VITE_GRAPHQL_URL=http://localhost:4000/graphql` | Cada servicio con `CORS_ORIGINS=http://localhost:5173`. |
+| Backend viejo con login propio | `http://localhost:3010/flights/v1` con `VITE_IDENTITY_URL=http://localhost:3010/flights/v1` | Navegador y `npm run test:api` (incluidas la cuenta y la compra). El backend debe tener `CORS_ORIGINS=http://localhost:5173`. Con el backend en WSL, desde Windows funciona `localhost` (no `127.0.0.1`). |
 | BFF GraphQL (local) | `http://localhost:4000/graphql` | Solo con `VITE_GRAPHQL_URL`, además de la API REST. Se levanta como dice `docs/VERIFICACION-LOCAL.md` del BFF (`bff_vuelos`). |
 | Render | `https://quinde-vuelos-api.onrender.com/flights/v1` | Solo verificación de lectura con `npm run test:api` (corre en Node, no necesita CORS); las suites de cuenta y compra se omiten solas porque escriben. **No se crean usuarios, holds ni reservas en Render.** Su CORS no incluye `localhost`. Duerme tras 15 min: la primera petición tarda cerca de un minuto. |
 
-`npm run test:api` toma la URL de `API_TEST_URL` o, si no está, de `VITE_API_URL` del `.env`. Ejemplo contra Render: `API_TEST_URL=https://quinde-vuelos-api.onrender.com/flights/v1 npm run test:api`.
+`npm run test:api` toma la URL de `API_TEST_URL` o, si no está, de `VITE_API_URL` del `.env`; la de identity, de `API_TEST_IDENTITY_URL` o `VITE_IDENTITY_URL` o, si no están, la derivada de la API (misma regla); la de GraphQL, de `API_TEST_GRAPHQL_URL` o `VITE_GRAPHQL_URL` (sin ella, la suite de GraphQL se omite). Ejemplo contra Render: `API_TEST_URL=https://quinde-vuelos-api.onrender.com/flights/v1 npm run test:api`.
 
 Todas las variables que empiezan con `VITE_` quedan visibles en el navegador: **no se ponen secretos ahí**.
 
@@ -167,7 +184,7 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo** (Mis via
 | `/` | Inicio: buscador, Ofertas, Destinos de Ecuador, Cómo funciona y preguntas frecuentes | Público | `POST /search` (las ofertas) | Buscador hecho (mock y API real); Ofertas hechas en mock (F7) |
 | `/resultados` | Vuelos y tarifas (paso 1) | Público | `POST /search` | Hecho (mock y API real) |
 | `/ofertas` | Las mismas ofertas del inicio en una página (misma sección y misma caché) | Público | `POST /search` | Hecho en mock; sin verificar con la API real (F7) |
-| `/compra/datos` | Pasajeros (paso 2) | Sesión (sin ella va a `/ingresar?volver=/compra/datos`) | `/auth/*`, `POST`/`GET`/`DELETE /offers/hold`, `GET /offers/{id}/seatmap` | Hecho (mock y API real); asientos opcionales por tramo |
+| `/compra/datos` | Pasajeros (paso 2) | Sesión (sin ella va a `/ingresar?volver=/compra/datos`) | cuenta (`/identity/v1/auth/*`), `POST`/`GET`/`DELETE /offers/hold`, `GET /offers/{id}/seatmap` | Hecho (mock y API real); asientos opcionales por tramo |
 | `/compra/pago` | Pago (paso 3) | Sesión | `POST /bookings`, `GET /offers/hold/{id}` | Hecho (mock y API real) |
 | `/compra/confirmacion/:id` | Confirmada, en proceso o fallida | Sesión | `GET /bookings/{id}` | Hecho (mock y API real) |
 | `/viajes` | Lista de viajes (Próximos, Pasados, Cancelados) | Sesión | `GET /bookings` | Hecho en mock; sin verificar con la API real |
@@ -179,8 +196,8 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo** (Mis via
 | `/viajes/:id/cambiar-fecha` | Cambio de fecha | Sesión | `POST .../date-change/search`, `POST .../date-change` | Hecho en mock; sin verificar con la API real |
 | `/viajes/:id/cancelar` | Cancelación | Sesión | `GET .../cancellation-quote`, `POST .../cancel` | Hecho en mock; sin verificar con la API real |
 | `/estado-vuelo` | Estado de un vuelo | Público | `GET /flights/{n}/status` | Hecho (mock y API real) |
-| `/ingresar`, `/registrarse` | Cuenta (vuelven a `?volver=`) | Público | `POST /auth/login`, `POST /auth/register` | Hecho (mock y API real) |
-| `/perfil` | Mis datos (solo lectura) y cerrar sesión | Sesión | `GET /auth/me`, `POST /auth/logout` | Hecho (mock y API real) |
+| `/ingresar`, `/registrarse` | Cuenta (vuelven a `?volver=`) | Público | `POST /identity/v1/auth/login`, `POST /identity/v1/auth/register` | Hecho (mock y API real) |
+| `/perfil` | Mis datos (solo lectura) y cerrar sesión | Sesión | `GET /identity/v1/auth/me`, `POST /identity/v1/auth/logout` | Hecho (mock y API real) |
 | `/ayuda` | Ayuda y textos legales | Público | Ninguna | Hecho |
 | `/componentes` | Catálogo interno | Solo desarrollo (404 en producción) | Ninguna | Hecho |
 | `/componentes/asientos` | Demo del selector de asientos (1 adulto, familia con niño y bebé, escala, ATR) | Solo desarrollo (404 en producción) | `GET /offers/{id}/seatmap` | Hecho (F5) |
@@ -548,9 +565,23 @@ Diferencias con el contrato encontradas en esta fase (además de las de `docs/DI
 
 Las respuestas de búsqueda, mapa de asientos, estado de vuelo y los ProblemDetails de 400 y 404 **cumplen los esquemas del contrato** (Ajv, local y Render).
 
+### La cuenta en identity detrás del gateway (Reto 2, fase 6c)
+
+Leído de `identity_vuelos` y `gateway_vuelos` (`main`) y verificado en local con los cinco servicios y el gateway (2026-10-16):
+
+- **Mismas formas, otra ruta.** `RegistroDto`, `LoginDto`, `RefrescoDto` y `UsuarioRespuestaDto` de identity son idénticos, campo por campo, a los que daba el core; `TokenRespuestaDto` solo cambia el texto de la descripción de `refresh_token` (nombra `/identity/v1/auth/refresh`). Mismo `ProblemDetails` (`code`: `VALIDATION_FAILED` o `RATE_LIMIT_EXCEEDED`), mismo 400 con `invalidParams`, 401 genérico, 409 por correo repetido y 429 con `Retry-After`; logout responde 204 con Bearer. Por eso el mapeo no cambió: solo cambia la base.
+- **Límites:** identity limita login a 5/min, registro a 10 cada 10 min y refresh a 30/min por IP (igual que el core antes); el gateway agrega un límite estricto de 20/min por IP y ruta en `login` y `register`, y uno global por IP.
+- **Tokens:** RS256, emitidos por identity con `iss` = el origen público del gateway; el core y el gateway los verifican con el JWKS. Los scopes de una persona son los mismos (`flights:read`, `hold`, `book`, `cancel`, `webhooks`).
+- **El gateway valida el token antes del core** en las rutas con token: un token inválido o vencido recibe 401 en el borde (con `WWW-Authenticate`), sin llegar al core; faltar un scope es 403. Para la sesión es el mismo 401 de siempre: una renovación en identity y un reintento; un segundo 401 cierra la sesión.
+- **`/flights/v1/auth/**` ya no existe:** el core corre con `AUTH_MODE=external` y responde 404 (el gateway lo deja pasar para que un frontend sin migrar vea ese 404 claro).
+- **Calentamiento:** `warmUp` pide `GET /health` al core y también a identity (son dos servicios que pueden dormir por separado); si comparten base, uno solo.
+- **No verificado:** el gateway y los servicios desplegados (solo local), PostgreSQL 18 (se usó 16) y el BFF por gRPC fuera del script del gateway.
+
 ### Lo que aprendimos de `/auth/*` (F3)
 
-Verificado con curl y `npm run test:api` contra el **backend local** (en Render no se crean usuarios):
+> Desde la fase 6c, estas rutas viven en identity (`/identity/v1/auth/*`) y no en el core; todo lo siguiente sigue valiendo.
+
+Verificado con curl y `npm run test:api` contra el **entorno local** (en Render no se crean usuarios):
 
 - **El registro no inicia sesión.** `POST /auth/register` responde 201 con el usuario y **sin tokens**; el frontend ingresa justo después con `POST /auth/login`. Si ese ingreso falla (por ejemplo, un 429), la cuenta ya existe y la pantalla lo dice así, sin anunciar que el registro falló.
 - **La cuenta es solo correo y contraseña.** No hay nombre, teléfono ni documento, y no hay endpoint para editar: Mi perfil es de solo lectura (`GET /auth/me`: correo, fecha de alta, roles y permisos).
@@ -660,7 +691,7 @@ Fuente: lo que probó el dueño contra el backend local (pases) y la lectura del
 - **Proactiva y reactiva:** se renueva poco antes de vencer (con el `expires_in` relativo, para que un reloj desfasado no provoque renovaciones en bucle) y, ante un 401, se renueva una vez y se reintenta la petición una vez; un segundo 401 cierra la sesión.
 - **Si la renovación es rechazada** (401/403): se borra todo, se avisa "Tu sesión se cerró por seguridad. Ingresa de nuevo." y se va a `/ingresar?volver=…`. La selección de compra no se pierde.
 - **Si la restauración falla por conexión** (sin red, tiempo agotado, 503), la sesión no se da por cerrada: el token sigue guardado y las rutas con sesión muestran "No pudimos recuperar tu sesión" con "Intentar de nuevo" (respeta `Retry-After`), en vez de mandar a ingresar.
-- **Cerrar sesión** llama a `POST /auth/logout`, borra los tokens y avisa a las demás pestañas; si la llamada falla, la sesión se cierra igual en el navegador.
+- **Cerrar sesión** llama a `POST /identity/v1/auth/logout`, borra los tokens y avisa a las demás pestañas; si la llamada falla, la sesión se cierra igual en el navegador.
 - **Contrapartida aceptada:** un script inyectado (XSS) podría leer el refresh token de `sessionStorage`/`localStorage` mientras la página está abierta. Lo mitigan React (no se inserta HTML sin escapar), la ausencia de `dangerouslySetInnerHTML` y que no se cargan scripts de terceros. **F8 debe agregar una Content-Security-Policy estricta** al publicar (`script-src 'self'`, `connect-src` limitado a la API, sin `unsafe-inline`). Una cookie `HttpOnly` sería mejor, pero la API no la ofrece.
 
 ### Aeropuertos y rutas (verificado contra la API el 2026-10-07)
@@ -739,7 +770,7 @@ Si el contrato define un límite, se usa exactamente ese.
 ## 8. Pruebas
 
 - **Hoy:** 806 pruebas con Vitest (`npm run test`): validadores, esquemas, buscador, rutas, `RequireAuth` con la sesión real, selección de compra, ventana de check-in, cliente HTTP (ProblemDetails, Retry-After, timeout, reintentos), mapeo y dinero contra respuestas reales, mock contra la API, catálogo, caché, componentes de resultados y estado de vuelo y, desde F3, la sesión (almacén, renovación única entre pestañas, reutilización, reloj desfasado, cierre en otra pestaña) y los formularios de cuenta (errores por campo, foco, doble envío, 401/409/429). Desde F4a, la compra: máquina de estados (todas las transiciones y errores), claves de idempotencia, temporizador con el tiempo del servidor y el reloj del equipo desfasado, seguimiento con espera creciente, pago simulado (prefijos, nada persistido), catálogo de mensajes, reglas de pasajeros, mapeo con respuestas reales y el mock de hold y reserva. Desde F4b, las pantallas: formulario de pasajeros por tipo, temporizador con avisos a 5 y 2 minutos, tarjeta, y la ruta completa de la compra con sesión, que cuenta los clics y falla si pasan de 3 (no hay Playwright instalado: es una prueba de componentes de las cuatro pantallas), con la cuenta incrustada, volver atrás, los errores del pago y los estados de la confirmación. Desde F6, la postventa: las reglas del mock con los mismos códigos del contrato (lista por cursor, boletos, check-in, pases, equipaje, cambio de fecha, cancelación), `RealFlightsApi` contra un cliente HTTP falso (rutas, cabeceras, 200/201/202 y dinero en centavos), las acciones habilitadas por estado, los filtros de la lista, los totales de equipaje, la compra de equipaje con 200/201/202/422, las claves de idempotencia (generación, reutilización y clave nueva al cambiar el pago), los hooks de check-in y cambio de fecha, el QR y las pantallas de lista, pases, equipaje y cancelación. Además, las pruebas del buscador con sugerencias, los resultados con pestañas, las fechas cercanas y el paso de cuenta (rama de mejoras de interacción). Desde F7: la tarifa más baja de una búsqueda (orden, desempates, moneda), el tope de 6 tarjetas, el presupuesto de 8 búsquedas y la concurrencia de 2, la caché con vencimiento, cancelar al salir, el 429 con `Retry-After`, las rutas sin vuelos y las fallas parciales; la cancelación y el reintento en el cliente HTTP y el mock; las tarjetas, los filtros, los estados de carga, vacío, error, falla parcial y 429 y el clic hasta `/resultados`; el inicio (jerarquía y textos de ayuda), los metadatos por ruta, `index.html` (sin servidores externos, tipografías y `robots.txt`), los escenarios del mock y que el mock cubra las seis rutas populares cualquiera que sea el día de la semana.
-- **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo contra un backend local: registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo, rotación y reutilización, cierre de sesión y 429. La de compra, también solo local: búsqueda real, hold y `GET`, `PAY-OK` 201 con boletos y el mismo envío dos veces con la misma clave = **una sola reserva** (`Idempotent-Replayed: true`), `PAY-REJ` 422 con el hold aún `HELD`, `PAY-PEND` 202 seguido hasta `CONFIRMED`, y liberar el hold. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 y reservas 10 por minuto).
+- **Integración:** `npm run test:api` contra la API real, con las respuestas validadas contra el contrato. La suite de cuenta corre solo en local (contra identity, directo o por el gateway): registro, 409, ingreso, `/auth/me`, **5 llamadas a la vez con el token vencido → 1 sola renovación y sin reutilización**, 401 reactivo (de identity y de una ruta del core: una sola renovación), rotación y reutilización, cierre de sesión y 429. La de compra, también solo local: búsqueda real, hold y `GET`, `PAY-OK` 201 con boletos y el mismo envío dos veces con la misma clave = **una sola reserva** (`Idempotent-Replayed: true`), `PAY-REJ` 422 con el hold aún `HELD`, `PAY-PEND` 202 seguido hasta `CONFIRMED`, y liberar el hold. Respeta los límites de tasa: entre dos corridas seguidas hay que esperar un minuto (ingreso 5 y reservas 10 por minuto).
 - **E2E:** `e2e/seats-demo.mjs` (selector de asientos, mock, 320/768/1280 px).
 - **Por agregar:** pruebas de extremo a extremo del flujo de compra y revisión automática de accesibilidad en cada ruta.
 - Al cerrar cada fase: lint, typecheck, build, pruebas, recorrido solo con teclado, 320 px, zoom al 200 % y modo oscuro.
