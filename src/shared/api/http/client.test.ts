@@ -59,6 +59,47 @@ describe('cliente HTTP', () => {
     expect(headersOf(1).Authorization).toBeUndefined();
   });
 
+  describe('base distinta por llamada (la cuenta va a identity)', () => {
+    const IDENTITY = 'https://gw.test/identity/v1';
+    const urlOf = (fetchImpl: ReturnType<typeof client>['fetchImpl'], i = 0) => String((fetchImpl.mock.calls[i] as unknown as [URL])[0]);
+    const headersOf = (fetchImpl: ReturnType<typeof client>['fetchImpl'], i = 0) =>
+      (fetchImpl.mock.calls[i] as unknown as [URL, RequestInit])[1].headers as Record<string, string>;
+
+    it('`base` reemplaza la del cliente solo en esa llamada (y se le quitan las barras finales)', async () => {
+      const { http, fetchImpl } = client([json(200, {}), json(200, {}), json(200, {})]);
+      await http.request('POST', '/auth/login', { body: {}, base: `${IDENTITY}//` });
+      await http.request('GET', '/bookings');
+      await http.request('GET', '/auth/me', { base: IDENTITY });
+      expect([0, 1, 2].map((i) => urlOf(fetchImpl, i))).toEqual([`${IDENTITY}/auth/login`, `${BASE}/bookings`, `${IDENTITY}/auth/me`]);
+    });
+
+    it('con base propia sigue valiendo la lógica del cliente: Bearer solo con auth, un reintento y ProblemDetails', async () => {
+      const { http, fetchImpl, sleep } = client(
+        [json(503, { status: 503 }, { 'Retry-After': '2' }), json(200, { ok: 1 }), json(401, { status: 401, code: 'VALIDATION_FAILED', title: 'Unauthorized' })],
+        { getAccessToken: () => 'tok123' },
+      );
+      await expect(http.request('GET', '/auth/me', { auth: true, retry: true, base: IDENTITY })).resolves.toEqual({ ok: 1 });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(sleep).toHaveBeenCalledWith(2000);
+      expect(urlOf(fetchImpl, 0)).toBe(`${IDENTITY}/auth/me`);
+      expect(urlOf(fetchImpl, 1)).toBe(`${IDENTITY}/auth/me`);
+      expect(headersOf(fetchImpl, 1).Authorization).toBe('Bearer tok123');
+      const error = await failure(http.request('POST', '/auth/login', { body: {}, base: IDENTITY }));
+      expect(error).toMatchObject({ status: 401, code: 'VALIDATION_FAILED' });
+      expect(headersOf(fetchImpl, 2).Authorization).toBeUndefined();
+    });
+
+    it('la deduplicación no mezcla la misma ruta de bases distintas', async () => {
+      const { http, fetchImpl } = client([json(200, { a: 1 }), json(200, { b: 2 })]);
+      const [a, b] = await Promise.all([
+        http.request('GET', '/health', { retry: true }),
+        http.request('GET', '/health', { retry: true, base: IDENTITY }),
+      ]);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect([a, b]).toEqual([{ a: 1 }, { b: 2 }]);
+    });
+  });
+
   describe('deduplicación de lecturas en vuelo', () => {
     it('dos lecturas idénticas simultáneas = una sola petición y la misma respuesta', async () => {
       const { http, fetchImpl } = client([json(200, { n: 1 })]);

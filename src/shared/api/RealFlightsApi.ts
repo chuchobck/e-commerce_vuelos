@@ -83,7 +83,14 @@ const CURRENCY = 'USD';
  * no se reintentan solas y llevan Idempotency-Key.
  */
 export class RealFlightsApi implements FlightsApi {
-  constructor(private readonly http: HttpClient) {}
+  /**
+   * `identityUrl` es la base de identity (la cuenta: register, login, refresh, logout y me). Sin ella, la cuenta queda en la
+   * base de la API (el login propio del core). Todo lo demás va siempre a la base del cliente HTTP.
+   */
+  constructor(
+    private readonly http: HttpClient,
+    private readonly identityUrl?: string,
+  ) {}
 
   async search(params: SearchParams, options: SearchOptions = {}): Promise<SearchResult> {
     // POST de solo lectura: admite el reintento de lecturas.
@@ -111,31 +118,36 @@ export class RealFlightsApi implements FlightsApi {
     return mapFlightStatus(dto);
   }
 
-  /* Cuenta. Las escrituras no se reintentan solas; /auth/me es una lectura. */
+  /* Cuenta (identity). Las escrituras no se reintentan solas; /auth/me es una lectura. */
 
   async register({ email, password }: Credentials): Promise<User> {
-    return mapUser(await this.http.request<UserResponseDto>('POST', '/auth/register', { body: { email, password } }));
+    return mapUser(await this.http.request<UserResponseDto>('POST', '/auth/register', { body: { email, password }, base: this.identityUrl }));
   }
 
   async login({ email, password }: Credentials): Promise<AuthTokens> {
-    return mapTokens(await this.http.request<TokenResponseDto>('POST', '/auth/login', { body: { email, password } }));
+    return mapTokens(await this.http.request<TokenResponseDto>('POST', '/auth/login', { body: { email, password }, base: this.identityUrl }));
   }
 
   async refresh(refreshToken: string): Promise<AuthTokens> {
-    return mapTokens(await this.http.request<TokenResponseDto>('POST', '/auth/refresh', { body: { refresh_token: refreshToken } }));
+    return mapTokens(await this.http.request<TokenResponseDto>('POST', '/auth/refresh', { body: { refresh_token: refreshToken }, base: this.identityUrl }));
   }
 
   async logout(refreshToken: string): Promise<void> {
-    await this.http.request('POST', '/auth/logout', { body: { refresh_token: refreshToken }, auth: true });
+    await this.http.request('POST', '/auth/logout', { body: { refresh_token: refreshToken }, auth: true, base: this.identityUrl });
   }
 
   async me(): Promise<User> {
-    return mapUser(await this.http.request<UserResponseDto>('GET', '/auth/me', { auth: true, retry: true }));
+    return mapUser(await this.http.request<UserResponseDto>('GET', '/auth/me', { auth: true, retry: true, base: this.identityUrl }));
   }
 
-  /** GET /health sin aviso de "despertando": despierta el servidor mientras el usuario escribe. */
+  /**
+   * GET /health sin aviso de "despertando": despierta los servidores gratuitos mientras el usuario escribe. Son dos si la
+   * cuenta vive en otro servicio (identity); si comparten base, uno solo.
+   */
   async warmUp(): Promise<void> {
-    await this.http.request('GET', '/health', { silent: true });
+    const pings = [this.http.request('GET', '/health', { silent: true })];
+    if (this.identityUrl) pings.push(this.http.request('GET', '/health', { silent: true, base: this.identityUrl }));
+    await Promise.all(pings);
   }
 
   /* Compra. Las escrituras nunca se reintentan solas: el reintento lo decide la compra con la misma clave. */

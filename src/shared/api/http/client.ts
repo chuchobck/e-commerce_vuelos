@@ -8,6 +8,7 @@
  *   esperando lo que diga Retry-After con un tope de 10 s. Las escrituras nunca se reintentan solas.
  *   El tiempo agotado cuenta porque el arranque en frío de Render (~52 s medidos) supera los 45 s:
  *   al reintentar, el servidor ya despertó.
+ * - Base por llamada (`base`): la cuenta va a identity y el resto a la API, con el mismo cliente.
  * - Si una petición tarda más de 3 s se marca como "servidor despertando" (ver activity.ts).
  * - Deduplicación: dos lecturas idénticas (`retry: true`, mismo método, URL, cuerpo y token) que
  *   coinciden en vuelo comparten la misma promesa. Así el doble montaje de StrictMode o un doble
@@ -37,6 +38,11 @@ export interface RequestOptions {
   auth?: boolean;
   /** Cancela la petición (y su reintento) cuando quien la pidió ya no necesita la respuesta. */
   signal?: AbortSignal;
+  /**
+   * Base distinta de la del cliente para esta llamada (p. ej. identity, donde vive la cuenta). Todo lo demás es igual:
+   * errores, reintentos, deduplicación, tiempo máximo y Bearer.
+   */
+  base?: string;
 }
 
 export interface HttpClientOptions {
@@ -78,7 +84,7 @@ export function createHttpClient({
   const base = baseUrl.replace(/\/+$/, '');
 
   async function attempt<T>(method: string, path: string, options: RequestOptions): Promise<HttpResult<T>> {
-    const url = new URL(`${base}${path}`);
+    const url = new URL(`${options.base ? options.base.replace(/\/+$/, '') : base}${path}`);
     for (const [k, v] of Object.entries(options.query ?? {})) url.searchParams.set(k, v);
 
     const headers: Record<string, string> = { Accept: 'application/json', ...options.headers };
@@ -160,6 +166,7 @@ export function createHttpClient({
     if (!options.retry || options.signal) return withRetry<T>(method, path, options);
     const key = JSON.stringify([
       method,
+      options.base ?? null,
       path,
       options.query ?? null,
       options.body ?? null,
