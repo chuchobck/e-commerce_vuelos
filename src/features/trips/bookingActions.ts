@@ -1,6 +1,6 @@
-import type { Booking, BookingStatus } from '@/shared/api';
+import type { BoardingPass, Booking, BookingStatus } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { checkInAvailability } from '@/shared/lib/checkinStatus';
+import { bookingCheckIn } from '@/shared/lib/checkinStatus';
 import { fareName } from '@/shared/lib/format';
 
 const t = es.aftersale.actions;
@@ -10,9 +10,11 @@ export type TripAction = 'checkIn' | 'passes' | 'baggage' | 'dateChange' | 'canc
 export interface ActionState {
   /** Se muestra. Los trámites que no corresponden a una reserva terminada (cancelada, fallida) no se muestran. */
   visible: boolean;
-  /** Se puede usar ahora. Si no, `reason` dice por qué (se escribe junto al botón desactivado). */
+  /** Se puede usar ahora. Si no, `reason` dice por qué (junto al botón desactivado, o en su lugar si no se muestra). */
   enabled: boolean;
   reason?: string;
+  /** Es el botón principal de la reserva (solo «Ver pases de abordar» cuando ya hay pases; si no, lo es el check-in). */
+  primary?: boolean;
 }
 
 export type TripActions = Record<TripAction, ActionState>;
@@ -33,10 +35,13 @@ const hidden: ActionState = { visible: false, enabled: false };
  *  - Solo una reserva CONFIRMADA admite check-in, equipaje, cambio y cancelación.
  *  - Con el primer vuelo ya salido solo se pueden ver los pases.
  *  - El cambio de fecha pide que todas las familias del viaje sean cambiables (`fare.changeable`).
- *  - La API no dice si el check-in ya se hizo: «Pases de abordar» queda siempre disponible y la pantalla explica
- *    si todavía no hay pases.
+ *  - Qué vuelos ya tienen check-in sale de sus pases de abordar (GET .../boarding-passes, `passes`). Con algún pase,
+ *    «Ver pases de abordar» es el botón principal; «Hacer check-in» solo se ofrece si queda algún vuelo `abierto` sin
+ *    hacer, y si no, no hay botón y `reason` explica por qué (ya hecho, cerrado, salió o cuándo abre).
+ *  - Sin `passes` (la consulta falló o no se pidió) no se sabe qué está hecho: el check-in se ofrece solo por la ventana
+ *    y, fuera de ella, queda desactivado con su motivo; «Pases de abordar» queda disponible y la pantalla lo explica.
  */
-export function bookingActions(booking: Booking, now: Date = new Date()): TripActions {
+export function bookingActions(booking: Booking, now: Date = new Date(), passes?: readonly BoardingPass[]): TripActions {
   if (ENDED.includes(booking.status)) {
     return { checkIn: hidden, passes: hidden, baggage: hidden, dateChange: hidden, cancel: hidden };
   }
@@ -47,7 +52,7 @@ export function bookingActions(booking: Booking, now: Date = new Date()): TripAc
   }
 
   const departed = new Date(booking.outbound.itinerary.segments[0].departureTime).getTime() <= now.getTime();
-  const check = checkInAvailability(booking, now);
+  const check = bookingCheckIn(booking, passes, now);
   const ok: ActionState = { visible: true, enabled: true };
   const afterDeparture = departed ? blocked(t.departed) : ok;
 
@@ -56,8 +61,8 @@ export function bookingActions(booking: Booking, now: Date = new Date()): TripAc
   const hasSeated = booking.passengers.some((p) => p.type !== 'INFANT');
 
   return {
-    checkIn: check.available ? ok : { visible: true, enabled: false, reason: check.reason },
-    passes: ok,
+    checkIn: check.available ? ok : { visible: !check.known, enabled: false, reason: check.reason },
+    passes: check.hasPasses ? { ...ok, primary: true } : ok,
     baggage: !hasSeated ? blocked(t.noActions) : afterDeparture,
     dateChange: departed ? blocked(t.departed) : unchangeable ? blocked(fmt(t.notChangeable, { fare: fareName(unchangeable.fare.brand) })) : ok,
     cancel: afterDeparture,

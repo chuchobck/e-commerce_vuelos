@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import { AlertTriangle, CheckCircle2, Circle, Clock, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Circle, Clock, XCircle, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/shared/lib/cn';
 
@@ -30,11 +30,13 @@ const ICONS = {
 export interface BadgeProps extends VariantProps<typeof badgeVariants> {
   children: ReactNode;
   className?: string;
+  /** Otro icono que el del tono, cuando el tono solo no distingue el estado (p. ej. el del check-in). */
+  icon?: LucideIcon;
 }
 
 /** Etiqueta de estado (reserva, vuelo). Siempre icono + texto. */
-export function Badge({ tone, children, className }: BadgeProps) {
-  const Icon = ICONS[tone ?? 'neutral'];
+export function Badge({ tone, children, className, icon }: BadgeProps) {
+  const Icon = icon ?? ICONS[tone ?? 'neutral'];
   return (
     <span className={cn(badgeVariants({ tone }), className)}>
       <Icon aria-hidden="true" />

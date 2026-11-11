@@ -132,6 +132,15 @@ export const aftersaleEs = {
     goCheckIn: 'Ir al check-in',
     cancelled: 'Esta reserva está cancelada: no tiene pases de abordar.',
     infantNote: 'Los infantes viajan en brazos de su adulto y no llevan pase propio.',
+    missingTitle: 'Vuelos sin pase de abordar',
+    missingFlight: '{leg}: vuelo {flight}, {route}',
+    /** Por qué un vuelo no tiene pase (según su estado de check-in). */
+    missing: {
+      salio: 'No tiene pase: el vuelo ya salió.',
+      cerrado: 'No tiene pase: el check-in en línea cerró 60 minutos antes de la salida. Acércate al mostrador del aeropuerto.',
+      'no-abre-aun': 'Aún no tiene pase: el check-in abre el {date} a las {time}.',
+      abierto: 'Aún no tiene pase: el check-in está abierto y todavía no lo haces.',
+    },
   },
 
   /* ----------------------------------------- check-in ----------------------------------------- */
@@ -139,7 +148,6 @@ export const aftersaleEs = {
     pageTitle: 'Check-in',
     heading: 'Check-in de la reserva {code}',
     lead: 'Disponible desde 48 horas hasta 60 minutos antes de la salida.',
-    passengersTitle: 'Pasajeros que harán el check-in',
     passengersText: 'Hacemos el check-in de todos los pasajeros de esta reserva a la vez. Revisa que estén todos.',
     infantLap: 'Viaja en brazos',
     seatLine: 'Asiento {seat}',
@@ -162,6 +170,26 @@ export const aftersaleEs = {
     noneTitle: 'No se pudo hacer el check-in',
     noneText: 'Ningún vuelo quedó registrado. Inténtalo de nuevo; si sigue igual, hazlo en el mostrador del aeropuerto.',
     seePasses: 'Ver pases de abordar',
+    opensAtFlight: 'El check-in del vuelo {flight} abre el {date} a las {time}.',
+    allDone: 'Ya hiciste el check-in de los vuelos que te quedan. Tus pases están en «Ver pases de abordar».',
+    /** Etiqueta por vuelo (siempre texto + icono, nunca solo color). */
+    status: {
+      'no-abre-aun': 'Check-in abre el {date} a las {time}',
+      abierto: 'Check-in abierto',
+      hecho: 'Check-in hecho',
+      hechoSeat: 'Check-in hecho · Asiento {seats}',
+      hechoSeats: 'Check-in hecho · Asientos {seats}',
+      cerrado: 'Check-in cerrado',
+      salio: 'El vuelo ya salió',
+    },
+    overviewTitle: 'Check-in',
+    flightsTitle: 'Tus vuelos',
+    flightsLabel: 'Estado del check-in por vuelo',
+    flightLine: '{leg}: vuelo {flight}, {route}',
+    flightWhen: '{date} · {time}',
+    summary: 'Check-in hecho en {done} de {total} vuelos',
+    summaryOne: 'Check-in hecho en {done} de 1 vuelo',
+    unknown: 'No pudimos confirmar qué vuelos ya tienen check-in. Revisa «Pases de abordar» o inténtalo más tarde.',
   },
 
   /* ----------------------------------------- equipaje ----------------------------------------- */

@@ -15,6 +15,20 @@ import { BOOKING } from './__fixtures__/booking';
 import { TripPassesPage } from './TripPassesPage';
 
 const t = es.aftersale.passes;
+const hoursFromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+
+/** La reserva de la prueba con la ida a `out` horas y, si se pide, una vuelta a `back` horas (asientos 14B y 10A). */
+function departingIn(out: number, back?: number) {
+  const segment = BOOKING.outbound.itinerary.segments[0];
+  const at = (h: number, id: string, flightNumber: string) => ({ ...segment, id, flightNumber, departureTime: hoursFromNow(h), arrivalTime: hoursFromNow(h + 1) });
+  return {
+    ...BOOKING,
+    outbound: { ...BOOKING.outbound, itinerary: { ...BOOKING.outbound.itinerary, segments: [at(out, 's1', 'LA1400')] } },
+    ...(back === undefined ? {} : { inbound: { ...BOOKING.outbound, itinerary: { ...BOOKING.outbound.itinerary, id: 'it2', segments: [at(back, 's2', 'LA1401')] } } }),
+    passengers: [{ ...BOOKING.passengers[0], seats: [{ segmentId: 's1', seatNumber: '14B' }, { segmentId: 's2', seatNumber: '10A' }] }],
+  };
+}
+
 const PASS: BoardingPass = { passengerId: 'PAX1', segmentId: 's1', seat: '14C', boardingGroup: 'B', boardingPosition: '22', barcode: 'M1PEREZ/ANA QG4P9X UIOGYE LA1400 14C', barcodeType: 'QR' };
 
 function renderPage() {
@@ -55,6 +69,7 @@ describe('pases de abordar', () => {
 
   it('antes del check-in la API responde 200 con la lista vacía: lo explica, lleva al check-in y no ofrece imprimir', async () => {
     api.getBoardingPasses.mockResolvedValue([]);
+    api.getBooking.mockResolvedValue(departingIn(24));
     renderPage();
     expect(await screen.findByText(t.emptyTitle)).toBeTruthy();
     expect(screen.getByRole('link', { name: t.goCheckIn }).getAttribute('href')).toBe(routes.tripCheckIn('b1'));
@@ -79,5 +94,33 @@ describe('pases de abordar', () => {
     api.getBoardingPasses.mockRejectedValue(new ApiError({ status: 404 }));
     renderPage();
     expect(await screen.findByText(es.trip.notFoundTitle)).toBeTruthy();
+  });
+
+  it('RJPZPN: con el pase de la vuelta, la ida (ya salió) lleva una línea que dice por qué no tiene pase', async () => {
+    api.getBooking.mockResolvedValue(departingIn(-30, 20));
+    api.getBoardingPasses.mockResolvedValue([{ ...PASS, segmentId: 's2', seat: '10A' }]);
+    renderPage();
+    await screen.findByRole('heading', { name: fmt(t.passFor, { name: 'Ana Pérez' }) });
+    expect(screen.getByText('10A')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: t.missingTitle })).toBeTruthy();
+    expect(screen.getByText('Ida: vuelo LA1400, UIO → GYE')).toBeTruthy();
+    expect(screen.getByText(t.missing.salio)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: t.goCheckIn })).toBeNull();
+  });
+
+  it('sin pases y todo cerrado: cada vuelo dice que el check-in cerró y no se lleva al check-in', async () => {
+    api.getBooking.mockResolvedValue(departingIn(0.5, 0.75));
+    api.getBoardingPasses.mockResolvedValue([]);
+    renderPage();
+    expect(await screen.findByText(t.emptyTitle)).toBeTruthy();
+    expect(screen.getAllByText(t.missing.cerrado)).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: t.goCheckIn })).toBeNull();
+  });
+
+  it('un vuelo que aún no abre dice cuándo abre', async () => {
+    api.getBooking.mockResolvedValue(departingIn(24 * 10));
+    api.getBoardingPasses.mockResolvedValue([]);
+    renderPage();
+    expect(await screen.findByText(/^Aún no tiene pase: el check-in abre el .+ a las \d{2}:\d{2}\.$/)).toBeTruthy();
   });
 });
