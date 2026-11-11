@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Booking, BookingStatus } from '@/shared/api';
+import type { BoardingPass, Booking, BookingStatus } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
 import { bookingActions } from './bookingActions';
 
@@ -113,3 +113,29 @@ describe('acciones habilitadas por estado de la reserva', () => {
     expect(a.baggage).toEqual({ visible: true, enabled: false, reason: t.noActions });
   });
 });
+
+describe('check-in y pases según los pases de abordar (GET .../boarding-passes)', () => {
+  const pass: BoardingPass = { passengerId: 'PAX1', segmentId: 's1', seat: '14B', boardingGroup: '2', boardingPosition: '014', barcode: 'BP', barcodeType: 'QR' };
+
+  it('sin pases y con el vuelo abierto: «Hacer check-in» es el principal y los pases no', () => {
+    const a = bookingActions(booking({ departsInHours: 24 }), NOW, []);
+    expect(a.checkIn).toEqual({ visible: true, enabled: true });
+    expect(a.passes.primary).toBeUndefined();
+  });
+
+  it('con el check-in hecho: «Ver pases» es el principal y no hay botón de check-in, con el motivo', () => {
+    const a = bookingActions(booking({ departsInHours: 24 }), NOW, [pass]);
+    expect(a.passes).toEqual({ visible: true, enabled: true, primary: true });
+    expect(a.checkIn).toEqual({ visible: false, enabled: false, reason: es.aftersale.checkin.allDone });
+  });
+
+  it('sin pases y con el check-in cerrado: no hay botón de check-in y se explica que cerró', () => {
+    expect(bookingActions(booking({ departsInHours: 0.5 }), NOW, []).checkIn).toEqual({ visible: false, enabled: false, reason: es.aftersale.checkin.closed });
+  });
+
+  it('sin pases y lejos de la salida: no hay botón de check-in y dice cuándo abre', () => {
+    const a = bookingActions(booking(), NOW, []);
+    expect([a.checkIn.visible, a.checkIn.reason?.startsWith('El check-in abre')]).toEqual([false, true]);
+  });
+});
+

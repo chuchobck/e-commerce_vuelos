@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 import { routes } from '@/app/routes';
-import type { Booking } from '@/shared/api';
+import type { BoardingPass, Booking } from '@/shared/api';
 import { es } from '@/shared/i18n';
 import { TripActions } from './TripActions';
 
@@ -29,10 +29,10 @@ function booking(status: Booking['status'], departsInHours: number): Booking {
   };
 }
 
-function renderActions(b: Booking) {
+function renderActions(b: Booking, passes?: BoardingPass[]) {
   return render(
     <MemoryRouter>
-      <TripActions booking={b} now={NOW} />
+      <TripActions booking={b} now={NOW} passes={passes} />
     </MemoryRouter>,
   );
 }
@@ -81,3 +81,21 @@ describe('acciones del detalle de un viaje', () => {
     expect(screen.getByText(t.noActions)).toBeTruthy();
   });
 });
+
+describe('acciones con los pases de abordar conocidos', () => {
+  const pass: BoardingPass = { passengerId: 'PAX1', segmentId: 's1', seat: '14B', boardingGroup: '2', boardingPosition: '014', barcode: 'BP', barcodeType: 'QR' };
+
+  it('con el check-in hecho, «Ver pases» va primero y no hay botón de check-in: se explica por qué', () => {
+    renderActions(booking('CONFIRMED', 24), [pass]);
+    expect(screen.getAllByRole('link')[0].textContent).toBe(t.passes);
+    expect(screen.queryByRole('link', { name: t.checkIn })).toBeNull();
+    expect(screen.queryByRole('button', { name: t.checkIn })).toBeNull();
+    expect(screen.getByText(es.aftersale.checkin.allDone)).toBeTruthy();
+  });
+
+  it('sin pases y con el vuelo abierto, «Hacer check-in» va primero', () => {
+    renderActions(booking('CONFIRMED', 24), []);
+    expect(screen.getAllByRole('link')[0].textContent).toBe(t.checkIn);
+  });
+});
+

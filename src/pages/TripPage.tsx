@@ -3,12 +3,14 @@ import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
 import { useAuth } from '@/features/auth';
+import { CheckInFlights, useBoardingPasses } from '@/features/checkin';
 import { LiveFlightStatus } from '@/features/flight-status';
 import { BookingStatusBadge, TripActions, TripFallback, TripTabs, useBooking } from '@/features/trips';
 import type { Booking } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
+import { bookingCheckIn } from '@/shared/lib/checkinStatus';
 import { formatMoney } from '@/shared/lib/format';
-import { Alert, Button, Card, CardTitle, TripSummary } from '@/shared/ui';
+import { Alert, Button, Card, CardTitle, LoadingState, TripSummary } from '@/shared/ui';
 
 const t = es.trip;
 const flight = es.aftersale.flight;
@@ -37,7 +39,11 @@ export function TripPage() {
   const { id = '' } = useParams();
   const { authorized } = useAuth();
   const trip = useBooking(id, authorized);
+  const boardingPasses = useBoardingPasses(id, authorized);
   const data = trip.booking;
+  // Hasta saber qué vuelos tienen pase no se dibujan los trámites: evita que «Hacer check-in» aparezca y desaparezca.
+  const passesSettled = boardingPasses.status !== 'loading';
+  const refreshAll = () => Promise.all([trip.refresh(), boardingPasses.refresh()]);
   const inProgress = data && ['PENDING', 'PENDING_PAYMENT', 'TICKET_ISSUING', 'CHANGE_PENDING', 'CANCELLATION_PENDING'].includes(data.status);
 
   return (
@@ -56,7 +62,7 @@ export function TripPage() {
               live="polite"
               title={t.status[data.status]}
               action={
-                <Button variant="secondary" onClick={() => void trip.refresh()} loading={trip.refreshing} loadingText={es.aftersale.flight.refreshing}>
+                <Button variant="secondary" onClick={() => void refreshAll()} loading={trip.refreshing} loadingText={es.aftersale.flight.refreshing}>
                   <RefreshCw aria-hidden="true" />
                   {es.aftersale.actions.refreshStatus}
                 </Button>
@@ -80,7 +86,13 @@ export function TripPage() {
             </Card>
           </div>
 
-          <TripActions booking={data} />
+          {data.status === 'CONFIRMED' && passesSettled ? (
+            <Card>
+              <CheckInFlights checkIn={bookingCheckIn(data, boardingPasses.passes)} title={es.aftersale.checkin.overviewTitle} />
+            </Card>
+          ) : null}
+
+          {passesSettled ? <TripActions booking={data} passes={boardingPasses.passes} /> : <LoadingState label={es.a11y.loading} skeletons={1} />}
 
           {data.status !== 'CANCELLED' && data.status !== 'FAILED' ? <TripFlightStatus booking={data} /> : null}
 
