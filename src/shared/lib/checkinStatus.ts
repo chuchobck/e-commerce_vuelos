@@ -107,15 +107,3 @@ export function bookingCheckIn(booking: Booking, passes: readonly BoardingPass[]
   }
   return { ...base, available: false, reason };
 }
-
-export interface CheckInAvailability {
-  available: boolean;
-  reason?: string;
-  windowText: string;
-}
-
-/** Envoltura temporal mientras las pantallas pasan a `bookingCheckIn`. */
-export function checkInAvailability(booking: Booking, now: Date = new Date()): CheckInAvailability {
-  const { available, reason, windowText } = bookingCheckIn(booking, undefined, now);
-  return { available, reason, windowText };
-}

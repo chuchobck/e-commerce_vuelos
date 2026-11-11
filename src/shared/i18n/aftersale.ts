@@ -139,7 +139,6 @@ export const aftersaleEs = {
     pageTitle: 'Check-in',
     heading: 'Check-in de la reserva {code}',
     lead: 'Disponible desde 48 horas hasta 60 minutos antes de la salida.',
-    passengersTitle: 'Pasajeros que harán el check-in',
     passengersText: 'Hacemos el check-in de todos los pasajeros de esta reserva a la vez. Revisa que estén todos.',
     infantLap: 'Viaja en brazos',
     seatLine: 'Asiento {seat}',

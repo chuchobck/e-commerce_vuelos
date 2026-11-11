@@ -1,7 +1,6 @@
 /** Check-in de un viaje propio y pases de abordar. */
 export { BoardingPassCard } from './BoardingPassCard';
 export { CheckInFlights } from './CheckInFlights';
-export { CheckInPassengers } from './CheckInPassengers';
 export { CheckInStatusBadge } from './CheckInStatusBadge';
 export { useBoardingPasses, type BoardingPassesState } from './useBoardingPasses';
 export { checkInProgress, useCheckIn, type CheckInState } from './useCheckIn';
