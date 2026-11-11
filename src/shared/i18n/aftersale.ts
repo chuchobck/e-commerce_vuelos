@@ -132,6 +132,15 @@ export const aftersaleEs = {
     goCheckIn: 'Ir al check-in',
     cancelled: 'Esta reserva está cancelada: no tiene pases de abordar.',
     infantNote: 'Los infantes viajan en brazos de su adulto y no llevan pase propio.',
+    missingTitle: 'Vuelos sin pase de abordar',
+    missingFlight: '{leg}: vuelo {flight}, {route}',
+    /** Por qué un vuelo no tiene pase (según su estado de check-in). */
+    missing: {
+      salio: 'No tiene pase: el vuelo ya salió.',
+      cerrado: 'No tiene pase: el check-in en línea cerró 60 minutos antes de la salida. Acércate al mostrador del aeropuerto.',
+      'no-abre-aun': 'Aún no tiene pase: el check-in abre el {date} a las {time}.',
+      abierto: 'Aún no tiene pase: el check-in está abierto y todavía no lo haces.',
+    },
   },
 
   /* ----------------------------------------- check-in ----------------------------------------- */

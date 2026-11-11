@@ -1,13 +1,12 @@
-import { ArrowLeft, CalendarCheck, Printer, QrCode } from 'lucide-react';
+import { ArrowLeft, Printer, QrCode } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { Page } from '@/app/layout/Page';
 import { routes } from '@/app/routes';
 import { useAuth } from '@/features/auth';
-import { BoardingPassCard } from '@/features/checkin';
+import { BoardingPassCard, MissingPasses, useBoardingPasses } from '@/features/checkin';
 import { TripFallback, TripTabs, useBooking } from '@/features/trips';
-import { flightsApi, isApiError } from '@/shared/api';
 import { es, fmt } from '@/shared/i18n';
-import { useAsync } from '@/shared/lib/useAsync';
+import { bookingCheckIn } from '@/shared/lib/checkinStatus';
 import { Alert, Button, EmptyState, ErrorState, LoadingState } from '@/shared/ui';
 
 const t = es.aftersale.passes;
@@ -15,25 +14,21 @@ const t = es.aftersale.passes;
 /**
  * Pases de abordar de una reserva, con su código QR y un botón para imprimir o guardar en PDF (la hoja de impresión
  * oculta el menú, las pestañas y los botones; ver las clases `print:`). Antes del check-in la API responde 200 con la lista
- * vacía: se explica y se lleva al check-in, sin botón de imprimir (no habría nada que imprimir).
+ * vacía: se explica, sin botón de imprimir (no habría nada que imprimir). Cada vuelo sin pase lleva una línea que dice por
+ * qué (salió, el check-in cerró, aún no abre o falta hacerlo) y, si alguno está abierto, se lleva al check-in.
  */
 export function TripPassesPage() {
   const { id = '' } = useParams();
   const { authorized } = useAuth();
   const trip = useBooking(id, authorized);
-  const passes = useAsync(() => authorized(() => flightsApi.getBoardingPasses(id)), [id]);
+  const passes = useBoardingPasses(id, authorized);
   const booking = trip.booking;
-
-  // La API real responde 200 con la lista vacía antes del check-in (no un error); un 409/404 también se trata como "aún no".
-  const notYet =
-    (passes.status === 'success' && passes.data.length === 0) ||
-    (passes.status === 'error' && isApiError(passes.error) && (passes.error.status === 409 || passes.error.status === 404));
   const segments = booking ? [booking.outbound, booking.inbound].flatMap((leg) => leg?.itinerary.segments ?? []) : [];
 
   let content;
   if (!booking) {
     content = <TripFallback state={trip} onRetry={() => void trip.refresh()} />;
-  } else if (passes.status === 'loading' || passes.status === 'idle') {
+  } else if (passes.status === 'loading') {
     content = <LoadingState label={es.a11y.loading} skeletons={2} />;
   } else if (booking.status === 'CANCELLED') {
     content = (
@@ -41,31 +36,22 @@ export function TripPassesPage() {
         <p>{t.cancelled}</p>
       </Alert>
     );
-  } else if (notYet) {
+  } else if (!passes.passes) {
+    content = <ErrorState error={passes.error} onRetry={() => void passes.refresh()} />;
+  } else if (passes.passes.length === 0) {
     content = (
-      <EmptyState
-        title={t.emptyTitle}
-        text={t.emptyText}
-        icon={<QrCode className="size-8" />}
-        action={
-          <Button asChild>
-            <Link to={routes.tripCheckIn(booking.id)}>
-              <CalendarCheck aria-hidden="true" />
-              {t.goCheckIn}
-            </Link>
-          </Button>
-        }
-      />
+      <>
+        <EmptyState title={t.emptyTitle} text={t.emptyText} icon={<QrCode className="size-8" />} />
+        <MissingPasses checkIn={bookingCheckIn(booking, passes.passes)} bookingId={booking.id} />
+      </>
     );
-  } else if (passes.status === 'error') {
-    content = <ErrorState error={passes.error} onRetry={() => void passes.execute()} />;
   } else {
     const nameOf = (passengerId: string) => {
       const p = booking.passengers.find((x) => x.id === passengerId);
       return p ? `${p.firstName} ${p.lastName}` : passengerId;
     };
     const order = booking.passengers.map((p) => p.id);
-    const sorted = [...passes.data].sort((a, b) => order.indexOf(a.passengerId) - order.indexOf(b.passengerId));
+    const sorted = [...passes.passes].sort((a, b) => order.indexOf(a.passengerId) - order.indexOf(b.passengerId));
     content = (
       <>
         <div className="flex flex-col items-start gap-2 print:hidden">
@@ -83,6 +69,7 @@ export function TripPassesPage() {
           ))}
         </ul>
         {booking.passengers.some((p) => p.type === 'INFANT') ? <p className="text-sm text-muted">{t.infantNote}</p> : null}
+        <MissingPasses checkIn={bookingCheckIn(booking, passes.passes)} bookingId={booking.id} />
       </>
     );
   }
