@@ -120,7 +120,7 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
 ## Postventa y Mis viajes (desde F6)
 
 - Todo cuelga de `/viajes` (`routes.trips()`, `routes.trip(id)`, …); `/mis-viajes*` solo redirige. Las acciones que se ofrecen salen de
-  `features/trips/bookingActions.ts` (estado, salida y `changeable`); una pantalla no decide por su cuenta.
+  `features/trips/bookingActions.ts` (estado, salida, `changeable` y pases); una pantalla no decide por su cuenta.
 - La F6 se hizo **solo con el mock**: nada de ella está verificado contra la API real. Lo asumido lleva `// DISCREPANCIA:` y está en
   `docs/DISCREPANCIAS-F6.md` («Pendiente de verificación real»); los pasos de comprobación, en la sección 5c del README. Al verificar un
   endpoint, se mueve su fila a «Lo que aprendimos de la API real» (README, sección 6) y se corrige el código.

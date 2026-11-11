@@ -139,6 +139,9 @@ El estado del vuelo en vivo (`GET /flights/{n}/status`) ya estaba verificado des
 
 - **Respuesta esperada (200):** `{ bookingId, boardingPasses: [{ passengerId, segmentId, seat, boardingGroup?, boardingPosition?, barcode, barcodeType (AZTEC|PDF417|QR) }] }`.
 - **Hallazgo (confirmado con la API real por el dueño y en `pase-abordar.service.ts` del backend, leído, no ejecutado):** antes del check-in, o con la reserva ya no `CONFIRMED`, responde **200 con `boardingPasses: []`**, no 409. El primer diseño asumía 409 y mostraba un botón «Imprimir» sin pases; ya se corrigió (lista vacía = «aún no hay pases», sin botón de imprimir) y el mock responde igual que la API.
+- **Uso nuevo (rama `feat/estado-checkin`, sin verificar con la API real):** la lista de pases es la fuente del estado del check-in por vuelo (resumen, check-in y
+  pases). Se asume que solo trae pases de vuelos con check-in hecho y que, en una ida y vuelta, cada pase dice su `segmentId`. Comprobarlo con `RJPZPN`
+  (README, sección 5c, paso 6b).
 - **Verificar:** que tras el check-in la lista traiga un pase por pasajero con asiento (el infante no lleva); un 404 solo para reserva ajena o inexistente;
   que `barcode` sea texto que un lector pueda leer como QR (el frontend dibuja siempre un QR con ese texto, también si `barcodeType` es `AZTEC` o `PDF417`);
   que no traiga puerta ni hora de embarque (el contrato no las define; la pantalla no las muestra); un pase por pasajero con asiento y por tramo.
@@ -216,8 +219,8 @@ El estado del vuelo en vivo (`GET /flights/{n}/status`) ya estaba verificado des
 | `shared/api/RealFlightsApi.ts` (`CURRENCY`) | Los importes de postventa llegan sin moneda y se toman como `USD` (toda la API vende en dólares) |
 | `shared/api/RealFlightsApi.ts` (`checkIn`) | La cabecera `Idempotency-Key` extra no estorba |
 | `shared/api/mapping.ts` (`mapDateChangeOptions`) | `totalToPay` negativo es reembolso |
-| `features/trips/bookingActions.ts` | La API no dice qué acciones son válidas; se derivan del estado, de la salida y de `changeable`. «Pases» queda siempre disponible porque la API no dice si el check-in ya se hizo |
-| `shared/lib/checkinStatus.ts` | El check-in se habilita con la reserva `CONFIRMED` y dentro de 48 h a 60 min antes de la primera salida del viaje |
+| `features/trips/bookingActions.ts` | La API no dice qué acciones son válidas; se derivan del estado, de la salida, de `changeable` y de los pases de abordar. «Pases» queda siempre disponible (es el principal si ya hay alguno) |
+| `shared/lib/checkinStatus.ts` (`bookingCheckIn`) | El check-in se habilita con la reserva `CONFIRMED` y algún vuelo dentro de su ventana (48 h a 60 min antes de **esa** salida) sin pase. Un vuelo cuenta como hecho si algún pase trae su `segmentId`: se asume que la API solo entrega pases de vuelos con check-in hecho (sección 1.4) |
 | `features/trips/tripFilters.ts` | `FAILED` se agrupa con «Cancelados»; las reservas sin fecha o con un estado desconocido van a «Próximos» |
 | `features/trips/useTripDetails.ts` | El número de vuelo y la hora de la tarjeta salen del detalle, no de la lista |
 | `shared/api/mock/aftersale.ts` | Reglas **del mock** que la API real puede tener distintas: tope de 3 maletas por pasajero e itinerario, cargo por cambio (Classic 25 USD, Flex 0, por pasajero con asiento), oferta de cambio 15 min, cotización 10 min, penalidad de cancelación 10 % si la tarifa es reembolsable (si no, no hay reembolso), orden de la lista (más recientes primero), `departureDate` en fecha local, el resultado «pendiente» a los 20 s |

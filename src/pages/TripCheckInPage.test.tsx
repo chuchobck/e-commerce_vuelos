@@ -137,4 +137,26 @@ describe('pantalla de check-in', () => {
     expect(await screen.findByText(c.serverWindowTitle)).toBeTruthy();
     expect(screen.getByText(es.errors.checkInNotAvailable)).toBeTruthy();
   });
+
+  it('RJPZPN: ida que ya salió y vuelta con check-in hecho → cada vuelo con su estado y su asiento, sin confirmar', async () => {
+    api.getBooking.mockResolvedValue(bookingWith(-30, 20));
+    api.getBoardingPasses.mockResolvedValue([pass('s2', '10A')]);
+    renderPage();
+    const [outbound, inbound] = await flightItems();
+    expect(outbound.textContent).toContain(c.status.salio);
+    expect(outbound.textContent).toContain(fmt(c.seatLine, { seat: '14B' }));
+    expect(inbound.textContent).toContain('Check-in hecho · Asiento 10A');
+    expect(screen.getByText('Check-in hecho en 1 de 2 vuelos').closest('[role="status"]')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: c.confirm })).toBeNull();
+    expect(screen.getByText(c.allDone)).toBeTruthy();
+  });
+
+  it('todo cerrado: cada vuelo «cerrado», sin botón de confirmar y con el motivo', async () => {
+    api.getBooking.mockResolvedValue(bookingWith(0.5, 0.75));
+    renderPage();
+    const items = await flightItems();
+    expect(items.every((li) => li.textContent?.includes(c.status.cerrado))).toBe(true);
+    expect(screen.queryByRole('button', { name: c.confirm })).toBeNull();
+    expect(screen.getByText(c.closed)).toBeTruthy();
+  });
 });

@@ -74,6 +74,9 @@ export function bookingCheckIn(booking: Booking, passes: readonly BoardingPass[]
   const known = passes !== undefined;
   const list = passes ?? [];
   const flights: FlightCheckIn[] = segments.map(({ leg, segment }) => {
+    // DISCREPANCIA: un vuelo cuenta como hecho si algún pase trae su `segmentId` (la API registra a todos los pasajeros con asiento
+    // a la vez) y se asume que la API solo entrega pases de vuelos con check-in hecho. Pendiente de verificar con la API real
+    // (README, sección 5c, paso 6b; reserva RJPZPN).
     const checkedIn = list.some((p) => p.segmentId === segment.id);
     return {
       leg,

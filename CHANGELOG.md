@@ -5,6 +5,23 @@ sección 1 del `README.md`; este archivo empieza con el Reto 2.
 
 ## [Sin publicar]
 
+### Añadido (estado del check-in por vuelo)
+
+- `segmentCheckInStatus` (`shared/lib/checkin.ts`): `no-abre-aun`, `abierto`, `hecho`, `cerrado` o `salio` por vuelo, con los bordes de 48 h y 60 min
+  probados; `bookingCheckIn` (`shared/lib/checkinStatus.ts`) lo arma para toda la reserva con el asiento de cada pasajero en cada vuelo. Qué vuelos
+  tienen check-in sale de `GET .../boarding-passes` (nunca de un `POST`).
+- Etiqueta por vuelo (`CheckInStatusBadge`, texto e icono) y lista con «Check-in hecho en N de M vuelos» (`CheckInFlights`) en el resumen de la
+  reserva y en la pantalla de check-in; «Vuelos sin pase de abordar» con el motivo en la pantalla de pases (`MissingPasses`).
+- Pruebas de componentes del resumen, del check-in y de los pases con tres situaciones: nada hecho y abierto, ida salida + vuelta hecha (`RJPZPN`)
+  y todo cerrado.
+
+### Corregido (estado del check-in por vuelo)
+
+- El resumen ofrecía «Hacer check-in» como botón principal aunque el check-in ya estuviera hecho: ahora lo es «Ver pases de abordar» y el check-in
+  solo aparece si queda un vuelo abierto sin hacer (si no, se explica por qué).
+- La pantalla de check-in mostraba un solo asiento (el de la ida) para toda la reserva y no sabía qué vuelos ya tenían check-in al recargarla.
+  Después de confirmar, vuelve a pedir la reserva y los pases para que las etiquetas cambien sin recargar.
+
 ### Añadido (Reto 2, fase 6c: la cuenta en identity detrás del gateway)
 
 - `VITE_IDENTITY_URL`: base de identity, donde van `register`, `login`, `refresh`, `logout` y `me` (`{base}/auth/*`). Vacía, se deriva de

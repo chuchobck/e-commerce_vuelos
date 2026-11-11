@@ -28,7 +28,7 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 - **Mis viajes y la postventa (F6, sección 5c) están hechos con el mock y NO se han verificado contra la API real** (el backend local no respondió durante la fase). El cliente real (`RealFlightsApi`) ya está escrito con las formas del contrato y probado contra un cliente HTTP falso; lo que falta es recorrerlo contra el backend con los pasos de «Verificación F6 contra API real» (sección 5c). Lo asumido y lo pendiente está en `docs/DISCREPANCIAS-F6.md`.
 - Navegación (sección 4): menú por momento del viajero, rutas centralizadas en `src/app/routes.ts`, rutas protegidas con `RequireAuth` (espera a que la sesión se restaure y conserva `?volver=`).
 - Camino feliz con sesión: **3 clics** desde "Elegir tarifa" hasta la confirmación (Elegir, Continuar al pago, Pagar), más escribir los datos del pasajero y de la tarjeta. Sin sesión se suman los de la cuenta.
-- Mis viajes (`/viajes`): lista con pestañas y paginación, detalle con acciones según el estado y el estado del vuelo en vivo, boletos, check-in (ventana 48 h / 60 min), pases de abordar con QR e impresión, equipaje extra, cambio de fecha y cancelación con cotización. Las escrituras llevan `Idempotency-Key` por intento y distinguen 200/201 (hecho), 202 (en proceso, se puede actualizar) y 422 (pago rechazado: se reintenta con otro pago sin perder lo elegido).
+- Mis viajes (`/viajes`): lista con pestañas y paginación, detalle con acciones según el estado y el estado del vuelo en vivo, boletos, check-in (ventana 48 h / 60 min por vuelo; cada vuelo con su estado y su asiento, y «Check-in hecho en N de M vuelos» según los pases de abordar), pases de abordar con QR e impresión (los vuelos sin pase dicen por qué), equipaje extra, cambio de fecha y cancelación con cotización. Las escrituras llevan `Idempotency-Key` por intento y distinguen 200/201 (hecho), 202 (en proceso, se puede actualizar) y 422 (pago rechazado: se reintenta con otro pago sin perder lo elegido).
 - **Ofertas y pulido del inicio (F7, sección 5e): hecho con el mock y NO verificado contra la API real** (el backend local no respondió). Una «oferta» es la tarifa económica más baja de una búsqueda real de las rutas populares, sin descuentos ni precios anteriores inventados; una carga del inicio hace como máximo 8 búsquedas (6 en el mock), de 2 en 2, solo cuando la sección se ve. Lo pendiente está en `docs/DISCREPANCIAS-F7.md` y los pasos en «Verificación F7 contra API real» (sección 5e).
 - Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
 - **Asientos (F5, secciones 5b y 6):** el selector (`features/seats`) está dentro del paso 2 como un bloque **opcional y plegado** ("Asignaremos tus asientos automáticamente. Elegir asientos (opcional)"): sin abrirlo no se pide ningún mapa y el camino sigue en 3 clics. Elige un asiento por pasajero en **cada tramo** (ida, vuelta y escalas) y viaja como `assignedSeats`; el panel lateral, la revisión del pago y la confirmación muestran los asientos de cada pasajero. Verificado con la API real (sección 6, "Lo que aprendimos de asientos").
@@ -336,10 +336,10 @@ Todo cuelga de `/viajes` (sesión obligatoria, bajo `RequireAuth`). Las pantalla
 | Ruta | Qué hace | Cómo maneja los estados |
 |---|---|---|
 | `/viajes` | Lista paginada por cursor («Cargar más viajes», 10 por página) con Próximos, Pasados y Cancelados y su cantidad | Próximos: el más cercano primero. Si falla «Cargar más», lo ya cargado sigue a la vista. Sin reservas: invita a buscar vuelos |
-| `/viajes/:id` | Resumen, estado del vuelo en vivo (con aviso de retraso), pasajeros, boletos y los trámites | Un trámite que no se puede usar se ve desactivado y dice por qué (el check-in dice cuándo abre) |
+| `/viajes/:id` | Resumen, estado del check-in por vuelo («Check-in hecho en N de M vuelos»), estado del vuelo en vivo (con aviso de retraso), pasajeros, boletos y los trámites | Un trámite que no se puede usar se ve desactivado y dice por qué. Con algún pase, «Ver pases de abordar» es el principal; «Hacer check-in» solo si queda un vuelo abierto sin hacer; si no, en su lugar se explica por qué (hecho, cerrado, salió o cuándo abre) |
 | `/viajes/:id/boletos` | Boletos electrónicos por pasajero y sus tramos (cupones) | Un infante tiene su boleto pero no pase propio |
-| `/viajes/:id/check-in` | Check-in de todos los pasajeros | Ventana de 48 h a 60 min antes de la salida; `Idempotency-Key` por intento; lleva a los pases |
-| `/viajes/:id/pases` | Pase por pasajero y tramo con QR, asiento, grupo y posición; «Imprimir / Guardar PDF» | Antes del check-in explica que aún no hay pases y lleva al check-in. El QR es SVG negro sobre blanco, también en modo oscuro |
+| `/viajes/:id/check-in` | Check-in de todos los pasajeros; cada vuelo con su estado y el asiento de cada pasajero en ese vuelo | Ventana de 48 h a 60 min antes de cada salida; confirmar solo si algún vuelo está abierto; `Idempotency-Key` por intento; después se vuelven a pedir la reserva y los pases (las etiquetas cambian sin recargar) y, si todo quedó hecho, lleva a los pases |
+| `/viajes/:id/pases` | Pase por pasajero y tramo con QR, asiento, grupo y posición; «Imprimir / Guardar PDF» | Antes del check-in explica que aún no hay pases. Cada vuelo sin pase dice por qué (salió, el check-in cerró, cuándo abre o que falta hacerlo) y solo lleva al check-in si alguno está abierto. El QR es SVG negro sobre blanco, también en modo oscuro |
 | `/viajes/:id/equipaje` | Cantidades por pasajero e itinerario, total en vivo, revisión y pago simulado | 200 «Equipaje agregado»; 202 «Pago en proceso» con «Actualizar ahora»; 422 «El pago fue rechazado» y se conserva lo elegido |
 | `/viajes/:id/cambiar-fecha` | Nueva fecha → alternativas con la diferencia de tarifa → antes y después + pago si hay algo que pagar | 200 hecho; 202 `CHANGE_PENDING`; 422 se conserva la elección; 410 oferta vencida vuelve a la búsqueda |
 | `/viajes/:id/cancelar` | Cotización (total, penalidad, reembolso) → diálogo con «Entiendo que esta acción no se puede deshacer» | 200 cancelada; 202 `CANCELLATION_PENDING`; cotización vencida pide otra; la reserva pasa a Cancelados |
@@ -348,13 +348,18 @@ Todo cuelga de `/viajes` (sesión obligatoria, bajo `RequireAuth`). Las pantalla
 
 | Estado de la reserva | Check-in | Pases | Equipaje | Cambio de fecha | Cancelar |
 |---|---|---|---|---|---|
-| `CONFIRMED` antes de la salida | Solo dentro de la ventana | Sí | Sí | Sí, si todas las tarifas son cambiables (Basic no) | Sí |
+| `CONFIRMED` antes de la salida | Solo si algún vuelo está en su ventana y sin pase (si no, no hay botón y se dice por qué) | Sí (principal si ya hay pases) | Sí | Sí, si todas las tarifas son cambiables (Basic no) | Sí |
 | `CONFIRMED` con el vuelo ya salido | No | Sí | No | No | No |
 | `PENDING`, `PENDING_PAYMENT`, `TICKET_ISSUING` | No (confirmar primero) | No | No | No | No |
 | `CHANGE_PENDING`, `CANCELLATION_PENDING` | No (trámite en proceso) | No | No | No | No |
 | `CANCELLED`, `FAILED` | Ninguno se ofrece | | | | |
 
 Una reserva con solo infantes no ofrece equipaje (el infante viaja en brazos y no ocupa asiento).
+
+**Estado del check-in por vuelo** (`shared/lib/checkin.ts`, `segmentCheckInStatus`; `shared/lib/checkinStatus.ts`, `bookingCheckIn`): `salio` (la salida ya
+pasó) > `hecho` (hay pase de ese vuelo) > `no-abre-aun` / `abierto` / `cerrado` (ventana [salida − 48 h, salida − 60 min)). Qué vuelos tienen pase sale
+**solo** de `GET .../boarding-passes`; nunca se llama a `POST .../check-in` para consultar. Si esa consulta falla, no se muestra «hecho» ni el conteo y los
+trámites quedan como si no se supiera (el check-in, solo por la ventana).
 
 ### Reglas que no se negocian
 
@@ -395,6 +400,15 @@ Pasos exactos para recorrer la F6 contra el backend **local**. Nunca contra Rend
 4. **Detalle y boletos.** Abre la reserva: estado del vuelo, pasajeros y, en `/boletos`, un boleto por pasajero con su número. *Anota:* estados de boleto, número de 13 dígitos.
 5. **Check-in.** Fuera de ventana, la página no ofrece el botón y explica cuándo abre (para ver el 409 `CHECK_IN_NOT_AVAILABLE` real usa el Swagger del backend local en `/api/docs`). Dentro de la ventana: «Hacer check-in» → 200 con asiento por tramo. Repite el clic: no debe hacer dos check-in. *Anota:* qué responde al repetir; en una ida y vuelta con solo la ida abierta debe dar 200 `IN_PROGRESS` y la pantalla debe decir «Listo para los vuelos que ya estaban abiertos» (no un error).
 6. **Pases.** Antes del check-in, `/pases` explica que aún no hay pases (la API responde 200 con la lista vacía) y no ofrece imprimir. Después, un pase por pasajero con asiento y QR. Escanea el QR con otro dispositivo y compara con el «Texto del código». Prueba «Imprimir / Guardar PDF». *Anota:* `barcodeType` (la API real nunca manda QR: PDF417 en económica o AZTEC en las demás; la pantalla lo dibuja como QR con el mismo texto y lo avisa, así que **compara el texto, no esperes que un lector de aeropuerto lo acepte**) y qué trae `boardingGroup`/`boardingPosition`.
+   **6b. Estado del check-in por vuelo** (con una ida y vuelta como `RJPZPN`: ida ya salida y vuelta con check-in hecho). Antes, en las DevTools (pestaña Red),
+   comprueba que `GET .../bookings/{id}/boarding-passes` traiga pases **solo** con el `segmentId` de la vuelta y que **ninguna** carga haga `POST .../check-in`.
+   - `/viajes/{id}`: «Check-in hecho en 1 de 2 vuelos»; la ida dice «El vuelo ya salió» y la vuelta «Check-in hecho · Asiento …» con el asiento **de la vuelta**.
+     «Ver pases de abordar» va primero; no hay «Hacer check-in» y en su lugar se lee «Ya hiciste el check-in de los vuelos que te quedan…».
+   - `/viajes/{id}/check-in` (recárgala con F5): las mismas etiquetas; cada vuelo con el asiento de cada pasajero **en ese vuelo** (deben ser distintos si
+     lo son en la reserva); sin botón «Confirmar y hacer check-in».
+   - `/viajes/{id}/pases`: el pase de la vuelta y, debajo, «Vuelos sin pase de abordar» con la ida y «No tiene pase: el vuelo ya salió.»
+   - Con otra reserva en ventana y sin check-in: confirmar y comprobar que las etiquetas pasan a «hecho» **sin recargar** (en Red: un `POST`, luego un `GET`
+     de la reserva y uno de los pases). *Anota:* si la API devuelve pases de vuelos ya salidos y si un vuelo con check-in puede volver a no tener pase.
 7. **Equipaje, tres veces** (cada intento usa una referencia nueva; los botones «Para probar» no aparecen con la API real: escribe la referencia en el campo):
    - `PAY-OK-` + 8 letras o números → 200 «Equipaje agregado»; recarga y comprueba «Ya compraste 1».
    - `PAY-PEND-…` → 202 «Pago en proceso»; espera 20–30 s y pulsa «Actualizar ahora» hasta ver «Listo».
