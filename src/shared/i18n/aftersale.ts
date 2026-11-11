@@ -177,7 +177,7 @@ export const aftersaleEs = {
     overviewTitle: 'Check-in',
     flightsTitle: 'Tus vuelos',
     flightsLabel: 'Estado del check-in por vuelo',
-    flightLine: 'Vuelo {flight} · {route}',
+    flightLine: '{leg}: vuelo {flight}, {route}',
     flightWhen: '{date} · {time}',
     summary: 'Check-in hecho en {done} de {total} vuelos',
     summaryOne: 'Check-in hecho en {done} de 1 vuelo',

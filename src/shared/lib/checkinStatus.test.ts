@@ -49,7 +49,7 @@ describe('check-in de una reserva, vuelo por vuelo', () => {
     expect(bookingCheckIn(booking(24), [], NOW).available).toBe(true);
     const early = bookingCheckIn(booking(24 * 10), [], NOW);
     expect([early.available, early.reason?.startsWith('El check-in abre'), early.flights[0].status]).toEqual([false, true, 'no-abre-aun']);
-    expect(early.flights[0].opensAtLocal).toBeTruthy();
+    expect(early.flights[0].opensAtLocal.slice(11)).toBe(early.flights[0].segment.departureTime.slice(11));
     expect(bookingCheckIn(booking(0.5), [], NOW)).toMatchObject({ available: false, reason: c.closed });
     expect(bookingCheckIn(booking(-2), [], NOW)).toMatchObject({ available: false, reason: c.departed });
   });

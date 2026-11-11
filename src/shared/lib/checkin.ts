@@ -12,7 +12,7 @@ export type CheckInWindow =
  * Apertura en hora del aeropuerto: 48 h son exactamente 2 días y Ecuador no cambia de horario,
  * así que basta restar los días a la fecha y conservar hora y desfase ("…T07:45:00-05:00").
  */
-function opensAtLocal(departureIso: string): string {
+export function opensAtLocal(departureIso: string): string {
   const day = new Date(`${departureIso.slice(0, 10)}T00:00:00Z`);
   day.setUTCDate(day.getUTCDate() - CHECKIN_OPENS_HOURS / 24);
   return day.toISOString().slice(0, 10) + departureIso.slice(10);

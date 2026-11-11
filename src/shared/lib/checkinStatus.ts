@@ -1,7 +1,7 @@
 import type { BoardingPass, Booking, Segment } from '@/shared/api';
 import { toAirportLocalIso } from '@/shared/api/mapping';
 import { es, fmt } from '@/shared/i18n';
-import { CHECKIN_CLOSES_MINUTES, CHECKIN_OPENS_HOURS, checkInWindow, segmentCheckInStatus, type SegmentCheckInStatus } from './checkin';
+import { CHECKIN_CLOSES_MINUTES, CHECKIN_OPENS_HOURS, opensAtLocal, segmentCheckInStatus, type SegmentCheckInStatus } from './checkin';
 import { formatLongDate, formatTime } from './format';
 
 const c = es.aftersale.checkin;
@@ -16,14 +16,16 @@ export interface FlightSeat {
 
 /** El check-in de un vuelo (un tramo) de la reserva. */
 export interface FlightCheckIn {
+  /** Tramo de la ida o de la vuelta. */
+  leg: 'outbound' | 'inbound';
   segment: Segment;
   status: SegmentCheckInStatus;
   /** Tiene pase de abordar (aunque el vuelo ya haya salido): cuenta en «hecho en N de M». */
   checkedIn: boolean;
   /** Un asiento por pasajero EN ESTE TRAMO (del pase si lo hay; si no, de la reserva). */
   seats: FlightSeat[];
-  /** Apertura en hora local del aeropuerto de salida, solo en `no-abre-aun`. */
-  opensAtLocal?: string;
+  /** Apertura del check-in en hora local del aeropuerto de salida (se muestra en `no-abre-aun`). */
+  opensAtLocal: string;
 }
 
 export interface BookingCheckIn {
@@ -68,19 +70,18 @@ function windowTextFor(segment: Segment, several: boolean): string {
  * `passes` undefined = no se pudo saber (la consulta falló o no terminó): ningún vuelo figura como hecho y no hay conteo.
  */
 export function bookingCheckIn(booking: Booking, passes: readonly BoardingPass[] | undefined, now: Date = new Date()): BookingCheckIn {
-  const segments = [booking.outbound, booking.inbound].flatMap((leg) => leg?.itinerary.segments ?? []);
+  const segments = (['outbound', 'inbound'] as const).flatMap((leg) => (booking[leg]?.itinerary.segments ?? []).map((segment) => ({ leg, segment })));
   const known = passes !== undefined;
   const list = passes ?? [];
-  const flights: FlightCheckIn[] = segments.map((segment) => {
+  const flights: FlightCheckIn[] = segments.map(({ leg, segment }) => {
     const checkedIn = list.some((p) => p.segmentId === segment.id);
-    const status = segmentCheckInStatus(segment.departureTime, now, checkedIn);
-    const window = checkInWindow(segment.departureTime, now);
     return {
+      leg,
       segment,
-      status,
+      status: segmentCheckInStatus(segment.departureTime, now, checkedIn),
       checkedIn,
       seats: seatsOf(booking, segment, list),
-      ...(status === 'no-abre-aun' && window.status === 'not-open' ? { opensAtLocal: window.opensAtLocal } : {}),
+      opensAtLocal: opensAtLocal(segment.departureTime),
     };
   });
 
@@ -96,7 +97,7 @@ export function bookingCheckIn(booking: Booking, passes: readonly BoardingPass[]
   // El primer vuelo que aún no tiene check-in ni salió decide el motivo; si no queda ninguno, ya está todo hecho o salió.
   const next = flights.find((f) => f.status !== 'hecho' && f.status !== 'salio');
   let reason: string;
-  if (next?.opensAtLocal) {
+  if (next?.status === 'no-abre-aun') {
     const when = { date: formatLongDate(next.opensAtLocal), time: formatTime(next.opensAtLocal) };
     reason = several ? fmt(c.opensAtFlight, { flight: next.segment.flightNumber, ...when }) : fmt(c.opensAt, when);
   } else if (next) {
