@@ -1,48 +1,120 @@
-import type { Booking } from '@/shared/api';
+import type { BoardingPass, Booking, Segment } from '@/shared/api';
 import { toAirportLocalIso } from '@/shared/api/mapping';
 import { es, fmt } from '@/shared/i18n';
-import { checkInWindow } from './checkin';
+import { CHECKIN_CLOSES_MINUTES, CHECKIN_OPENS_HOURS, checkInWindow, segmentCheckInStatus, type SegmentCheckInStatus } from './checkin';
 import { formatLongDate, formatTime } from './format';
 
 const c = es.aftersale.checkin;
 
-export interface CheckInAvailability {
+/** El asiento de un pasajero en un vuelo. `seat` null: lo asigna la aerolínea (o es un infante, que viaja en brazos). */
+export interface FlightSeat {
+  passengerId: string;
+  name: string;
+  infant: boolean;
+  seat: string | null;
+}
+
+/** El check-in de un vuelo (un tramo) de la reserva. */
+export interface FlightCheckIn {
+  segment: Segment;
+  status: SegmentCheckInStatus;
+  /** Tiene pase de abordar (aunque el vuelo ya haya salido): cuenta en «hecho en N de M». */
+  checkedIn: boolean;
+  /** Un asiento por pasajero EN ESTE TRAMO (del pase si lo hay; si no, de la reserva). */
+  seats: FlightSeat[];
+  /** Apertura en hora local del aeropuerto de salida, solo en `no-abre-aun`. */
+  opensAtLocal?: string;
+}
+
+export interface BookingCheckIn {
+  flights: FlightCheckIn[];
+  /** Se sabe qué vuelos tienen pase (la consulta de pases respondió). Si no, no hay «hecho» ni conteo. */
+  known: boolean;
+  /** Vuelos con pase y total de vuelos de la reserva. */
+  done: number;
+  total: number;
+  hasPasses: boolean;
+  /** Se puede hacer el check-in ahora: reserva confirmada y algún vuelo `abierto` (sin pase). */
   available: boolean;
-  /** Por qué no se puede ahora (y cuándo abre), para mostrarlo junto al botón desactivado. */
+  /** Por qué no se puede (y cuándo abre), para escribirlo donde iría el botón. */
   reason?: string;
   /** "Abre el … y cierra el …" en hora local del aeropuerto de salida (del vuelo que importa ahora). */
   windowText: string;
 }
 
-/**
- * ¿Se puede hacer el check-in de esta reserva ahora? La API no dice si el check-in ya se hizo ni expone la ventana
- * (DISCREPANCIA): se deriva del estado y de la regla de 48 h a 60 min antes DE CADA VUELO (leído en el backend: la ventana
- * es por vuelo, así que una reserva de ida y vuelta puede hacer el check-in de la ida y, días después, el de la vuelta).
- * Hay check-in si algún vuelo está dentro de su ventana; si no, se explica cuándo abre el próximo.
- */
-export function checkInAvailability(booking: Booking, now: Date = new Date()): CheckInAvailability {
-  const segments = [booking.outbound, booking.inbound].flatMap((leg) => leg?.itinerary.segments ?? []);
-  const windows = segments.map((segment) => ({ segment, window: checkInWindow(segment.departureTime, now) }));
-  const open = windows.find((w) => w.window.status === 'open');
-  const upcoming = windows.find((w) => w.window.status === 'not-open');
-  const focus = open ?? upcoming ?? windows[windows.length - 1];
+/** Un asiento por pasajero en este tramo: el del pase si lo hay; si no, el asignado en la reserva. */
+function seatsOf(booking: Booking, segment: Segment, passes: readonly BoardingPass[]): FlightSeat[] {
+  return booking.passengers.map((p) => {
+    const infant = p.type === 'INFANT';
+    const pass = passes.find((x) => x.passengerId === p.id && x.segmentId === segment.id);
+    const seat = infant ? null : pass?.seat || p.seats.find((s) => s.segmentId === segment.id)?.seatNumber || null;
+    return { passengerId: p.id, name: `${p.firstName} ${p.lastName}`, infant, seat };
+  });
+}
+
+function windowTextFor(segment: Segment, several: boolean): string {
+  const departure = new Date(segment.departureTime).getTime();
   const at = (iso: string) => `${formatLongDate(iso)} a las ${formatTime(iso)}`;
+  const opens = toAirportLocalIso(new Date(departure - CHECKIN_OPENS_HOURS * 3_600_000).toISOString(), segment.origin);
+  const closes = toAirportLocalIso(new Date(departure - CHECKIN_CLOSES_MINUTES * 60_000).toISOString(), segment.origin);
+  const times = { opens: at(opens), closes: at(closes) };
+  return several ? fmt(c.windowFlight, { flight: segment.flightNumber, ...times }) : fmt(c.window, times);
+}
 
-  let windowText = '';
-  if (focus) {
-    const departure = new Date(focus.segment.departureTime).getTime();
-    const opens = toAirportLocalIso(new Date(departure - 48 * 3_600_000).toISOString(), focus.segment.origin);
-    const closes = toAirportLocalIso(new Date(departure - 60 * 60_000).toISOString(), focus.segment.origin);
-    const times = { opens: at(opens), closes: at(closes) };
-    windowText = segments.length > 1 ? fmt(c.windowFlight, { flight: focus.segment.flightNumber, ...times }) : fmt(c.window, times);
-  }
+/**
+ * Estado del check-in de una reserva, vuelo por vuelo. La ventana es POR VUELO (leído en el backend): una reserva de ida y
+ * vuelta puede hacer el check-in de la ida y, días después, el de la vuelta. Qué vuelos ya lo tienen sale de
+ * GET /bookings/{id}/boarding-passes (solo trae pases de los vuelos con check-in hecho); nunca de POST /check-in, que escribe.
+ * `passes` undefined = no se pudo saber (la consulta falló o no terminó): ningún vuelo figura como hecho y no hay conteo.
+ */
+export function bookingCheckIn(booking: Booking, passes: readonly BoardingPass[] | undefined, now: Date = new Date()): BookingCheckIn {
+  const segments = [booking.outbound, booking.inbound].flatMap((leg) => leg?.itinerary.segments ?? []);
+  const known = passes !== undefined;
+  const list = passes ?? [];
+  const flights: FlightCheckIn[] = segments.map((segment) => {
+    const checkedIn = list.some((p) => p.segmentId === segment.id);
+    const status = segmentCheckInStatus(segment.departureTime, now, checkedIn);
+    const window = checkInWindow(segment.departureTime, now);
+    return {
+      segment,
+      status,
+      checkedIn,
+      seats: seatsOf(booking, segment, list),
+      ...(status === 'no-abre-aun' && window.status === 'not-open' ? { opensAtLocal: window.opensAtLocal } : {}),
+    };
+  });
 
-  if (booking.status === 'CANCELLED') return { available: false, reason: c.tripCancelled, windowText };
-  if (booking.status !== 'CONFIRMED') return { available: false, reason: c.notConfirmed, windowText };
-  if (open) return { available: true, windowText };
-  if (upcoming && upcoming.window.status === 'not-open') {
-    return { available: false, reason: fmt(c.opensAt, { date: formatLongDate(upcoming.window.opensAtLocal), time: formatTime(upcoming.window.opensAtLocal) }), windowText };
+  const several = flights.length > 1;
+  const focus = flights.find((f) => f.status === 'abierto') ?? flights.find((f) => f.status === 'no-abre-aun') ?? flights[flights.length - 1];
+  const done = flights.filter((f) => f.checkedIn).length;
+  const base = { flights, known, done, total: flights.length, hasPasses: done > 0, windowText: focus ? windowTextFor(focus.segment, several) : '' };
+
+  if (booking.status === 'CANCELLED') return { ...base, available: false, reason: c.tripCancelled };
+  if (booking.status !== 'CONFIRMED') return { ...base, available: false, reason: c.notConfirmed };
+  if (flights.some((f) => f.status === 'abierto')) return { ...base, available: true };
+
+  // El primer vuelo que aún no tiene check-in ni salió decide el motivo; si no queda ninguno, ya está todo hecho o salió.
+  const next = flights.find((f) => f.status !== 'hecho' && f.status !== 'salio');
+  let reason: string;
+  if (next?.opensAtLocal) {
+    const when = { date: formatLongDate(next.opensAtLocal), time: formatTime(next.opensAtLocal) };
+    reason = several ? fmt(c.opensAtFlight, { flight: next.segment.flightNumber, ...when }) : fmt(c.opensAt, when);
+  } else if (next) {
+    reason = c.closed;
+  } else {
+    reason = flights.some((f) => f.status === 'hecho') ? c.allDone : c.departed;
   }
-  const allDeparted = windows.every((w) => new Date(w.segment.departureTime).getTime() <= now.getTime());
-  return { available: false, reason: allDeparted ? c.departed : c.closed, windowText };
+  return { ...base, available: false, reason };
+}
+
+export interface CheckInAvailability {
+  available: boolean;
+  reason?: string;
+  windowText: string;
+}
+
+/** Envoltura temporal mientras las pantallas pasan a `bookingCheckIn`. */
+export function checkInAvailability(booking: Booking, now: Date = new Date()): CheckInAvailability {
+  const { available, reason, windowText } = bookingCheckIn(booking, undefined, now);
+  return { available, reason, windowText };
 }

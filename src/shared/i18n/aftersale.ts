@@ -162,6 +162,26 @@ export const aftersaleEs = {
     noneTitle: 'No se pudo hacer el check-in',
     noneText: 'Ningún vuelo quedó registrado. Inténtalo de nuevo; si sigue igual, hazlo en el mostrador del aeropuerto.',
     seePasses: 'Ver pases de abordar',
+    opensAtFlight: 'El check-in del vuelo {flight} abre el {date} a las {time}.',
+    allDone: 'Ya hiciste el check-in de los vuelos que te quedan. Tus pases están en «Ver pases de abordar».',
+    /** Etiqueta por vuelo (siempre texto + icono, nunca solo color). */
+    status: {
+      'no-abre-aun': 'Check-in abre el {date} a las {time}',
+      abierto: 'Check-in abierto',
+      hecho: 'Check-in hecho',
+      hechoSeat: 'Check-in hecho · Asiento {seats}',
+      hechoSeats: 'Check-in hecho · Asientos {seats}',
+      cerrado: 'Check-in cerrado',
+      salio: 'El vuelo ya salió',
+    },
+    overviewTitle: 'Check-in',
+    flightsTitle: 'Tus vuelos',
+    flightsLabel: 'Estado del check-in por vuelo',
+    flightLine: 'Vuelo {flight} · {route}',
+    flightWhen: '{date} · {time}',
+    summary: 'Check-in hecho en {done} de {total} vuelos',
+    summaryOne: 'Check-in hecho en {done} de 1 vuelo',
+    unknown: 'No pudimos confirmar qué vuelos ya tienen check-in. Revisa «Pases de abordar» o inténtalo más tarde.',
   },
 
   /* ----------------------------------------- equipaje ----------------------------------------- */
