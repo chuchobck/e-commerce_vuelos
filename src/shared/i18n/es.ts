@@ -4,11 +4,14 @@
  * Para interpolar valores usa `fmt(es.x.y, { clave: valor })` desde src/shared/i18n/fmt.ts.
  */
 import { aftersaleEs } from './aftersale';
+import { departuresEs, kioskEs } from './kiosk';
 import { seatsEs } from './seats';
 
 export const es = {
   seats: seatsEs,
   aftersale: aftersaleEs,
+  kiosk: kioskEs,
+  departures: departuresEs,
 
   app: {
     name: 'Quinde',

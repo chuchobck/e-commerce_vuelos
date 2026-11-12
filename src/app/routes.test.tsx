@@ -37,6 +37,8 @@ describe('tabla de rutas', () => {
     tripDateChange: routes.tripDateChange('bkg_1'),
     tripCancel: routes.tripCancel('bkg_1'),
     flightStatus: routes.flightStatus(),
+    kiosk: routes.kiosk(),
+    departures: routes.departures(),
     login: routes.login(),
     register: routes.register(),
     profile: routes.profile(),

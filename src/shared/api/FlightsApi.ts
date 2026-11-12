@@ -16,8 +16,11 @@ import type {
   DateChangeOption,
   DateChangeQuery,
   DateChangeRequest,
+  DeparturesPage,
   FlightStatus,
   Hold,
+  IataCode,
+  KioskSession,
   ListBookingsParams,
   PostSaleOutcome,
   SearchOptions,
@@ -26,6 +29,7 @@ import type {
   SeatMap,
   User,
 } from './types';
+
 
 /**
  * Contrato único entre la interfaz y el proveedor de datos de vuelos.
@@ -113,4 +117,18 @@ export interface FlightsApi {
   getCancellationQuote(bookingId: string): Promise<CancellationQuote>;
   /** POST /bookings/{id}/cancel con la cotización. Hecha (200) o en proceso (202, CANCELLATION_PENDING). 409 si ya estaba cancelada. */
   cancelBooking(bookingId: string, request: CancelRequest, idempotencyKey: string): Promise<PostSaleOutcome<void>>;
+
+  /* Kiosko de check-in (público, sin cuenta). El token del kiosko lo guarda quien llama, solo en memoria. */
+
+  /** POST /kiosk/lookup. 404 si la reserva o el apellido no coinciden (mismo error siempre); 429 por exceso de intentos. */
+  kioskLookup(pnr: string, lastName: string): Promise<KioskSession>;
+  /** POST /kiosk/bookings/{id}/check-in con `Authorization: Kiosk <token>`. 401 KIOSK_SESSION_INVALID si venció; 409 CHECK_IN_NOT_AVAILABLE. */
+  kioskCheckIn(bookingId: string, kioskToken: string): Promise<CheckInResult>;
+  /** GET /kiosk/bookings/{id}/boarding-passes con `Authorization: Kiosk <token>`. */
+  kioskBoardingPasses(bookingId: string, kioskToken: string): Promise<BoardingPass[]>;
+
+  /* Tablero de salidas (público). */
+
+  /** GET /airports/{iata}/departures?date=yyyy-MM-dd[&cursor=…]. Horas locales del aeropuerto, sin datos de pasajeros. */
+  getDepartures(airport: IataCode, date: string, options?: { cursor?: string; signal?: AbortSignal }): Promise<DeparturesPage>;
 }

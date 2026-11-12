@@ -18,6 +18,7 @@ import type {
   UserResponseDto,
 } from './contract';
 import type { FlightsApi } from './FlightsApi';
+import type { DeparturesResponseDto, KioskLookupResponseDto } from './kioskContract';
 import type { HttpClient } from './http/client';
 import { deviceFingerprint } from './http/deviceFingerprint';
 import {
@@ -30,7 +31,9 @@ import {
   mapCheckIn,
   mapDateChangeOptions,
   mapFlightStatus,
+  mapDepartures,
   mapHoldCreated,
+  mapKioskLookup,
   mapHoldStatus,
   mapSearchResponse,
   mapTicket,
@@ -63,8 +66,11 @@ import type {
   DateChangeOption,
   DateChangeQuery,
   DateChangeRequest,
+  DeparturesPage,
   FlightStatus,
   Hold,
+  IataCode,
+  KioskSession,
   ListBookingsParams,
   PostSaleOutcome,
   SearchOptions,
@@ -258,5 +264,38 @@ export class RealFlightsApi implements FlightsApi {
       auth: true,
     });
     return status === 202 ? { status: 'pending' } : { status: 'done', data: undefined };
+  }
+
+  /* Kiosko: sin sesión de cuenta. Nada de estas llamadas se registra (`quiet`): su ruta y su cuerpo llevan datos de la reserva. */
+
+  async kioskLookup(pnr: string, lastName: string): Promise<KioskSession> {
+    return mapKioskLookup(await this.http.request<KioskLookupResponseDto>('POST', '/kiosk/lookup', { body: { pnr, lastName }, quiet: true }));
+  }
+
+  async kioskCheckIn(bookingId: string, kioskToken: string): Promise<CheckInResult> {
+    const dto = await this.http.request<CheckInResponseDto>('POST', `/kiosk/bookings/${encodeURIComponent(bookingId)}/check-in`, {
+      headers: { Authorization: `Kiosk ${kioskToken}` },
+      quiet: true,
+    });
+    return mapCheckIn(dto);
+  }
+
+  async kioskBoardingPasses(bookingId: string, kioskToken: string): Promise<BoardingPass[]> {
+    const dto = await this.http.request<BoardingPassListDto>('GET', `/kiosk/bookings/${encodeURIComponent(bookingId)}/boarding-passes`, {
+      headers: { Authorization: `Kiosk ${kioskToken}` },
+      quiet: true,
+    });
+    return mapBoardingPasses(dto);
+  }
+
+  /* Tablero de salidas. */
+
+  async getDepartures(airport: IataCode, date: string, { cursor, signal }: { cursor?: string; signal?: AbortSignal } = {}): Promise<DeparturesPage> {
+    const dto = await this.http.request<DeparturesResponseDto>('GET', `/airports/${encodeURIComponent(airport)}/departures`, {
+      query: cursor ? { date, cursor } : { date },
+      retry: true,
+      signal,
+    });
+    return mapDepartures(dto);
   }
 }

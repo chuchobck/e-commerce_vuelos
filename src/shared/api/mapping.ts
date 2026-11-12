@@ -4,6 +4,7 @@
  */
 import { addMoney, multiplyMoney, parseMoney, zeroMoney, type Money } from '@/shared/lib/money';
 import { airportOffsetMinutes } from './airports';
+import type { DeparturesResponseDto, KioskLookupResponseDto } from './kioskContract';
 import type {
   AddBaggageRequestDto,
   BaggageAddedDto,
@@ -69,6 +70,11 @@ import type {
   SearchResult,
   Segment,
   User,
+  DepartureStatus,
+  DeparturesPage,
+  KioskPassengerCheckIn,
+  KioskSession,
+  KioskWindow,
 } from './types';
 
 /** "2026-10-09T11:00:00.000Z" en un aeropuerto UTC−5 → "2026-10-09T06:00:00-05:00". */
@@ -503,4 +509,67 @@ export function mapCancellationQuote(dto: CancellationQuoteDto): CancellationQuo
 
 export function toCancelRequest(request: CancelRequest): CancelBookingRequestDto {
   return { quoteId: request.quoteId, ...(request.reason ? { reason: request.reason } : {}) };
+}
+
+/* Kiosko y salidas: sus formas no están en el contrato generado (ver ./kioskContract.ts). */
+
+const KIOSK_WINDOWS: readonly KioskWindow[] = ['OPEN', 'NOT_YET_OPEN', 'CLOSED'];
+const KIOSK_CHECK_IN: readonly KioskPassengerCheckIn[] = ['CHECKED_IN', 'NOT_CHECKED_IN', 'FAILED'];
+const DEPARTURE_STATUSES: readonly DepartureStatus[] = ['SCHEDULED', 'BOARDING', 'DEPARTED', 'DELAYED', 'ARRIVED', 'CANCELLED', 'DIVERTED'];
+
+/**
+ * Respuesta del lookup del kiosko. Una ventana desconocida se trata como cerrada (nunca se ofrece un check-in que la API
+ * no dijo que estaba abierto) y un estado de pasajero desconocido como pendiente.
+ */
+export function mapKioskLookup(dto: KioskLookupResponseDto): KioskSession {
+  const { booking } = dto;
+  return {
+    token: dto.kioskToken,
+    expiresAt: dto.expiresAt,
+    booking: {
+      id: booking.bookingId,
+      status: booking.status,
+      passengers: booking.passengers.map((p) => ({ id: p.passengerId, type: p.passengerType, firstName: p.firstName, lastName: p.lastName })),
+      flights: booking.flights.map((f) => ({
+        segmentId: f.segmentId,
+        flightNumber: f.flightNumber,
+        origin: f.origin,
+        destination: f.destination,
+        // Hora local del aeropuerto, venga la API en UTC o con desfase (README, sección 5f).
+        departureAt: toAirportLocalIso(f.departureAt, f.origin),
+        arrivalAt: toAirportLocalIso(f.arrivalAt, f.destination),
+        departureTerminal: f.departureTerminal ?? null,
+        status: f.status,
+        checkIn: {
+          window: KIOSK_WINDOWS.includes(f.checkIn.window) ? f.checkIn.window : 'CLOSED',
+          opensAt: f.checkIn.opensAt ? toAirportLocalIso(f.checkIn.opensAt, f.origin) : null,
+          closesAt: f.checkIn.closesAt ? toAirportLocalIso(f.checkIn.closesAt, f.origin) : null,
+        },
+        passengers: f.passengers.map((p) => ({
+          passengerId: p.passengerId,
+          seat: p.seat ?? null,
+          checkInStatus: KIOSK_CHECK_IN.includes(p.checkInStatus) ? p.checkInStatus : 'NOT_CHECKED_IN',
+        })),
+      })),
+    },
+  };
+}
+
+/** Tablero de salidas. Las horas se dejan tal cual llegan (hora local del aeropuerto con desfase). */
+export function mapDepartures(dto: DeparturesResponseDto): DeparturesPage {
+  return {
+    airport: { code: dto.airport.iataCode, name: dto.airport.name, city: dto.airport.city, timeZone: dto.airport.timeZone },
+    date: dto.date,
+    nextCursor: dto.nextCursor ?? null,
+    departures: dto.departures.map((d) => ({
+      flightNumber: d.flightNumber,
+      airline: d.airline,
+      destination: { code: d.destination.iataCode, city: d.destination.city },
+      scheduledTime: d.scheduledTime,
+      estimatedTime: d.estimatedTime ?? null,
+      status: DEPARTURE_STATUSES.find((s) => s === d.status) ?? null,
+      terminal: d.terminal ?? null,
+      gate: d.gate ?? null,
+    })),
+  };
 }

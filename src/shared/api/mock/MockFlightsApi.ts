@@ -11,7 +11,9 @@ import {
   mapCheckIn,
   mapDateChangeOptions,
   mapFlightStatus,
+  mapDepartures,
   mapHoldCreated,
+  mapKioskLookup,
   mapHoldStatus,
   mapSearchResponse,
   mapTicket,
@@ -42,8 +44,11 @@ import type {
   DateChangeOption,
   DateChangeQuery,
   DateChangeRequest,
+  DeparturesPage,
   FlightStatus,
   Hold,
+  IataCode,
+  KioskSession,
   ListBookingsParams,
   PostSaleOutcome,
   SearchOptions,
@@ -64,6 +69,7 @@ import {
 } from './auth';
 import { mockFlightStatus, mockSearch } from './generators';
 import * as aftersale from './aftersale';
+import { mockDepartures, mockKioskBoardingPasses, mockKioskCheckIn, mockKioskLookup } from './kiosk';
 import * as purchase from './purchase';
 import { simulate, simulated } from './network';
 import { activeScenario, planFor } from './scenarios';
@@ -333,6 +339,28 @@ export class MockFlightsApi implements FlightsApi {
   async me(): Promise<User> {
     await simulate('me', [503]);
     return publicUser(this.requireUser());
+  }
+
+  /* Kiosko y salidas: sin sesión de cuenta, sin errores aleatorios (las pruebas manuales dependen de los PNR de demostración). */
+
+  async kioskLookup(pnr: string, lastName: string): Promise<KioskSession> {
+    await simulate('kioskLookup', [], { randomErrors: false });
+    return mapKioskLookup(mockKioskLookup(pnr, lastName));
+  }
+
+  async kioskCheckIn(bookingId: string, kioskToken: string): Promise<CheckInResult> {
+    await simulate('kioskCheckIn', [], { randomErrors: false });
+    return mapCheckIn(mockKioskCheckIn(bookingId, kioskToken));
+  }
+
+  async kioskBoardingPasses(bookingId: string, kioskToken: string): Promise<BoardingPass[]> {
+    await simulate('kioskBoardingPasses', [], { randomErrors: false });
+    return mapBoardingPasses(mockKioskBoardingPasses(bookingId, kioskToken));
+  }
+
+  async getDepartures(airport: IataCode, date: string, { cursor, signal }: { cursor?: string; signal?: AbortSignal } = {}): Promise<DeparturesPage> {
+    await simulate('getDepartures', [503], { signal });
+    return mapDepartures(mockDepartures(airport, date, cursor));
   }
 
   private issueTokens(user: StoredUser, family: string): AuthTokens {

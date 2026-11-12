@@ -34,6 +34,11 @@ export interface RequestOptions {
   retry?: boolean;
   /** No cuenta para el aviso de "servidor despertando" (p. ej. el ping de salud). */
   silent?: boolean;
+  /**
+   * No registra nada de esta llamada, ni siquiera en desarrollo: su ruta o su cuerpo llevan datos que no deben salir
+   * en la consola (el kiosko: identificador de la reserva).
+   */
+  quiet?: boolean;
   /** Petición con sesión: lleva Authorization: Bearer. Las rutas públicas nunca llevan token. */
   auth?: boolean;
   /** Cancela la petición (y su reintento) cuando quien la pidió ya no necesita la respuesta. */
@@ -113,7 +118,7 @@ export function createHttpClient({
     } catch (error) {
       if (cancelled()) throw abortedError();
       const timedOut = controller.signal.aborted;
-      log(`[api] ${method} ${path}: ${timedOut ? 'tiempo agotado' : 'sin conexión'}`, error);
+      if (!options.quiet) log(`[api] ${method} ${path}: ${timedOut ? 'tiempo agotado' : 'sin conexión'}`, error);
       throw new ApiError({ status: 0, code: timedOut ? 'TIMEOUT' : 'NETWORK', detail: String(error) });
     } finally {
       clearTimeout(timer);
@@ -139,7 +144,7 @@ export function createHttpClient({
 
     if (!response.ok) {
       const error = problemToApiError(response.status, body, response.headers.get('Retry-After'));
-      log(`[api] ${method} ${path}: ${response.status} ${error.code ?? ''} ${error.detail ?? ''}`, body);
+      if (!options.quiet) log(`[api] ${method} ${path}: ${response.status} ${error.code ?? ''} ${error.detail ?? ''}`, body);
       throw error;
     }
     return { status: response.status, body: body as T | undefined };
