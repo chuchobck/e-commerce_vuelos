@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import { Navigate, useParams, type RouteObject } from 'react-router-dom';
 import { HomePage } from '@/pages/HomePage';
+import { KioskLayout } from './layout/KioskLayout';
 import { RootLayout } from './layout/RootLayout';
 import { RouteLoading } from './layout/RouteLoading';
 import { RouteErrorPage } from './layout/RouteErrorPage';
@@ -43,6 +44,13 @@ export function buildRoutes({ dev }: { dev: boolean }): RouteObject[] {
       : [];
 
   return [
+    // El kiosko es público y va aparte: sin menú de cuenta, sin pie y sin guardia de sesión.
+    {
+      element: <KioskLayout />,
+      HydrateFallback: RouteLoading,
+      errorElement: <RouteErrorPage />,
+      children: [{ id: 'kiosk', path: paths.kiosk, ...lazyPage(() => import('@/pages/KioskPage'), 'KioskPage') }],
+    },
     {
       element: <RootLayout />,
       HydrateFallback: RouteLoading,
@@ -70,6 +78,7 @@ export function buildRoutes({ dev }: { dev: boolean }): RouteObject[] {
           ],
         },
         { id: 'flightStatus', path: paths.flightStatus, ...lazyPage(() => import('@/pages/FlightStatusPage'), 'FlightStatusPage') },
+        { id: 'departures', path: paths.departures, ...lazyPage(() => import('@/pages/DeparturesPage'), 'DeparturesPage') },
         { id: 'login', path: paths.login, ...lazyPage(() => import('@/pages/LoginPage'), 'LoginPage') },
         { id: 'register', path: paths.register, ...lazyPage(() => import('@/pages/RegisterPage'), 'RegisterPage') },
         { id: 'help', path: paths.help, ...lazyPage(() => import('@/pages/HelpPage'), 'HelpPage') },

@@ -64,6 +64,15 @@ describe('tabla de rutas', () => {
     }
   });
 
+  it('el kiosko y las salidas son públicos: sin RequireAuth y, el kiosko, sin el marco con el menú de la cuenta', () => {
+    expect(guarded(routes.kiosk())).toBe(false);
+    expect(guarded(routes.departures())).toBe(false);
+    const kioskRoot = matchRoutes(buildRoutes({ dev: false }), routes.kiosk())?.[0].route.element as { type?: { name?: string } } | undefined;
+    expect(kioskRoot?.type?.name).toBe('KioskLayout');
+    const departuresRoot = matchRoutes(buildRoutes({ dev: false }), routes.departures())?.[0].route.element as { type?: { name?: string } } | undefined;
+    expect(departuresRoot?.type?.name).toBe('RootLayout');
+  });
+
   it('/componentes solo existe en desarrollo', () => {
     expect(routeIdFor(paths.uiKit, true)).toBe('uiKit');
     expect(routeIdFor(paths.uiKit, false)).toBe('notFound');
