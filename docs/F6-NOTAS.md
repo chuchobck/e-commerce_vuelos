@@ -1,0 +1,32 @@
+# Kiosko de check-in y tablero de salidas — notas
+
+Rama `feat/kiosko-salidas`. Pantallas: `/kiosko` y `/salidas` (README, sección 5f). Este archivo guarda lo decidido sin consultar y lo que no se pudo verificar. (El nombre «F6» es el del encargo; no es la F6 de Mis viajes.)
+
+## Decisiones tomadas sin consultar
+
+1. **Sin TanStack Query.** El repo no lo tiene (ni dependencia ni proveedor) y el encargo lo nombraba. `useDepartures` usa `setInterval` de 30 s, pausa con `document.hidden` y actualiza enseguida al volver (`visibilitychange`). Cumple lo pedido sin sumar una dependencia ni un `QueryClientProvider` para una sola pantalla. Si se prefiere la librería, solo cambia ese hook.
+2. **El «código de barras» es un QR.** El componente del e-commerce (`BoardingPassCard` → `QrCode`) dibuja un QR con el texto de `barcode`; si `barcodeType` no es `QR`, el propio componente lo avisa. No se hizo otro dibujo.
+3. **Tipos del kiosko a mano** (`shared/api/kioskContract.ts`): las rutas `/kiosk/*` y `/airports/{iata}/departures` no están en `contracts/vuelos-openapi.yaml` y los tipos generados no se editan. Check-in y pases reutilizan `CheckInResponse` y `BoardingPassListResponse` del contrato y su mapeo.
+4. **El check-in de la API es por reserva.** «Hacer check-in» aparece en cada vuelo con ventana `OPEN`, pero hace el check-in de toda la reserva. Un vuelo con algún pasajero `NOT_CHECKED_IN` o `FAILED` y ventana abierta lo ofrece (también reintenta un `FAILED`).
+5. **Marco propio para el kiosko** (`KioskLayout`, ruta hermana de `RootLayout`) en vez de ocultar partes del layout normal: así el menú de la cuenta, el pie y los avisos de sesión no existen en esa pantalla. `/salidas` va en el layout normal (con el menú público).
+6. **Inactividad solo con algo que borrar** (reserva en pantalla o datos escritos): con el formulario vacío no sale «¿Sigues ahí?» cada minuto. El número de la cuenta regresiva es visual (`aria-hidden`); el texto del diálogo anuncia los 15 s una sola vez, para no saturar al lector de pantalla.
+7. **Vencimiento del token acotado** entre 30 s y 10 min desde que llega la respuesta, en vez de comparar `expiresAt` con la hora local sin más: un reloj desfasado no debe dejar el kiosko inservible. La autoridad es el 401 `KIOSK_SESSION_INVALID`.
+8. **Se borran el código y el apellido** de la memoria en cuanto el lookup responde bien.
+9. **`RequestOptions.quiet`** en el cliente HTTP: no registra nada de una llamada, ni en desarrollo. Hacía falta porque el registro de desarrollo escribe la ruta (con el `bookingId`) y el detalle en `console.warn`. Solo lo usan las tres llamadas del kiosko.
+10. **Horas del kiosko** (`departureAt`, `arrivalAt`, `opensAt`, `closesAt`): el encargo no dice si llegan en UTC o con desfase; se normalizan a la hora local del aeropuerto con `toAirportLocalIso` (sirve en ambos casos). Las del tablero **no se tocan**: ya llegan locales y se muestran tal cual (`HH:mm` del propio texto).
+11. **Valores desconocidos no abren nada:** una ventana que el frontend no conoce se trata como `CLOSED`; un estado de pasajero desconocido, como `NOT_CHECKED_IN`; un estado de salida desconocido se muestra como «Sin estado», sin inventar nada.
+12. **Sin `Idempotency-Key`** en el check-in del kiosko: el encargo no lo pide y no se inventan cabeceras. Un fallo no se reintenta solo.
+13. **`BoardingPassCard`** pasó de pedir un `Segment` a pedir `PassSegment` (`Pick<Segment, 'flightNumber' | 'origin' | 'destination' | 'departureTime'>`), para que el kiosko le pase su vuelo sin inventar un tramo entero. Cambio solo de tipo; la pantalla de pases del e-commerce no cambia.
+14. **Fecha del tablero:** entrada nativa `type="date"`; «hoy» se calcula en la zona del aeropuerto de arranque (UIO), no en la del navegador.
+15. **Tabla en 320 px:** Puerta y Estado quedan fuera de la vista y la tabla se desplaza dentro de su contenedor (`role="region"`, con foco y etiqueta, desplazable con teclado); la página no tiene scroll horizontal. Por debajo de `sm` se ocultan la aerolínea y el código del destino. El título visible va fuera de la tabla y el `caption` es para lectores de pantalla.
+16. **Sin enlaces nuevos en el menú ni el pie** para `/kiosko` y `/salidas`: se abren por su URL.
+17. **Mock del kiosko** con tres reservas fijas (README 5f) y errores aleatorios apagados; las salidas del mock se calculan con las rutas del mock y `mockFlightStatus`, con páginas de 12 para poder probar «Ver más».
+
+## Lo que no se pudo verificar
+
+- **Ninguna ruta `/kiosk/*` contra la API real** (por indicación, no se probó el lookup con datos reales). Sin verificar: la forma exacta de las respuestas, los códigos de error reales (`KIOSK_SESSION_INVALID`, `CHECK_IN_NOT_AVAILABLE`, el cuerpo del 404 y del 429, `Retry-After`), si las horas llegan en UTC o con desfase, y qué pasa con una reserva cancelada o con infantes.
+- **`?cursor=` en las salidas.** El encargo habla de `nextCursor` pero no del nombre del parámetro de entrada; se usó `cursor` por analogía con `GET /bookings`. Con curl, `?cursor=abc` dio 400, pero el despliegue nunca devolvió `nextCursor` (15 salidas de UIO, sin página siguiente), así que «Ver más» solo está probado con el cliente falso y el mock.
+- **Salidas reales con estados distintos de `SCHEDULED`, con puerta o con `estimatedTime`:** el 2026-11-12 todas las de UIO eran `SCHEDULED` con `terminal`, `gate` y `estimatedTime` en `null`. Esos casos están probados solo con datos fabricados.
+- **No se recorrió el kiosko en un navegador con teclado, zoom 200 %, modo oscuro, `prefers-reduced-motion` ni la vista previa de impresión.** Sí se vieron capturas de Chrome sin interfaz de `/kiosko` (paso 1) y `/salidas` a 320 y 1280 px en modo mock. Que la hoja de impresión deje solo el pase se apoya en clases `print:hidden` y una prueba que las comprueba, no en haberla impreso. Los pasos 2 y 3 solo se vieron en pruebas de componentes.
+- **Sin pruebas de extremo a extremo** (el repo no tiene un conjunto e2e) ni `npm run test:api` para estas rutas.
+- **`npm run test` no queda del todo en verde, pero no por este trabajo:** fallan 16 pruebas (`RequireAuth.test.tsx`, `routes.test.tsx` → «redirecciones de rutas viejas», `features/offers/OffersMockHints` y `mockCoverage`). Fallan igual en un `git worktree` de `main` sin estos cambios: unas por el `AbortSignal` de undici dentro de jsdom y otras porque el `.env` local fija `VITE_API_URL` y esas pruebas esperan el mock (esta causa es una suposición razonada, no la comprobé).
