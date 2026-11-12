@@ -6,11 +6,14 @@ import { QrCode } from '@/shared/ui/qr-code';
 
 const t = es.aftersale.passes;
 
+/** Lo que el pase necesita del vuelo: lo cumple un `Segment` de la reserva y también un vuelo del kiosko. */
+export type PassSegment = Pick<Segment, 'flightNumber' | 'origin' | 'destination' | 'departureTime'>;
+
 interface BoardingPassCardProps {
   pass: BoardingPass;
   passengerName: string;
   /** El tramo del pase (de la reserva). Sin él, solo se muestra lo que dio la API. */
-  segment?: Segment;
+  segment?: PassSegment;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
