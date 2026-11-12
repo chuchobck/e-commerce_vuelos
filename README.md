@@ -30,6 +30,7 @@ Alcance: **solo vuelos**. Alojamientos, autos y atracciones los llevan otros equ
 - Camino feliz con sesión: **3 clics** desde "Elegir tarifa" hasta la confirmación (Elegir, Continuar al pago, Pagar), más escribir los datos del pasajero y de la tarjeta. Sin sesión se suman los de la cuenta.
 - Mis viajes (`/viajes`): lista con pestañas y paginación, detalle con acciones según el estado y el estado del vuelo en vivo, boletos, check-in (ventana 48 h / 60 min por vuelo; cada vuelo con su estado y su asiento, y «Check-in hecho en N de M vuelos» según los pases de abordar), pases de abordar con QR e impresión (los vuelos sin pase dicen por qué), equipaje extra, cambio de fecha y cancelación con cotización. Las escrituras llevan `Idempotency-Key` por intento y distinguen 200/201 (hecho), 202 (en proceso, se puede actualizar) y 422 (pago rechazado: se reintenta con otro pago sin perder lo elegido).
 - **Ofertas y pulido del inicio (F7, sección 5e): hecho con el mock y NO verificado contra la API real** (el backend local no respondió). Una «oferta» es la tarifa económica más baja de una búsqueda real de las rutas populares, sin descuentos ni precios anteriores inventados; una carga del inicio hace como máximo 8 búsquedas (6 en el mock), de 2 en 2, solo cuando la sección se ve. Lo pendiente está en `docs/DISCREPANCIAS-F7.md` y los pasos en «Verificación F7 contra API real» (sección 5e).
+- **Kiosko de check-in (`/kiosko`) y tablero de salidas (`/salidas`) — sección 5f, rama `feat/kiosko-salidas`:** dos pantallas públicas, sin cuenta. Hechas con el mock y con pruebas de componentes; **lo único verificado contra el despliegue real fue `GET /airports/{iata}/departures` (solo lectura, con curl)**. Las tres rutas `/kiosk/*` NO se probaron con datos reales y no están en el contrato (detalle en la sección 5f y en `docs/F6-NOTAS.md`).
 - Mi perfil muestra los datos reales de la cuenta, solo lectura: la API no permite editarlos.
 - **Asientos (F5, secciones 5b y 6):** el selector (`features/seats`) está dentro del paso 2 como un bloque **opcional y plegado** ("Asignaremos tus asientos automáticamente. Elegir asientos (opcional)"): sin abrirlo no se pide ningún mapa y el camino sigue en 3 clics. Elige un asiento por pasajero en **cada tramo** (ida, vuelta y escalas) y viaja como `assignedSeats`; el panel lateral, la revisión del pago y la confirmación muestran los asientos de cada pasajero. Verificado con la API real (sección 6, "Lo que aprendimos de asientos").
 - **Mejora de buscar y comprar (rama `mejora-ihc-busqueda-compra`, sección 5d):** el buscador usa campos con sugerencias (se escribe y se predice al instante, con clic o teclado), el botón de buscar espera a que los datos estén completos y se corrige en tiempo real; si no hay vuelos esa fecha se ofrecen fechas cercanas con su precio, la otra cabina y otros destinos; los resultados separan Ida y Vuelta en dos pestañas centradas (elegir la ida pasa sola a la vuelta), con orden y "Solo directos"; y la cuenta salió del paso 2: sin sesión se va a Ingresar con el vuelo guardado y se vuelve sin perder nada.
@@ -198,13 +199,15 @@ Menú principal: **Vuelos · Ofertas · Mis viajes · Estado de vuelo** (Mis via
 | `/estado-vuelo` | Estado de un vuelo | Público | `GET /flights/{n}/status` | Hecho (mock y API real) |
 | `/ingresar`, `/registrarse` | Cuenta (vuelven a `?volver=`) | Público | `POST /identity/v1/auth/login`, `POST /identity/v1/auth/register` | Hecho (mock y API real) |
 | `/perfil` | Mis datos (solo lectura) y cerrar sesión | Sesión | `GET /identity/v1/auth/me`, `POST /identity/v1/auth/logout` | Hecho (mock y API real) |
+| `/kiosko` | Kiosko de check-in de autoservicio (3 pasos, pantalla completa, sin menú de cuenta) | Público | `POST /kiosk/lookup`, `POST /kiosk/bookings/{id}/check-in`, `GET /kiosk/bookings/{id}/boarding-passes` | Hecho en mock; sin verificar con la API real (5f) |
+| `/salidas` | Tablero de salidas por aeropuerto y fecha | Público | `GET /airports/{iata}/departures` | Hecho (mock); forma verificada con curl en el despliegue real (5f) |
 | `/ayuda` | Ayuda y textos legales | Público | Ninguna | Hecho |
 | `/componentes` | Catálogo interno | Solo desarrollo (404 en producción) | Ninguna | Hecho |
 | `/componentes/asientos` | Demo del selector de asientos (1 adulto, familia con niño y bebé, escala, ATR) | Solo desarrollo (404 en producción) | `GET /offers/{id}/seatmap` | Hecho (F5) |
 
 Rutas viejas que redirigen: `/mis-viajes` y `/mis-viajes/*` → `/viajes` y `/viajes/*` (hasta F5 se llamaban así), `/mis-reservas` → `/viajes`, `/reserva/:id` → `/viajes/:id`, `/check-in` → `/viajes`, `/compra` → `/compra/datos`.
 
-Por qué el check-in no es una sección del menú: en la API el check-in se hace por `bookingId` y solo el dueño de la reserva puede hacerlo. No existe búsqueda por código de reserva y apellido, así que un check-in sin cuenta no puede funcionar. Vive dentro de cada viaje. Pendiente: que el inicio muestre un aviso cuando un viaje entra en la ventana de check-in.
+Por qué el check-in no es una sección del menú: en la API el check-in de la cuenta se hace por `bookingId` y solo el dueño de la reserva puede hacerlo; vive dentro de cada viaje. El check-in sin cuenta existe solo como **kiosko de autoservicio** (`/kiosko`, sección 5f), con código de reserva y apellido, y tampoco está en el menú. Pendiente: que el inicio muestre un aviso cuando un viaje entra en la ventana de check-in.
 
 ---
 
@@ -540,6 +543,50 @@ Al verificar un punto, se pasa su fila de `docs/DISCREPANCIAS-F7.md` (sección 4
 
 ---
 
+## 5f. Kiosko de check-in y tablero de salidas
+
+Dos pantallas **públicas**: no piden sesión, no redirigen a `/ingresar` y no leen la cuenta. Las rutas están en `src/app/routes.ts` (`paths.kiosk`, `paths.departures`). Las decisiones tomadas sin consultar y lo que no se pudo verificar están en `docs/F6-NOTAS.md`.
+
+### `/kiosko` — autoservicio en tres pasos (`features/kiosk`, página `KioskPage`)
+
+Va en su propio marco (`app/layout/KioskLayout`): pantalla completa, sin el menú ni el menú de la cuenta, sin pie y sin avisos de sesión. Botones de 56–64 px y letra grande; un solo `h1` por paso y el foco se mueve a él al cambiar de paso.
+
+1. **Identificación:** código de reserva (6 letras o números, se pasa a mayúsculas) y apellido → `POST /flights/v1/kiosk/lookup` con `{pnr, lastName}`. El botón se activa con datos válidos y `FormStatus` dice qué falta.
+2. **Reserva:** cada vuelo con número, ruta, salida en hora local del aeropuerto, estado y cada pasajero con asiento y estado del check-in (`CHECKED_IN`, `NOT_CHECKED_IN`, `FAILED`). Según `checkIn.window` de ese vuelo: `OPEN` → «Hacer check-in»; `NOT_YET_OPEN` → cuándo abre (`opensAt`); `CLOSED` → que ya cerró. Un vuelo con todos sus pasajeros registrados ofrece directamente «Ver pases».
+3. **Pases:** pasajero, vuelo, asiento, grupo y posición, y el código con **el mismo componente del e-commerce** (`BoardingPassCard` de `features/checkin`, que dibuja un **QR**; el kiosko no tiene otro dibujo). «Imprimir» llama a `window.print()` y la hoja de impresión deja solo los pases (todo lo demás lleva `print:hidden`). «Terminar» borra todo y vuelve al paso 1.
+
+| Ruta (todas bajo `/flights/v1`) | Cabecera | Respuesta |
+|---|---|---|
+| `POST /kiosk/lookup` | ninguna | `{kioskToken, expiresAt, booking}` |
+| `POST /kiosk/bookings/{bookingId}/check-in` | `Authorization: Kiosk <kioskToken>` (no Bearer) | `CheckInResponse` del contrato (mismo mapeo que el check-in de la cuenta) |
+| `GET /kiosk/bookings/{bookingId}/boarding-passes` | `Authorization: Kiosk <kioskToken>` | `BoardingPassListResponse` del contrato |
+
+**La API de check-in es por reserva**, no por vuelo: «Hacer check-in» en un vuelo con ventana abierta hace el check-in de la reserva (todos sus pasajeros) y luego se piden los pases.
+
+**Reglas de la sesión del kiosko**
+
+- El `kioskToken` (y el `bookingId`, el código y el apellido) viven **solo en memoria** del hook `useKioskFlow`. Nunca en `localStorage`, `sessionStorage`, cookies, URL ni consola; el cliente HTTP no registra nada de las llamadas del kiosko (`RequestOptions.quiet`) ni en desarrollo. Tras el lookup se borran el código y el apellido de la memoria. Pruebas: `KioskFlow.test.tsx` («privacidad de la sesión») y `shared/api/kiosk.test.ts`.
+- **Inactividad:** a los 60 s sin tocar nada aparece «¿Sigues ahí?» con cuenta regresiva de 15 s y luego se borra todo y se vuelve al paso 1. Cualquier interacción (puntero, tecla, toque, rueda) la cancela. Solo corre si hay algo que borrar (una reserva en pantalla o datos escritos).
+- **Vencimiento:** el token dura 10 minutos (`expiresAt`); a los 10 minutos se borra todo aunque haya actividad. El temporizador se acota entre 30 s y 10 min para que un reloj desfasado no deje el kiosko inservible; manda el 401 de la API.
+- **Errores** (`features/kiosk/kioskMessages.ts`, textos en `es.kiosk.errors`; nunca se muestra el `detail`): 404 → «No encontramos una reserva con esos datos» (siempre el mismo, no revela si falló el código o el apellido); 401 `KIOSK_SESSION_INVALID` → venció la sesión, se vuelve al paso 1; 409 `CHECK_IN_NOT_AVAILABLE` → «El check-in no está disponible para este vuelo»; 429 → «Demasiados intentos, espera un minuto». El resto usa `errorMessage`.
+- Horas: `departureAt`, `arrivalAt`, `opensAt` y `closesAt` se llevan a la hora local del aeropuerto en el mapeo (`mapKioskLookup`, con `toAirportLocalIso`), lleguen en UTC o con desfase.
+
+**Modo mock** (`VITE_API_URL` vacía): tres reservas de demostración con el apellido `Demo` — `ABC123` (ventana abierta), `FUT456` (aún no abre), `CER789` (ya cerró) —; las pistas están dentro de `<MockOnly>`. Sin errores aleatorios.
+
+### `/salidas` — tablero (`features/departures`, página `DeparturesPage`)
+
+`GET /flights/v1/airports/{iataCode}/departures?date=YYYY-MM-DD`. Selector de aeropuerto (el catálogo estático de `shared/api/airports.ts`) y de fecha (hoy en la zona del aeropuerto por defecto).
+
+- Tabla semántica con `caption`: **Hora, Vuelo, Destino, Puerta, Estado**, letra grande. La hora se muestra tal cual llega (`2026-11-12T06:30:00-05:00` → `06:30`), **sin convertirla** a la zona del navegador. Puerta nula → «—». Si `estimatedTime` es otro instante que `scheduledTime`, se muestra «Nueva hora HH:mm» y la programada va tachada. El estado nunca va solo en color: icono + texto (Programado, Embarcando, Despegó, Demorado, Aterrizó, Cancelado, Desviado); las canceladas se incluyen.
+- Se actualiza cada 30 s (`useDepartures`), en pausa con la pestaña oculta y al volver actualiza enseguida si pasó el intervalo. Muestra «Actualizado a las HH:mm»; si una actualización falla conserva la última tabla y avisa con `role="alert"`.
+- «Ver más» con `nextCursor`: pide la página siguiente con `?cursor=` (ver `docs/F6-NOTAS.md`: el nombre del parámetro no está verificado). Sin reservas ni datos de pasajeros.
+
+### Verificado contra el despliegue real (2026-11-12, solo lectura, curl)
+
+`GET /airports/UIO/departures` → 200 con `{airport, date, departures[]}`; cada salida trae `flightNumber, airline, destination{iataCode, city}, scheduledTime` (hora local con `-05:00`), `estimatedTime`, `status`, `terminal`, `gate`. Diferencias con lo esperado, ya contempladas: `nextCursor` **no viene** (no es `null`) cuando no hay más páginas; ese día las 15 salidas de UIO eran `SCHEDULED` con `estimatedTime`, `terminal` y `gate` en `null`; un aeropuerto desconocido da 404 con `code: VALIDATION_FAILED`; `cache-control: no-store`. No se probó el lookup ni ninguna ruta `/kiosk/*`.
+
+---
+
 ## 6. Reglas de la API que el frontend respeta
 
 - **Rutas públicas:** búsqueda, mapa de asientos y estado de vuelo. Todo lo demás exige sesión.
@@ -804,6 +851,7 @@ Si el contrato define un límite, se usa exactamente ese.
 | F5 | Selector de asientos (mapa en forma de avión, lista, filtros, conflictos 409/422), integrado en el paso 2 y verificado con la API real | Hecha (tag `fase-5`) |
 | F6 | Mis viajes: lista, detalle, boletos, check-in, pases con QR, equipaje, cambio de fecha, cancelación | Hecha en mock (rama `fase-6-viajes`); **sin verificar con la API real** |
 | F7 | Ofertas y pulido del inicio | Hecha en mock (rama `feat/f7-ofertas-inicio`); **sin verificar con la API real**; LCP 3,0–3,1 s, meta 2,5 s no cumplida |
+| — | Kiosko de check-in y tablero de salidas (5f) | Hecho en mock (rama `feat/kiosko-salidas`); salidas verificadas con curl, kiosko **sin verificar con la API real** |
 | F8 | Calidad y entrega: pruebas de extremo a extremo, accesibilidad, despliegue | Pendiente |
 
 Desde F2, cada fase se cierra funcionando **con el mock y con la API real**.

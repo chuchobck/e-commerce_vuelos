@@ -417,3 +417,63 @@ export interface AuthTokens {
   expiresIn: number;
   scope: string;
 }
+
+/* -------------------------------------------------------------------------------------------- */
+/* Kiosko de check-in y tablero de salidas (F6 del kiosko). Formas en ./kioskContract.ts.         */
+/* -------------------------------------------------------------------------------------------- */
+
+export type KioskWindow = 'OPEN' | 'NOT_YET_OPEN' | 'CLOSED';
+export type KioskPassengerCheckIn = 'CHECKED_IN' | 'NOT_CHECKED_IN' | 'FAILED';
+
+export interface KioskFlight {
+  segmentId: string;
+  flightNumber: string;
+  origin: IataCode;
+  destination: IataCode;
+  /** ISO con el desfase del aeropuerto: la hora se muestra tal cual. */
+  departureAt: string;
+  arrivalAt: string;
+  departureTerminal: string | null;
+  /** Estado del vuelo tal como lo da la API (SCHEDULED, DELAYED…); `es.status.states` lo traduce. */
+  status: string;
+  checkIn: { window: KioskWindow; opensAt: string | null; closesAt: string | null };
+  passengers: { passengerId: string; seat: string | null; checkInStatus: KioskPassengerCheckIn }[];
+}
+
+export interface KioskBooking {
+  /** Identificador interno de la reserva: nunca se muestra, se registra ni sale de la memoria. */
+  id: string;
+  status: string;
+  passengers: { id: string; type: string; firstName: string; lastName: string }[];
+  flights: KioskFlight[];
+}
+
+export interface KioskSession {
+  /** Credencial del kiosko (Authorization: Kiosk …). Solo en memoria. */
+  token: string;
+  /** Vencimiento en ISO (10 minutos desde el ingreso). */
+  expiresAt: string;
+  booking: KioskBooking;
+}
+
+export type DepartureStatus = 'SCHEDULED' | 'BOARDING' | 'DEPARTED' | 'DELAYED' | 'ARRIVED' | 'CANCELLED' | 'DIVERTED';
+
+export interface Departure {
+  flightNumber: string;
+  airline: string;
+  destination: { code: IataCode; city: string };
+  /** Hora local del aeropuerto con desfase (ISO). */
+  scheduledTime: string;
+  estimatedTime: string | null;
+  /** `null` si la API manda un estado que este frontend no conoce. */
+  status: DepartureStatus | null;
+  terminal: string | null;
+  gate: string | null;
+}
+
+export interface DeparturesPage {
+  airport: { code: IataCode; name: string; city: string; timeZone: string };
+  date: string;
+  departures: Departure[];
+  nextCursor: string | null;
+}

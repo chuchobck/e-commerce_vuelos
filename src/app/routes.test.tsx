@@ -37,6 +37,8 @@ describe('tabla de rutas', () => {
     tripDateChange: routes.tripDateChange('bkg_1'),
     tripCancel: routes.tripCancel('bkg_1'),
     flightStatus: routes.flightStatus(),
+    kiosk: routes.kiosk(),
+    departures: routes.departures(),
     login: routes.login(),
     register: routes.register(),
     profile: routes.profile(),
@@ -60,6 +62,15 @@ describe('tabla de rutas', () => {
     for (const href of [routes.checkoutDetails(), routes.checkoutPayment(), routes.checkoutConfirmation('x')]) {
       expect(guarded(href)).toBe(true);
     }
+  });
+
+  it('el kiosko y las salidas son públicos: sin RequireAuth y, el kiosko, sin el marco con el menú de la cuenta', () => {
+    expect(guarded(routes.kiosk())).toBe(false);
+    expect(guarded(routes.departures())).toBe(false);
+    const kioskRoot = matchRoutes(buildRoutes({ dev: false }), routes.kiosk())?.[0].route.element as { type?: { name?: string } } | undefined;
+    expect(kioskRoot?.type?.name).toBe('KioskLayout');
+    const departuresRoot = matchRoutes(buildRoutes({ dev: false }), routes.departures())?.[0].route.element as { type?: { name?: string } } | undefined;
+    expect(departuresRoot?.type?.name).toBe('RootLayout');
   });
 
   it('/componentes solo existe en desarrollo', () => {

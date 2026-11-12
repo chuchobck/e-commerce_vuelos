@@ -154,6 +154,14 @@ ESLint 9 (typescript-eslint, react-hooks, jsx-a11y, import-x).
   (`lazyPage`); el inicio queda en el paquete principal. Librerías pesadas de uso puntual, en su propio archivo (`lazy`).
 - Antes de afirmar rendimiento, se mide (Lighthouse sobre `vite preview`) y se informa el número real, no una estimación.
 
+## Kiosko y salidas (`/kiosko`, `/salidas`)
+
+- Públicas: sin `RequireAuth` y sin leer la cuenta. El kiosko va en su propio marco (`app/layout/KioskLayout`), sin menú de cuenta. Detalle: README, sección 5f.
+- Es la única excepción a «check-in solo dueño con sesión»: va por `/kiosk/*` con `Authorization: Kiosk <token>` (nunca Bearer).
+- `kioskToken`, `bookingId`, código y apellido solo en memoria (`features/kiosk/useKioskFlow.ts`): jamás almacenamiento, URL, cookies, consola ni mensajes. Las llamadas del kiosko van con `quiet: true` (el cliente HTTP no las registra). Una prueba lo vigila.
+- El pase se dibuja con `BoardingPassCard` de `features/checkin`; la página se lo entrega al kiosko por `renderPass` (un módulo no importa de otro).
+- Sus rutas no están en el contrato: formas a mano en `shared/api/kioskContract.ts`; no se amplían sin verificar contra la API.
+
 ## Accesibilidad: WCAG 2.2 AA
 
 HTML semántico, un solo `h1` por página, "Saltar al contenido", foco siempre visible y nunca tapado,

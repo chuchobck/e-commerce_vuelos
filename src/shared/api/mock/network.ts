@@ -108,6 +108,7 @@ export const MOCK_OPERATIONS = [
   'checkIn',
   'getBoardingPasses',
   'getFlightStatus',
+  'getDepartures',
   'login',
   'register',
   'refresh',
