@@ -17,8 +17,8 @@ const STYLE: Record<Status, { Icon: LucideIcon; color: string }> = {
 export function DepartureStatus({ status }: { status: Status | null }) {
   const style = status ? STYLE[status] : null;
   return (
-    <span className={cn('inline-flex items-center gap-2 font-bold', style?.color)}>
-      {style ? <style.Icon aria-hidden="true" className="size-6 shrink-0" /> : null}
+    <span className={cn('inline-flex flex-col items-start gap-1 font-bold sm:flex-row sm:items-center sm:gap-2', style?.color)}>
+      {style ? <style.Icon aria-hidden="true" className="size-5 shrink-0 sm:size-6" /> : null}
       {status ? es.departures.states[status] : es.departures.unknownStatus}
     </span>
   );
